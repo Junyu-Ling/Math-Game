@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import {
   createOauthState,
@@ -13,10 +14,17 @@ import {
 import {
   applyRoomAction,
   createInvite,
+  findAccountByEmail,
+  findAccountById,
   heartbeat,
   leaveRoom,
   lobbyStoreKind,
+  rememberPlayer,
   respondInvite,
+  saveAccount,
+  stashVerify,
+  takeVerify,
+  clearVerify,
 } from "./lobby.mjs";
 import { loadMods } from "./game-mods.mjs";
 
@@ -41,8 +49,10 @@ function signUser(user) {
   return jwt.sign(publicUser(user), JWT_SECRET, { expiresIn: "7d" });
 }
 
-function upsertGithubUser(identity) {
+async function upsertGithubUser(identity) {
+  const fromRedis = identity.email ? await findAccountByEmail(identity.email) : null;
   const existing =
+    fromRedis ||
     [...users.values()].find((u) => u.githubId === identity.githubId) ||
     [...users.values()].find((u) => u.email && u.email === identity.email);
   const user = existing
@@ -67,6 +77,7 @@ function upsertGithubUser(identity) {
         createdAt: new Date().toISOString(),
       };
   users.set(user.id, user);
+  await saveAccount(user);
   return user;
 }
 
@@ -155,7 +166,7 @@ export async function handle(req, res, path) {
     try {
       const access = await exchangeGithubCode(code, callbackUrl);
       const identity = await fetchGithubIdentity(access);
-      const user = upsertGithubUser(identity);
+      const user = await upsertGithubUser(identity);
       const token = signUser(user);
       res.statusCode = 302;
       res.setHeader("Location", `${frontend}/auth/callback#token=${encodeURIComponent(token)}`);
@@ -204,12 +215,103 @@ export async function handle(req, res, path) {
     return;
   }
 
+  if (path === "auth/register") {
+    try {
+      const body = await readBody(req);
+      const email = String(body.email || "").trim().toLowerCase();
+      const password = String(body.password || "");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        send(res, 400, { error: "Invalid email" });
+        return;
+      }
+      if (password.length < 6) {
+        send(res, 400, { error: "Password must be at least 6 characters" });
+        return;
+      }
+      if (await findAccountByEmail(email)) {
+        send(res, 400, { error: "That email is already registered" });
+        return;
+      }
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      await stashVerify(email, { hash: bcrypt.hashSync(password, 10), code });
+      send(res, 200, {
+        needCode: true,
+        hint: process.env.SMTP_HOST
+          ? "A code was sent to your email. It expires in 10 minutes."
+          : `Your verification code is ${code}. It expires in 10 minutes.`,
+      });
+    } catch (err) {
+      send(res, 400, { error: String(err.message || "Registration failed") });
+    }
+    return;
+  }
+
+  if (path === "auth/verify") {
+    try {
+      const body = await readBody(req);
+      const email = String(body.email || "").trim().toLowerCase();
+      const code = String(body.code || "");
+      const pending = await takeVerify(email);
+      if (!pending) {
+        send(res, 400, { error: "Code missing or expired" });
+        return;
+      }
+      if (pending.code !== code) {
+        send(res, 400, { error: "Wrong code" });
+        return;
+      }
+      const user = {
+        id: `u_${Date.now()}`,
+        email,
+        passwordHash: pending.hash,
+        chips: 1000,
+        createdAt: new Date().toISOString(),
+        provider: "email",
+        name: email.split("@")[0],
+      };
+      await saveAccount(user);
+      await clearVerify(email);
+      users.set(user.id, user);
+      send(res, 200, { token: signUser(user), user: publicUser(user) });
+    } catch (err) {
+      send(res, 400, { error: String(err.message || "Verification failed") });
+    }
+    return;
+  }
+
+  if (path === "auth/login") {
+    try {
+      const body = await readBody(req);
+      const email = String(body.email || "").trim().toLowerCase();
+      const password = String(body.password || "");
+      const user = await findAccountByEmail(email);
+      if (!user) {
+        send(res, 400, { error: "Wrong email or password" });
+        return;
+      }
+      if (!user.passwordHash) {
+        send(res, 400, { error: "Use GitHub to sign in to this account" });
+        return;
+      }
+      if (!bcrypt.compareSync(password, user.passwordHash)) {
+        send(res, 400, { error: "Wrong email or password" });
+        return;
+      }
+      await rememberPlayer(user);
+      users.set(user.id, user);
+      send(res, 200, { token: signUser(user), user: publicUser(user) });
+    } catch (err) {
+      send(res, 400, { error: String(err.message || "Login failed") });
+    }
+    return;
+  }
+
   if (path === "me") {
     const h = req.headers.authorization || "";
     const token = h.startsWith("Bearer ") ? h.slice(7) : "";
     try {
       const payload = jwt.verify(token, JWT_SECRET);
-      const stored = users.get(payload.id);
+      const stored = users.get(payload.id) || (await findAccountById(payload.id));
       send(res, 200, { user: publicUser(stored || payload) });
     } catch {
       send(res, 401, { error: "Not signed in" });

@@ -115,7 +115,7 @@ export const authApi = {
   },
 
   async register(email: string, password: string): Promise<{ needCode: boolean; hint?: string }> {
-    if (apiBase) {
+    if (liveApi) {
       return request("/api/auth/register", {
         method: "POST",
         headers: headers(),
@@ -132,7 +132,7 @@ export const authApi = {
   },
 
   async verify(email: string, code: string): Promise<AuthPayload> {
-    if (apiBase) {
+    if (liveApi) {
       return request("/api/auth/verify", {
         method: "POST",
         headers: headers(),
@@ -158,7 +158,7 @@ export const authApi = {
   },
 
   async login(email: string, password: string): Promise<AuthPayload> {
-    if (apiBase) {
+    if (liveApi) {
       return request("/api/auth/login", {
         method: "POST",
         headers: headers(),

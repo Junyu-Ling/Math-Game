@@ -26,7 +26,9 @@ import {
   heartbeat,
   leaveRoom,
   lobbyStoreKind,
+  rememberPlayer,
   respondInvite,
+  saveAccount,
   snapshot,
 } from "./lobby.mjs";
 import { loadMods } from "./game-mods.mjs";
@@ -247,6 +249,7 @@ app.get("/api/auth/github/callback", async (req, res) => {
     const access = await exchangeGithubCode(code, callbackUrl);
     const identity = await fetchGithubIdentity(access);
     const user = upsertGithubUser(identity);
+    await saveAccount(user);
     const token = signUser(user);
     res.redirect(`${frontend}/auth/callback#token=${encodeURIComponent(token)}`);
   } catch (err) {
@@ -300,11 +303,12 @@ app.post("/api/auth/verify", async (req, res) => {
   users.push(user);
   writeUsers(users);
   await cacheDel(`verify:${email}`);
+  await saveAccount(user);
   const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: "7d" });
   res.json({ token, user: publicUser(user) });
 });
 
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   const password = String(req.body?.password || "");
   const user = readUsers().find((u) => u.email === email);
@@ -315,6 +319,7 @@ app.post("/api/auth/login", (req, res) => {
   if (!bcrypt.compareSync(password, user.passwordHash)) {
     return res.status(400).json({ error: "邮箱或密码错误" });
   }
+  await rememberPlayer(user);
   const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: "7d" });
   res.json({ token, user: publicUser(user) });
 });
@@ -348,6 +353,7 @@ function seedDemo() {
 }
 
 seedDemo();
+void Promise.all(readUsers().map((u) => saveAccount(u))).catch(() => {});
 
 const QUEUE = "queue:coda";
 const ENQUEUE = `

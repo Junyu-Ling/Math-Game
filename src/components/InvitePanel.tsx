@@ -33,7 +33,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       {game === "guandan" ? <p>Guandan needs four players. Host invites three people; the deal starts at 4/4.</p> : null}
       {gdWait ? <p>Seated {seated.size}/4.</p> : null}
       {online.length === 0 ? (
-        <p>No other players yet. Anyone who logs in will appear here.</p>
+        <p>No other accounts yet. Anyone who registers or logs in will appear here, even when they are offline.</p>
       ) : (
         online.map((p) => {
           const live = p.online !== false;

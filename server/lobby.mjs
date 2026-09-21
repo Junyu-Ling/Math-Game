@@ -197,16 +197,47 @@ async function listPresence() {
   return out;
 }
 
-async function rememberPlayer(user) {
+export async function rememberPlayer(user) {
   const id = String(user.id);
   const rec = {
     id,
     name: playerName(user),
     avatar: user.avatar || "",
+    email: user.email || "",
   };
   await kvSet(`axiom:u:${id}`, rec, USER_SEC);
   await sadd("axiom:users", id);
 }
+
+export async function saveAccount(user) {
+  const id = String(user.id);
+  await kvSet(`axiom:acct:${id}`, user, USER_SEC);
+  if (user.email) await kvSet(`axiom:acctemail:${String(user.email).toLowerCase()}`, id, USER_SEC);
+  await rememberPlayer(user);
+}
+
+export async function findAccountById(id) {
+  return readJson(`axiom:acct:${String(id)}`);
+}
+
+export async function findAccountByEmail(email) {
+  const id = await kvGet(`axiom:acctemail:${String(email).toLowerCase()}`);
+  if (!id) return null;
+  return findAccountById(id);
+}
+
+export async function stashVerify(email, payload) {
+  await kvSet(`axiom:verify:${String(email).toLowerCase()}`, payload, 600);
+}
+
+export async function takeVerify(email) {
+  return readJson(`axiom:verify:${String(email).toLowerCase()}`);
+}
+
+export async function clearVerify(email) {
+  await kvDel(`axiom:verify:${String(email).toLowerCase()}`);
+}
+
 
 async function listRoster(viewerId) {
   const live = await listPresence();
