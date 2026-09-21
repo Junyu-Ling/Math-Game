@@ -485,8 +485,21 @@ export function DaVinciPage() {
           <div className="center-well">
             {arranging ? (
               <div className="arrange-clock" aria-live="polite">
-                <b>{Math.ceil(remain)}</b>
-                <span>{opening ? "Opening" : "Insert"}</span>
+                <svg viewBox="0 0 100 100" aria-hidden="true">
+                  <circle className="arrange-track" cx="50" cy="50" r="40" />
+                  <circle
+                    className="arrange-progress"
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    strokeDasharray={2 * Math.PI * 40}
+                    strokeDashoffset={2 * Math.PI * 40 * (1 - Math.max(0, Math.min(1, remain / (ARRANGE_MS / 1000))))}
+                  />
+                </svg>
+                <div className="arrange-clock-face">
+                  <b>{Math.ceil(remain)}</b>
+                  <span>{opening ? "Opening" : "Insert"}</span>
+                </div>
               </div>
             ) : (
               <div className="draw-picks">
