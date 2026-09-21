@@ -9,17 +9,30 @@ export type ServerMsg =
 
 const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
-export function wsUrl(token: string): string {
-  const http = apiBase || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8787");
-  const ws = http.replace(/^http/, "ws");
-  return `${ws}/ws?token=${encodeURIComponent(token)}`;
+function normalizeWsBase(raw: string): string {
+  let u = raw.trim().replace(/\/$/, "");
+  if (!u) return "";
+  if (u.startsWith("http")) u = u.replace(/^http/, "ws");
+  if (!u.endsWith("/ws")) u += "/ws";
+  return u;
+}
+
+export function wsUrl(token: string, explicit?: string): string {
+  const fromEnv = normalizeWsBase(import.meta.env.VITE_WS_URL ?? "");
+  const fromArg = normalizeWsBase(explicit ?? "");
+  const base =
+    fromArg ||
+    fromEnv ||
+    normalizeWsBase((apiBase || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8787")).replace(/^http/, "ws"));
+  return `${base}?token=${encodeURIComponent(token)}`;
 }
 
 export function connectCoda(
   token: string,
   onMessage: (msg: ServerMsg) => void,
+  socketUrl?: string,
 ): { send: (data: object) => void; close: () => void } {
-  const socket = new WebSocket(wsUrl(token));
+  const socket = new WebSocket(wsUrl(token, socketUrl));
   socket.onmessage = (ev) => {
     try {
       onMessage(JSON.parse(String(ev.data)) as ServerMsg);

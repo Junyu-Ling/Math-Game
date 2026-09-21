@@ -25,7 +25,7 @@ npm run dev
 | player1@axiom.local | axiom123 |
 | player2@axiom.local | axiom123 |
 
-完整步骤见 [docs/BACKEND.md](docs/BACKEND.md)。
+完整步骤见 [docs/BACKEND.md](docs/BACKEND.md)。线上站点目前只开 GitHub 登录；匹配需要另外部署 `server/` 后在 Vercel 填 `MATCH_WS_URL`。
 
 ## 当前范围
 

@@ -27,6 +27,7 @@ import { MahjongTile } from "../../components/MahjongTile";
 import { DeckStack } from "../../components/PlayingCard";
 import { wait } from "../../lib/shuffle";
 import { useAuth } from "../../context/AuthContext";
+import { fetchHealth } from "../../lib/api";
 import { connectCoda, sendAction, sendLeave, sendQueue } from "../../lib/realtime";
 import { VIRTUAL_USERS } from "../../lib/virtual";
 
@@ -416,20 +417,34 @@ export function DaVinciPage() {
     if (fullRef.current) setState(viewFor(fullRef.current, id));
   }
 
-  function beginMatch() {
+  async function beginMatch() {
     setNetErr("");
     if (!live) {
       setNetErr("先在项目根目录配置 VITE_API_URL 并启动 server/，才能匹配。");
       return;
     }
     if (!user || !token) {
-      setNetErr("请先登录邮箱账号。");
+      setNetErr("请先登录 GitHub 或邮箱账号。");
+      return;
+    }
+    let matchWs = "";
+    try {
+      const health = await fetchHealth();
+      if (!health.match) {
+        setNetErr("线上匹配还没开通。把 server/ 部署到长期运行的主机后，在 Vercel 填 MATCH_WS_URL 即可。");
+        return;
+      }
+      matchWs = health.ws || "";
+    } catch {
+      setNetErr("健康检查失败，暂时无法匹配。");
       return;
     }
     resetTable();
     setMatching(true);
     setOnline(true);
-    const conn = connectCoda(token, (msg) => {
+    const conn = connectCoda(
+      token,
+      (msg) => {
       if (msg.type === "queued") setMatching(true);
       if (msg.type === "error") {
         setNetErr(msg.error);
@@ -464,7 +479,9 @@ export function DaVinciPage() {
           return next;
         });
       }
-    });
+    },
+      matchWs,
+    );
     connRef.current = conn;
     sendQueue(conn, { useJokers: jokers, black: blackN, white: whiteN });
   }

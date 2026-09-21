@@ -135,6 +135,26 @@ FRONTEND_ORIGIN=https://math31415926.vercel.app
 
 4. 网站 `/login` → 使用 GitHub 登录。
 
+---
+
+## 线上开通匹配（Vercel 不能跑 WebSocket）
+
+`math31415926.vercel.app` 只负责页面和 GitHub 登录。匹配要对局，需要一台**一直开着的 Node**（Railway / Render / Fly）跑 `server/`，再加 Redis。
+
+1. 部署 `server/`（启动命令 `npm start`，监听 `PORT`）。配 Redis，`REDIS_URL` 填托管 Redis。  
+2. **`JWT_SECRET` 必须和 Vercel 里那份完全相同**，否则 GitHub 登录拿到的 token 无法入队。  
+3. `FRONTEND_ORIGIN=https://math31415926.vercel.app`  
+4. 服务起来后 WebSocket 地址类似 `wss://你的主机/ws`。  
+5. Vercel 环境变量增加（Production）：
+
+```
+MATCH_WS_URL=wss://你的主机/ws
+```
+
+不必重编前端：健康检查会变成 `"match": true`，达芬奇页「匹配联机」就会连这台机。
+
+本地现在就能匹配：开 Redis + `npm run server` + 根目录 `VITE_API_URL=http://localhost:8787`。
+
 线上匹配联机仍需要独立 WebSocket 服务；GitHub 登录本身走 HTTPS `/api` 即可。
 
 ---

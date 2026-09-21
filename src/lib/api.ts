@@ -24,6 +24,20 @@ export type AuthPayload = {
 const isProd = import.meta.env.PROD;
 const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
+export type HealthInfo = {
+  ok: boolean;
+  github?: boolean;
+  match?: boolean;
+  vercel?: boolean;
+  ws?: string;
+};
+
+export async function fetchHealth(): Promise<HealthInfo> {
+  const res = await fetch(`${apiBase}/api/health`);
+  if (!res.ok) throw new Error(`健康检查失败 (${res.status})`);
+  return (await res.json()) as HealthInfo;
+}
+
 function headers(token?: string): HeadersInit {
   const h: Record<string, string> = { "Content-Type": "application/json" };
   if (token) h.Authorization = `Bearer ${token}`;

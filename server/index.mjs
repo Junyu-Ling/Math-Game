@@ -204,6 +204,7 @@ app.get("/api/health", async (_req, res) => {
     smtp: Boolean(mailer),
     github: githubReady(),
     match: true,
+    ws: "",
   });
 });
 

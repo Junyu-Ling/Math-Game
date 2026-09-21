@@ -76,7 +76,14 @@ function query(req, key) {
 
 export async function handle(req, res, path) {
   if (path === "health" || path === "") {
-    send(res, 200, { ok: true, github: githubReady(), match: false, vercel: true });
+    const matchWs = String(process.env.MATCH_WS_URL || "").trim();
+    send(res, 200, {
+      ok: true,
+      github: githubReady(),
+      match: Boolean(matchWs),
+      vercel: true,
+      ws: matchWs,
+    });
     return;
   }
 
