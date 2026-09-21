@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Avatar } from "./Avatar";
+import { InviteToasts } from "./InviteToasts";
 
 export function Shell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
@@ -36,6 +37,7 @@ export function Shell({ children }: { children: ReactNode }) {
           )}
         </nav>
       </header>
+      <InviteToasts />
       <main>{children}</main>
       <footer className="foot">
         <span>Axiom</span>

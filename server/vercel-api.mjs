@@ -171,7 +171,7 @@ export async function handle(req, res, path) {
     try {
       const user = authUser(req);
       if (req.method === "GET" || req.method === "HEAD") {
-        send(res, 200, await heartbeat(user, query(req, "href")));
+        send(res, 200, await heartbeat(user, query(req, "href"), query(req, "light") === "1"));
         return;
       }
       const body = await readBody(req);
@@ -188,9 +188,8 @@ export async function handle(req, res, path) {
         return;
       }
       if (op === "action") {
-        const mods = await loadMods();
-        const room = await applyRoomAction(user, String(body.roomId || ""), body.action, mods);
-        send(res, 200, { room, ...(await heartbeat(user)) });
+        const room = await applyRoomAction(user, String(body.roomId || ""), body.action);
+        send(res, 200, { room });
         return;
       }
       if (op === "leave") {

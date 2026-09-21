@@ -1,25 +1,18 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLobby } from "../context/LobbyContext";
+import { GAME_LABEL } from "../lib/lobby";
 import { Avatar } from "./Avatar";
-
-const LABELS: Record<string, string> = {
-  coda: "Coda",
-  flip7: "Flip 7",
-  bj: "Blackjack",
-  m24: "Make 24",
-  holdem: "Hold’em",
-  guandan: "Guandan",
-  uno: "UNO",
-};
 
 export function InviteList({ game, meta }: { game: string; meta?: Record<string, unknown> }) {
   const { user } = useAuth();
-  const { online, error, invite, room, store } = useLobby();
+  const { online, error, invite, room, store, inviteCooldownMs } = useLobby();
   const gdWait = room?.game === "guandan" && (room.view as { phase?: string } | undefined)?.phase === "lobby";
   const host = Boolean(user && room?.seats?.[0] === user.id);
   const seated = new Set(room?.seats || []);
-  const canInviteMore = !room || (gdWait && host && seated.size < 4);
+  const cooling = inviteCooldownMs > 0;
+  const waitSec = Math.ceil(inviteCooldownMs / 1000);
+  const canInviteMore = (!room || (gdWait && host && seated.size < 4)) && !cooling;
 
   if (!user) {
     return (
@@ -57,7 +50,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
               disabled={!canInviteMore || Boolean(p.roomId) || seated.has(p.id)}
               onClick={() => void invite(p.id, game, meta).catch((ex) => alert(ex.message))}
             >
-              Invite
+              Invite{cooling ? ` (${waitSec})` : ""}
             </button>
           </div>
         ))
@@ -85,7 +78,7 @@ export function InvitePanel({ game, meta }: { game: string; meta?: Record<string
             <div key={i.id} className="person-row" style={{ marginBottom: 8 }}>
               <Avatar src={i.fromAvatar} name={i.fromName} />
               <span className="person-name">
-                {i.fromName} · {LABELS[i.game] || i.game}
+                {i.fromName} · {GAME_LABEL[i.game] || i.game}
               </span>
               <button className="btn" type="button" onClick={() => void respond(i.id, true)}>
                 Accept
@@ -104,7 +97,7 @@ export function InvitePanel({ game, meta }: { game: string; meta?: Record<string
             <div key={i.id} className="person-row">
               <Avatar src={i.toAvatar} name={i.toName} />
               <p>
-                Waiting for {i.toName} · {LABELS[i.game] || i.game}
+                Waiting for {i.toName} · {GAME_LABEL[i.game] || i.game}
               </p>
             </div>
           ))}

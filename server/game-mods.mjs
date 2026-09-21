@@ -1,4 +1,7 @@
+let cached = null;
+
 export async function loadMods() {
+  if (cached) return cached;
   const [coda, flip, bj, m24, uno, holdem, guandan] = await Promise.all([
     import("./bundled/coda.mjs"),
     import("./bundled/flip.mjs"),
@@ -8,5 +11,6 @@ export async function loadMods() {
     import("./bundled/holdem.mjs"),
     import("./bundled/guandan.mjs"),
   ]);
-  return { coda, flip, bj, m24, uno, holdem, guandan };
+  cached = { coda, flip, bj, m24, uno, holdem, guandan };
+  return cached;
 }

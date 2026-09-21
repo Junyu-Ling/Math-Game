@@ -9,6 +9,7 @@ type LobbyCtx = {
   room: RoomSnap | null;
   error: string;
   store: "redis" | "memory" | "";
+  inviteCooldownMs: number;
   invite: (toId: string, game: string, meta?: Record<string, unknown>) => Promise<void>;
   respond: (id: string, accept: boolean) => Promise<void>;
   sendAction: (action: object) => Promise<void>;
@@ -16,25 +17,65 @@ type LobbyCtx = {
 };
 
 const Ctx = createContext<LobbyCtx | null>(null);
+const COOLDOWN = 5000;
 
 export function LobbyProvider({ children }: { children: ReactNode }) {
   const { token, user } = useAuth();
   const nav = useNavigate();
   const [snap, setSnap] = useState<LobbySnap>({ online: [], invites: [], room: null, store: "memory" });
   const [error, setError] = useState("");
+  const [inviteUntil, setInviteUntil] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   const roomGame = useRef<string | null>(null);
+  const roomSeq = useRef(0);
+  const snapRef = useRef(snap);
+  snapRef.current = snap;
+
+  function takeRoom(next: RoomSnap | null | undefined, prev: RoomSnap | null) {
+    if (!next) {
+      if (!prev) return null;
+      return prev;
+    }
+    const seq = next.seq ?? 0;
+    if (seq && seq < roomSeq.current) return prev;
+    if (seq) roomSeq.current = seq;
+    return next;
+  }
+
+  useEffect(() => {
+    if (inviteUntil <= Date.now()) return;
+    const id = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, [inviteUntil]);
 
   useEffect(() => {
     if (!token || !user) {
       setSnap({ online: [], invites: [], room: null, store: "memory" });
+      roomSeq.current = 0;
       return;
     }
     let stop = false;
+    let timer = 0;
     const tick = async () => {
+      const inRoom = Boolean(snapRef.current.room);
       try {
-        const next = await lobbyApi.sync(token, window.location.pathname);
+        const next = await lobbyApi.sync(token, window.location.pathname, inRoom);
         if (stop) return;
-        setSnap(next);
+        setSnap((prev) => {
+          const light = Boolean(next.light);
+          const room = next.room
+            ? takeRoom(next.room, prev.room)
+            : light
+              ? prev.room
+              : null;
+          if (!room) roomSeq.current = light ? roomSeq.current : 0;
+          return {
+            online: light && !next.online.length ? prev.online : next.online,
+            invites: next.invites,
+            room,
+            store: next.store || prev.store,
+          };
+        });
         setError("");
         const g = next.room?.game || null;
         if (g && g !== roomGame.current) {
@@ -44,13 +85,14 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         roomGame.current = g;
       } catch (ex) {
         if (!stop) setError(ex instanceof Error ? ex.message : "Lobby sync failed");
+      } finally {
+        if (!stop) timer = window.setTimeout(tick, snapRef.current.room ? 350 : 900);
       }
     };
     void tick();
-    const id = window.setInterval(tick, 2000);
     return () => {
       stop = true;
-      window.clearInterval(id);
+      window.clearTimeout(timer);
     };
   }, [token, user, nav]);
 
@@ -61,32 +103,50 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       room: snap.room,
       error,
       store: snap.store || "",
+      inviteCooldownMs: Math.max(0, inviteUntil - now),
       async invite(toId, game, meta = {}) {
         if (!token) throw new Error("Sign in first");
+        if (Date.now() < inviteUntil) throw new Error("Wait 5 seconds before inviting again");
         const next = await lobbyApi.invite(token, toId, game, meta);
-        setSnap(next);
+        setInviteUntil(Date.now() + COOLDOWN);
+        setSnap((prev) => ({
+          ...next,
+          online: next.online?.length ? next.online : prev.online,
+          room: takeRoom(next.room, prev.room),
+        }));
       },
       async respond(id, accept) {
         if (!token) throw new Error("Sign in first");
         const next = await lobbyApi.respond(token, id, accept);
-        setSnap(next);
+        setSnap((prev) => ({
+          ...next,
+          online: next.online?.length ? next.online : prev.online,
+          room: next.room ? takeRoom(next.room, prev.room) : next.room ?? prev.room,
+        }));
         if (accept && next.room) {
+          roomSeq.current = next.room.seq || roomSeq.current;
           const path = GAME_PATH[next.room.game];
           if (path) nav(path);
         }
       },
       async sendAction(action) {
-        if (!token || !snap.room) return;
-        const next = await lobbyApi.action(token, snap.room.id, action);
-        setSnap(next);
+        const roomId = snapRef.current.room?.id;
+        if (!token || !roomId) return;
+        const next = await lobbyApi.action(token, roomId, action);
+        if (!next.room) return;
+        setSnap((prev) => ({
+          ...prev,
+          room: takeRoom(next.room as RoomSnap, prev.room),
+        }));
       },
       async leave() {
         if (!token) return;
+        roomSeq.current = 0;
         const next = await lobbyApi.leave(token);
         setSnap(next);
       },
     }),
-    [snap, error, token, nav],
+    [snap, error, token, nav, inviteUntil, now],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

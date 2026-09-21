@@ -19,6 +19,7 @@ export type RoomSnap = {
   game: string;
   seats: string[];
   endsAt: number | null;
+  seq?: number;
   view: unknown;
 };
 
@@ -27,6 +28,7 @@ export type LobbySnap = {
   invites: Invite[];
   room: RoomSnap | null;
   store?: "redis" | "memory";
+  light?: boolean;
 };
 
 async function call(token: string, path: string, init: RequestInit = {}): Promise<LobbySnap & Record<string, unknown>> {
@@ -43,9 +45,20 @@ async function call(token: string, path: string, init: RequestInit = {}): Promis
   return data;
 }
 
+export const GAME_LABEL: Record<string, string> = {
+  coda: "Coda",
+  flip7: "Flip 7",
+  bj: "Blackjack",
+  m24: "Make 24",
+  holdem: "Hold’em",
+  guandan: "Guandan",
+  uno: "UNO",
+};
+
 export const lobbyApi = {
-  sync(token: string, href = "") {
-    return call(token, `/api/lobby?href=${encodeURIComponent(href)}`);
+  sync(token: string, href = "", light = false) {
+    const q = `href=${encodeURIComponent(href)}${light ? "&light=1" : ""}`;
+    return call(token, `/api/lobby?${q}`);
   },
   invite(token: string, toId: string, game: string, meta: Record<string, unknown> = {}) {
     return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "invite", toId, game, meta }) });

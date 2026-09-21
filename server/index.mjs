@@ -476,7 +476,7 @@ app.patch("/api/me/chips", auth, (req, res) => {
 });
 
 app.get("/api/lobby", auth, async (req, res) => {
-  res.json(await heartbeat(req.user, String(req.query.href || "")));
+  res.json(await heartbeat(req.user, String(req.query.href || ""), String(req.query.light || "") === "1"));
 });
 
 app.post("/api/lobby", auth, async (req, res) => {
@@ -492,9 +492,8 @@ app.post("/api/lobby", auth, async (req, res) => {
       return res.json({ ...(await snapshot(req.user.id)), ...result });
     }
     if (op === "action") {
-      const mods = await loadMods();
-      const room = await applyRoomAction(req.user, String(req.body.roomId || ""), req.body.action, mods);
-      return res.json({ room, ...(await snapshot(req.user.id)) });
+      const room = await applyRoomAction(req.user, String(req.body.roomId || ""), req.body.action);
+      return res.json({ room });
     }
     if (op === "leave") {
       return res.json(await leaveRoom(req.user.id));

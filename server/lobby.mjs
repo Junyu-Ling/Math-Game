@@ -4,6 +4,7 @@ import { loadMods } from "./game-mods.mjs";
 const ONLINE_SEC = 20;
 const INVITE_SEC = 60;
 const ROOM_SEC = 7200;
+const INVITE_COOLDOWN_MS = 5000;
 
 const mem = new Map();
 let redis = null;
@@ -154,6 +155,35 @@ async function listPresence() {
   const ids = await smembers("axiom:online");
   const now = Date.now();
   const out = [];
+  const r = client();
+  if (r && ids.length) {
+    try {
+      const keys = ids.map((id) => `axiom:p:${id}`);
+      const rows = await r.mget(...keys);
+      for (let i = 0; i < ids.length; i++) {
+        const raw = rows[i];
+        if (!raw) {
+          await srem("axiom:online", ids[i]);
+          continue;
+        }
+        let p;
+        try {
+          p = JSON.parse(raw);
+        } catch {
+          continue;
+        }
+        if (!p || now - p.seenAt > ONLINE_SEC * 1000) {
+          await srem("axiom:online", ids[i]);
+          await kvDel(`axiom:p:${ids[i]}`);
+          continue;
+        }
+        out.push(p);
+      }
+      return out;
+    } catch {
+      /* fallback */
+    }
+  }
   for (const id of ids) {
     const p = await readJson(`axiom:p:${id}`);
     if (!p || now - p.seenAt > ONLINE_SEC * 1000) {
@@ -181,6 +211,7 @@ async function saveRoom(room) {
     seats: room.seats,
     state: room.state,
     endsAt: room.endsAt,
+    seq: room.seq || 0,
   };
   await kvSet(`axiom:room:${room.id}`, rec, ROOM_SEC);
   for (const id of room.seats) await kvSet(`axiom:seat:${id}`, room.id, ROOM_SEC);
@@ -191,7 +222,7 @@ async function attachMods(rec) {
   return { ...rec, mods: await getMods() };
 }
 
-export async function heartbeat(user, href = "") {
+export async function heartbeat(user, href = "", light = false) {
   const id = String(user.id);
   const seat = await getSeat(id);
   const rec = {
@@ -205,14 +236,15 @@ export async function heartbeat(user, href = "") {
   };
   await kvSet(`axiom:p:${id}`, rec, ONLINE_SEC);
   await sadd("axiom:online", id, ONLINE_SEC + 5);
-  return snapshot(id);
+  return snapshot(id, light);
 }
 
-export async function snapshot(userId) {
-  const onlinePeople = await listPresence();
-  const online = onlinePeople
-    .filter((p) => p.id !== userId)
-    .map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, roomId: p.roomId }));
+export async function snapshot(userId, light = false) {
+  const online = light
+    ? []
+    : (await listPresence())
+        .filter((p) => p.id !== userId)
+        .map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, roomId: p.roomId }));
   const inviteIds = await smembers(`axiom:uinv:${userId}`);
   const invites = [];
   for (const id of inviteIds) {
@@ -232,7 +264,7 @@ export async function snapshot(userId) {
       room = publicRoom(rec, userId);
     }
   }
-  return { online, invites, room, store: lobbyStoreKind() };
+  return { online, invites, room, store: lobbyStoreKind(), light: Boolean(light) };
 }
 
 async function expireArrange(room) {
@@ -246,6 +278,10 @@ export async function createInvite(from, toId, game, meta = {}) {
   const fromId = String(from.id);
   toId = String(toId);
   if (fromId === toId) throw new Error("You cannot invite yourself");
+  const last = Number((await kvGet(`axiom:invcd:${fromId}`)) || 0);
+  if (last && Date.now() - last < INVITE_COOLDOWN_MS) {
+    throw new Error("Wait 5 seconds before inviting again");
+  }
   const target = await readJson(`axiom:p:${toId}`);
   if (!target) throw new Error("They are not online");
   const fromSeat = await getSeat(fromId);
@@ -276,6 +312,7 @@ export async function createInvite(from, toId, game, meta = {}) {
   await kvSet(`axiom:inv:${id}`, invite, INVITE_SEC);
   await sadd(`axiom:uinv:${fromId}`, id, INVITE_SEC);
   await sadd(`axiom:uinv:${toId}`, id, INVITE_SEC);
+  await kvSet(`axiom:invcd:${fromId}`, String(Date.now()), 15);
   return invite;
 }
 
@@ -328,6 +365,7 @@ function startRoom(invite, from, to, mods) {
     seats: [a.id, b.id],
     state,
     endsAt,
+    seq: 1,
   };
 }
 
@@ -353,6 +391,7 @@ async function joinGuandanTable(user, invite, mods) {
     if (rec.seats.length === 4) {
       rec.state = mods.guandan.startGuandanTable(rec.state.players.map((p) => ({ id: p.id, name: p.name })));
     }
+    rec.seq = (rec.seq || 0) + 1;
     rec.mods = mods;
     await saveRoom(rec);
     return { ok: true, room: publicRoom(rec, user.id) };
@@ -368,6 +407,7 @@ async function joinGuandanTable(user, invite, mods) {
     seats: [hostId, joiner.id],
     state,
     endsAt: null,
+    seq: 1,
     mods,
   };
   await saveRoom(room);
@@ -375,6 +415,7 @@ async function joinGuandanTable(user, invite, mods) {
 }
 
 export async function applyRoomAction(user, roomId, action, mods) {
+  mods = mods || (await getMods());
   const rec = await getRoomRecord(roomId);
   if (!rec || !rec.seats.includes(user.id)) throw new Error("Game not found");
   const room = { ...rec, mods };
@@ -400,6 +441,7 @@ export async function applyRoomAction(user, roomId, action, mods) {
       room.state = mods.guandan.applyGuandanAction(room.state, user.id, action);
     }
   }
+  room.seq = (room.seq || 0) + 1;
   await saveRoom(room);
   return publicRoom(room, user.id);
 }
@@ -456,6 +498,7 @@ function publicRoom(room, viewerId) {
     game: room.game,
     seats: room.seats,
     endsAt: room.endsAt,
+    seq: room.seq || 0,
     view,
   };
 }
