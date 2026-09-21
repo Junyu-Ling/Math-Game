@@ -71,6 +71,7 @@ function Row({
   onGap,
   gaps,
   ghostAt,
+  reserveSlot,
 }: {
   tiles: CodaTile[];
   hide: boolean;
@@ -82,6 +83,7 @@ function Row({
   onGap?: (i: number) => void;
   gaps?: number[];
   ghostAt?: number | null;
+  reserveSlot?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -96,7 +98,7 @@ function Row({
         key: `g-${i}`,
         node: (
           <button
-            className={`gap on ${chosen ? "ghost" : ""}`}
+            className={`gap on ${chosen ? "ghost" : "slim"}`}
             type="button"
             onClick={() => onGap?.(i)}
             aria-label="Insert slot"
@@ -127,6 +129,12 @@ function Row({
       });
     }
   }
+  if (reserveSlot && gapSet.size === 0) {
+    cells.push({
+      key: "reserve",
+      node: <span className="gap reserve" aria-hidden />,
+    });
+  }
   useLayoutEffect(() => {
     const wrap = wrapRef.current;
     const row = rowRef.current;
@@ -145,7 +153,7 @@ function Row({
     const ro = new ResizeObserver(() => requestAnimationFrame(fit));
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, [tiles, gaps, ghostAt]);
+  }, [tiles, gaps, ghostAt, reserveSlot]);
 
   return (
     <div className="tiles-fit" ref={wrapRef}>
@@ -477,43 +485,46 @@ export function DaVinciPage() {
                 playerId={rival.id}
                 selectedIndex={aimedRival}
                 flash={flash}
+                reserveSlot
                 onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: rival.id, index: i })}
               />
             </div>
           </div>
 
           <div className="center-well">
-            {arranging ? (
-              <div className="arrange-clock" aria-live="polite">
-                <svg viewBox="0 0 100 100" aria-hidden="true">
-                  <circle className="arrange-track" cx="50" cy="50" r="40" />
-                  <circle
-                    className="arrange-progress"
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    strokeDasharray={2 * Math.PI * 40}
-                    strokeDashoffset={2 * Math.PI * 40 * (1 - Math.max(0, Math.min(1, remain / (ARRANGE_MS / 1000))))}
-                  />
-                </svg>
-                <div className="arrange-clock-face">
-                  <b>{Math.ceil(remain)}</b>
-                  <span>{opening ? "Opening" : "Insert"}</span>
+            <div className="coda-center-tools">
+              <div className={`coda-tool ${arranging ? "" : "is-idle"}`}>
+                <div className="arrange-clock" aria-live={arranging ? "polite" : "off"}>
+                  <svg viewBox="0 0 100 100" aria-hidden="true">
+                    <circle className="arrange-track" cx="50" cy="50" r="40" />
+                    <circle
+                      className="arrange-progress"
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      strokeDasharray={2 * Math.PI * 40}
+                      strokeDashoffset={2 * Math.PI * 40 * (1 - Math.max(0, Math.min(1, remain / (ARRANGE_MS / 1000))))}
+                    />
+                  </svg>
+                  <div className="arrange-clock-face">
+                    <b>{arranging ? Math.ceil(remain) : 5}</b>
+                    <span>{opening ? "Opening" : "Insert"}</span>
+                  </div>
                 </div>
               </div>
-            ) : (
-              <div className="draw-picks">
-                <DeckStack count={state.deck.length} label="Deck" />
-                {state.phase === "draw" && myTurn ? (
+              <div className={`coda-tool ${arranging ? "is-idle" : ""}`}>
+                <div className="draw-picks">
+                  <DeckStack count={state.deck.length} label="Deck" />
                   <div className="draw-colors">
                     {(["black", "white"] as const).map((color) => {
                       const n = deckCounts(state)[color];
+                      const canDraw = state.phase === "draw" && myTurn && n > 0;
                       return (
                         <button
                           key={color}
                           className={`btn draw-color-btn ${color}`}
                           type="button"
-                          disabled={n <= 0}
+                          disabled={!canDraw}
                           onClick={() => dispatch({ type: "draw", color })}
                         >
                           Draw {color === "black" ? "black" : "white"} · {n}
@@ -521,9 +532,9 @@ export function DaVinciPage() {
                       );
                     })}
                   </div>
-                ) : null}
+                </div>
               </div>
-            )}
+            </div>
             <div className="hand-card">
               <div className="seat-label">{arranging ? "To insert" : "Drawn tile"}</div>
               {showDrawn && drawnTile ? (
@@ -549,6 +560,7 @@ export function DaVinciPage() {
                 playerId={you.id}
                 selectedIndex={aimedYou}
                 flash={flash}
+                reserveSlot
                 gaps={arrangeGaps}
                 ghostAt={myInsert ? autoSlot : null}
                 onGap={(i) => {
@@ -613,33 +625,54 @@ export function DaVinciPage() {
                   : `Opening mix: black ${blackN} · white ${whiteN}${online ? " · duel" : ""}`}
             </p>
           </div>
-          {playing && state?.phase === "guess" && myTurn && (
-            <div>
-              <h3>Guess {state.selected ? "· locked" : "· tap a rival tile first"}</h3>
-              <div className="pad">
-                {numbers.map((n) => (
-                  <button key={n} type="button" disabled={!state.selected} onClick={() => dispatch({ type: "guess", value: n })}>
-                    {n}
-                  </button>
-                ))}
-                {jokers && (
-                  <button type="button" disabled={!state.selected} onClick={() => dispatch({ type: "guess", value: "joker" })}>
-                    —
-                  </button>
-                )}
+          {playing && state ? (
+            <div className="coda-play-actions">
+              <div className={state.phase === "guess" && myTurn ? "" : "is-idle"}>
+                <h3>Guess {state.selected ? "· locked" : "· tap a rival tile first"}</h3>
+                <div className="pad">
+                  {numbers.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      disabled={!(state.phase === "guess" && myTurn && state.selected)}
+                      onClick={() => dispatch({ type: "guess", value: n })}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                  {jokers ? (
+                    <button
+                      type="button"
+                      disabled={!(state.phase === "guess" && myTurn && state.selected)}
+                      onClick={() => dispatch({ type: "guess", value: "joker" })}
+                    >
+                      —
+                    </button>
+                  ) : (
+                    <span className="pad-slot-reserve" aria-hidden />
+                  )}
+                </div>
+              </div>
+              <div className={`row-actions coda-continue ${state.phase === "continue" && myTurn ? "" : "is-idle"}`}>
+                <button
+                  className="btn btn-go"
+                  type="button"
+                  disabled={!(state.phase === "continue" && myTurn)}
+                  onClick={() => dispatch({ type: "continue" })}
+                >
+                  HIT AGAIN
+                </button>
+                <button
+                  className="btn btn-gold"
+                  type="button"
+                  disabled={!(state.phase === "continue" && myTurn)}
+                  onClick={() => dispatch({ type: "stay" })}
+                >
+                  STAY
+                </button>
               </div>
             </div>
-          )}
-          {playing && state?.phase === "continue" && myTurn && (
-            <div className="row-actions">
-              <button className="btn btn-go" type="button" onClick={() => dispatch({ type: "continue" })}>
-                HIT AGAIN
-              </button>
-              <button className="btn btn-gold" type="button" onClick={() => dispatch({ type: "stay" })}>
-                STAY
-              </button>
-            </div>
-          )}
+          ) : null}
           <div>
             <h3>RULE</h3>
             <ul>

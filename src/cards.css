@@ -529,11 +529,14 @@
   isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(168px, 1fr) 168px minmax(168px, 1fr);
+  grid-template-rows: minmax(168px, 1fr) 188px minmax(168px, 1fr);
   justify-content: stretch;
   justify-items: stretch;
   align-content: stretch;
-  min-height: clamp(440px, 72dvh, 640px);
+  height: clamp(480px, 74dvh, 680px);
+  min-height: clamp(480px, 74dvh, 680px);
+  max-height: clamp(480px, 74dvh, 680px);
+  overflow: hidden;
   padding: clamp(14px, 2vw, 22px);
   background: rgba(255, 255, 255, 0.45);
   box-shadow: none;
@@ -679,6 +682,10 @@
   z-index: 8;
 }
 
+.table-coda .coda-burst {
+  z-index: 12;
+}
+
 .rps-row {
   display: flex;
   justify-content: center;
@@ -690,6 +697,7 @@
 .table-coda > .center-well {
   position: relative;
   z-index: 1;
+  min-width: 0;
 }
 
 .table-coda .seat {
@@ -706,6 +714,7 @@
   min-height: 132px;
   overflow: visible;
   width: 100%;
+  min-width: 0;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -714,9 +723,10 @@
 .table-coda .tiles-fit {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   display: flex;
   justify-content: center;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .table-coda .tiles {
@@ -772,19 +782,49 @@
 }
 
 .table-coda .center-well {
-  height: 168px;
-  min-height: 168px;
+  height: 188px;
+  min-height: 188px;
+  max-height: 188px;
   padding: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.coda-center-tools {
+  position: relative;
+  min-width: min(100%, 268px);
+  min-height: 168px;
+  display: grid;
+  place-items: center;
+}
+
+.coda-center-tools .coda-tool {
+  grid-area: 1 / 1;
+}
+
+.coda-center-tools .coda-tool.is-idle,
+.coda-play-actions .is-idle {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.coda-play-actions {
+  min-height: 248px;
+}
+
+.coda-play-actions .pad-slot-reserve {
+  min-height: 40px;
 }
 
 .table-coda .hand-card {
   min-width: 72px;
-  min-height: 110px;
+  min-height: 124px;
 }
 
 .table-coda .gap,
 .table-coda .gap.on,
-.table-coda .gap.ghost {
+.table-coda .gap.ghost,
+.table-coda .gap.reserve {
   position: relative;
   width: var(--tile-w, 56px);
   height: var(--tile-h, 84px);
@@ -794,6 +834,20 @@
   border-radius: 7px;
   background: rgba(230, 194, 122, 0.08);
   box-sizing: border-box;
+}
+
+.table-coda .gap.reserve {
+  border-color: transparent;
+  background: transparent;
+  pointer-events: none;
+}
+
+.table-coda .gap.slim {
+  width: 12px;
+  flex-basis: 12px;
+  margin-left: 2px;
+  margin-right: 2px;
+  background: rgba(230, 194, 122, 0.12);
 }
 
 .table-coda .gap.ghost {

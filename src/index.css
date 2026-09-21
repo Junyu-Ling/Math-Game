@@ -327,7 +327,7 @@ button:disabled {
 
 .coda-page .game-layout {
   grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
-  align-items: stretch;
+  align-items: start;
 }
 
 .hero {
