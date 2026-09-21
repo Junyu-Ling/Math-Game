@@ -1,4 +1,5 @@
 import { useAuth } from "../context/AuthContext";
+import { IconGithub } from "./Icons";
 
 export function GithubButton() {
   const { githubStartUrl, live } = useAuth();
@@ -12,7 +13,8 @@ export function GithubButton() {
   }
 
   return (
-    <button className="btn" type="button" onClick={go}>
+    <button className="btn btn-icon" type="button" onClick={go}>
+      <IconGithub />
       Continue with GitHub
     </button>
   );

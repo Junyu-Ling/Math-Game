@@ -248,15 +248,28 @@ export async function createInvite(from, toId, game, meta = {}) {
   if (fromId === toId) throw new Error("You cannot invite yourself");
   const target = await readJson(`axiom:p:${toId}`);
   if (!target) throw new Error("They are not online");
-  if ((await getSeat(fromId)) || (await getSeat(toId))) throw new Error("Someone is already in a game");
+  const fromSeat = await getSeat(fromId);
+  const toSeat = await getSeat(toId);
+  if (toSeat) throw new Error("Someone is already in a game");
+  if (fromSeat) {
+    const rec = await getRoomRecord(fromSeat);
+    const lobby = rec && rec.game === "guandan" && rec.state?.phase === "lobby";
+    if (!lobby) throw new Error("Someone is already in a game");
+    if (rec.seats[0] !== fromId) throw new Error("Only the host can invite");
+    if (rec.seats.length >= 4) throw new Error("The table is full");
+    if (rec.seats.includes(toId)) throw new Error("They are already seated");
+    if (game !== "guandan") throw new Error("This table is Guandan");
+  }
   const id = uid("inv");
   const invite = {
     id,
     game,
     fromId,
     fromName: playerName(from),
+    fromAvatar: from.avatar || "",
     toId,
     toName: target.name,
+    toAvatar: target.avatar || "",
     meta,
     createdAt: Date.now(),
   };
@@ -274,6 +287,9 @@ export async function respondInvite(user, inviteId, accept, mods) {
   await srem(`axiom:uinv:${invite.fromId}`, inviteId);
   await srem(`axiom:uinv:${invite.toId}`, inviteId);
   if (!accept) return { ok: true, declined: true };
+  if (invite.game === "guandan") {
+    return joinGuandanTable(user, invite, mods);
+  }
   if ((await getSeat(invite.fromId)) || (await getSeat(invite.toId))) throw new Error("Someone is already in a game");
   const from = await readJson(`axiom:p:${invite.fromId}`);
   if (!from) throw new Error("They went offline");
@@ -301,6 +317,8 @@ function startRoom(invite, from, to, mods) {
     state = mods.m24.startM24Duel(a, b);
   } else if (invite.game === "uno") {
     state = mods.uno.startUnoDuel(a, b);
+  } else if (invite.game === "holdem") {
+    state = mods.holdem.startHoldemDuel(a, b);
   } else {
     throw new Error("Unknown game");
   }
@@ -311,6 +329,49 @@ function startRoom(invite, from, to, mods) {
     state,
     endsAt,
   };
+}
+
+async function joinGuandanTable(user, invite, mods) {
+  const hostId = String(invite.fromId);
+  const joiner = { id: String(user.id), name: playerName(user) };
+  if (await getSeat(joiner.id)) throw new Error("You are already in a game");
+  const hostSeat = await getSeat(hostId);
+  let rec = hostSeat ? await getRoomRecord(hostSeat) : null;
+  const host = await readJson(`axiom:p:${hostId}`);
+  if (!host) throw new Error("They went offline");
+  if (rec && rec.game === "guandan" && rec.state?.phase === "lobby") {
+    if (rec.seats.includes(joiner.id)) throw new Error("Already seated");
+    if (rec.seats.length >= 4) throw new Error("The table is full");
+    rec.seats = [...rec.seats, joiner.id];
+    rec.state = mods.guandan.startGuandanLobby(
+      rec.seats.map((id) => {
+        const existing = rec.state.players.find((p) => p.id === id);
+        if (existing) return { id, name: existing.name };
+        return joiner;
+      }),
+    );
+    if (rec.seats.length === 4) {
+      rec.state = mods.guandan.startGuandanTable(rec.state.players.map((p) => ({ id: p.id, name: p.name })));
+    }
+    rec.mods = mods;
+    await saveRoom(rec);
+    return { ok: true, room: publicRoom(rec, user.id) };
+  }
+  if (hostSeat) throw new Error("Host is already in a game");
+  const state = mods.guandan.startGuandanLobby([
+    { id: hostId, name: host.name },
+    joiner,
+  ]);
+  const room = {
+    id: uid("room"),
+    game: "guandan",
+    seats: [hostId, joiner.id],
+    state,
+    endsAt: null,
+    mods,
+  };
+  await saveRoom(room);
+  return { ok: true, room: publicRoom(room, user.id) };
 }
 
 export async function applyRoomAction(user, roomId, action, mods) {
@@ -332,6 +393,12 @@ export async function applyRoomAction(user, roomId, action, mods) {
     room.state = mods.m24.applyM24Action(room.state, user.id, action);
   } else if (room.game === "uno") {
     room.state = mods.uno.applyUnoAction(room.state, user.id, action);
+  } else if (room.game === "holdem") {
+    room.state = mods.holdem.applyHoldemAction(room.state, user.id, action);
+  } else if (room.game === "guandan") {
+    if (room.state?.phase === "play") {
+      room.state = mods.guandan.applyGuandanAction(room.state, user.id, action);
+    }
   }
   await saveRoom(room);
   return publicRoom(room, user.id);
@@ -341,12 +408,28 @@ export async function leaveRoom(userId) {
   const rid = await getSeat(userId);
   if (!rid) return snapshot(userId);
   const rec = await attachMods(await getRoomRecord(rid));
+  if (rec?.game === "guandan" && rec.state?.phase === "lobby") {
+    const hostLeft = rec.seats[0] === userId;
+    await kvDel(`axiom:seat:${userId}`);
+    if (hostLeft || rec.seats.length <= 2) {
+      for (const id of rec.seats) await kvDel(`axiom:seat:${id}`);
+      await kvDel(`axiom:room:${rid}`);
+      return snapshot(userId);
+    }
+    rec.seats = rec.seats.filter((id) => id !== userId);
+    rec.state = rec.mods.guandan.startGuandanLobby(
+      rec.state.players.filter((p) => p.id !== userId).map((p) => ({ id: p.id, name: p.name })),
+    );
+    await saveRoom(rec);
+    return snapshot(userId);
+  }
   if (rec && rec.state?.phase !== "over") {
     rec.state = {
       ...rec.state,
       phase: "over",
       winnerId: rec.seats.find((id) => id !== userId) || null,
-      message: "Rival left.",
+      winnerTeam: null,
+      message: "A player left.",
     };
     await saveRoom(rec);
   }
@@ -365,6 +448,8 @@ function publicRoom(room, viewerId) {
     if (room.game === "m24") view = mods.m24.viewM24(room.state, viewerId);
     if (room.game === "uno") view = mods.uno.viewUno(room.state, viewerId);
     if (room.game === "flip7") view = mods.flip.viewFlip7(room.state, viewerId);
+    if (room.game === "holdem") view = mods.holdem.viewHoldem(room.state, viewerId);
+    if (room.game === "guandan") view = mods.guandan.viewGuandan(room.state, viewerId);
   }
   return {
     id: room.id,

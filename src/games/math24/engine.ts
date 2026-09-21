@@ -1,6 +1,7 @@
+import { makeDeck, rankValue, type PokerCard } from "../../lib/poker";
 import { shuffle } from "../../lib/shuffle";
 
-export type Puzzle = { nums: number[]; solution: string };
+export type Puzzle = { nums: number[]; cards: PokerCard[]; solution: string };
 
 const OPS = [
   { s: "+", f: (a: number, b: number) => a + b },
@@ -43,13 +44,15 @@ export function solve24(nums: number[]): string | null {
   return search(nums.map((n) => ({ n, e: String(n) })));
 }
 
-export function newPuzzle(max = 10): Puzzle {
-  for (let i = 0; i < 400; i++) {
-    const nums = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * max));
+export function newPuzzle(_max = 13): Puzzle {
+  for (let i = 0; i < 500; i++) {
+    const cards = makeDeck().slice(0, 4);
+    const nums = cards.map((c) => rankValue(c.rank));
     const solution = solve24(nums);
-    if (solution) return { nums, solution };
+    if (solution) return { nums, cards, solution };
   }
-  return { nums: [1, 3, 4, 6], solution: "(6/(1-(3/4)))" };
+  const cards = makeDeck().slice(0, 4);
+  return { nums: [1, 3, 4, 6], cards, solution: "(6/(1-(3/4)))" };
 }
 
 export function randomUnsolved(max = 10): number[] {
@@ -161,6 +164,7 @@ export type M24DuelState = {
   mode: "duel";
   players: Array<{ id: string; name: string }>;
   nums: number[];
+  cards: PokerCard[];
   solution: string;
   scores: Record<string, number>;
   phase: "play" | "over";
@@ -181,6 +185,7 @@ export function startM24Duel(a: { id: string; name: string }, b: { id: string; n
     mode: "duel",
     players: [a, b],
     nums: puzzle.nums,
+    cards: puzzle.cards,
     solution: puzzle.solution,
     scores: { [a.id]: 0, [b.id]: 0 },
     phase: "play",
@@ -217,6 +222,7 @@ export function applyM24Action(state: M24DuelState, actorId: string, action: M24
     ...state,
     scores,
     nums: puzzle.nums,
+    cards: puzzle.cards,
     solution: puzzle.solution,
     round: state.round + 1,
     message: `${actor?.name} scores! ${scores[actorId]} / ${state.goal}. Next hand.`,

@@ -177,10 +177,10 @@ function applyGuess(state: CodaState, value: CodaValue, youId: string): { next: 
 }
 
 const BURST: Record<Flash["kind"], { title: string; sub: string }> = {
-  hit: { title: "HIT", sub: "Correct. The tile knocks down." },
-  miss: { title: "MISS", sub: "Wrong. Your drawn tile is shown." },
-  win: { title: "WIN", sub: "Rival is out. You win." },
-  lose: { title: "LOSE", sub: "All of your tiles are open." },
+  hit: { title: "Hit", sub: "Correct. The tile knocks down." },
+  miss: { title: "Miss", sub: "Wrong. Your drawn tile is shown." },
+  win: { title: "You win", sub: "The other row is fully open." },
+  lose: { title: "You lose", sub: "All of your tiles are open." },
 };
 
 export function DaVinciPage() {
@@ -260,7 +260,7 @@ export function DaVinciPage() {
   useEffect(() => {
     if (!flash) return;
     if (flash.kind === "win" || flash.kind === "lose") return;
-    const t = window.setTimeout(() => setFlash(null), 1400);
+    const t = window.setTimeout(() => setFlash(null), 420);
     return () => window.clearTimeout(t);
   }, [flash]);
 
@@ -277,7 +277,7 @@ export function DaVinciPage() {
     if (!me || me.human || state.phase === "over" || arranging || state.phase === "rps") return;
     let stop = false;
     (async () => {
-      await wait(650);
+      await wait(140);
       if (stop) return;
       if (state.phase === "draw") {
         setState((s) => (s ? drawCard(s, aiDrawColor(s)) : s));
@@ -289,12 +289,10 @@ export function DaVinciPage() {
         const locked =
           state.selected && state.selected.playerId === g.playerId && state.selected.index === g.index;
         if (!locked) {
-          await wait(380);
-          if (stop) return;
           setState((s) => (s ? selectTile(s, g.playerId, g.index) : s));
           return;
         }
-        await wait(1200);
+        await wait(160);
         if (stop) return;
         const { next, flash: fx } = applyGuess(state, g.value, you?.id ?? "");
         setState(next);
@@ -302,7 +300,7 @@ export function DaVinciPage() {
         return;
       }
       if (state.phase === "continue") {
-        await wait(400);
+        await wait(120);
         if (stop) return;
         setState((s) => (s ? (Math.random() < 0.4 ? continueGuess(s) : stay(s)) : s));
       }

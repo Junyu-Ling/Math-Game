@@ -1,9 +1,7 @@
-import { shuffle, uid } from "../../lib/shuffle";
+import { makeShoe, type PokerCard } from "../../lib/poker";
 
-export type Suit = "S" | "H" | "D" | "C";
-export type Rank = "A" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K";
-
-export type BjCard = { id: string; suit: Suit; rank: Rank; hidden?: boolean };
+export type { Suit, Rank } from "../../lib/poker";
+export type BjCard = PokerCard;
 
 export type Hand = {
   cards: BjCard[];
@@ -25,15 +23,8 @@ export type BjState = {
   message: string;
 };
 
-const ranks: Rank[] = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-const suits: Suit[] = ["S", "H", "D", "C"];
-
 export function freshShoe(n = 4): BjCard[] {
-  const cards: BjCard[] = [];
-  for (let i = 0; i < n; i++) {
-    for (const suit of suits) for (const rank of ranks) cards.push({ id: uid("b"), suit, rank });
-  }
-  return shuffle(cards);
+  return makeShoe(n);
 }
 
 export function startBj(chips: number): BjState {
@@ -358,10 +349,4 @@ export function viewBjDuel(state: BjDuelState, viewerId: string): BjDuelState {
   };
 }
 
-export function suitGlyph(suit: Suit): string {
-  return { S: "♠", H: "♥", D: "♦", C: "♣" }[suit];
-}
-
-export function isRed(suit: Suit): boolean {
-  return suit === "H" || suit === "D";
-}
+export { suitGlyph, isRed } from "../../lib/poker";

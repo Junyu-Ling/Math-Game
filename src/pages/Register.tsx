@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { GithubButton } from "../components/GithubButton";
+import { IconMail } from "../components/Icons";
 
 export function Register() {
   const { register, verify, live } = useAuth();
@@ -43,9 +44,10 @@ export function Register() {
       <p className="kicker">{live ? "Live API" : "Local mock"}</p>
       <h1>Register</h1>
       <p className="lede">Or continue with GitHub to create an account in one step.</p>
-      <div className="row-actions" style={{ marginBottom: 18 }}>
+      <div className="auth-method">
         <GithubButton />
       </div>
+      <p className="auth-or">or email</p>
       {!needCode ? (
         <form onSubmit={onRegister}>
           <div className="field">
@@ -63,7 +65,8 @@ export function Register() {
             />
           </div>
           <div className="row-actions">
-            <button className="btn" type="submit">
+            <button className="btn btn-icon" type="submit">
+              <IconMail />
               Send code
             </button>
             <Link to="/login" className="btn btn-ghost">

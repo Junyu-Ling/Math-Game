@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { applyM24Action, startM24Practice, type M24DuelState } from "./engine";
+import { PokerFace } from "../../components/PlayingCard";
 import { GameSetup } from "../../components/GameSetup";
 import { InvitePanel } from "../../components/InvitePanel";
 import { useAuth } from "../../context/AuthContext";
@@ -39,7 +40,7 @@ export function Math24Page() {
   }, [practice, local?.round, local?.phase, local?.solution]);
 
   function tapNum(i: number) {
-    if (!state || used[i]) return;
+    if (!state || used[i] || state.phase === "over") return;
     const n = state.nums[i];
     if (n === undefined) return;
     setExpr((e) => e + String(n));
@@ -89,16 +90,13 @@ export function Math24Page() {
           ) : (
             <>
               <div className="m24-board">
-                {state.nums.map((n, i) => (
-                  <button
-                    key={`${n}-${i}-${state.round}`}
-                    className={`m24-num ${used[i] ? "used" : ""}`}
-                    type="button"
-                    disabled={state.phase === "over"}
-                    onClick={() => tapNum(i)}
-                  >
-                    {n}
-                  </button>
+                {(state.cards?.length
+                  ? state.cards
+                  : state.nums.map((n, i) => ({ id: `n${i}`, suit: "S" as const, rank: (n === 1 ? "A" : String(n)) as "A" }))
+                ).map((card, i) => (
+                  <div key={`${card.id}-${state.round}`} className={used[i] ? "dim-card" : undefined}>
+                    <PokerFace card={card} onClick={state.phase === "over" ? undefined : () => tapNum(i)} />
+                  </div>
                 ))}
               </div>
               <div className="expr">{expr || "—"}</div>

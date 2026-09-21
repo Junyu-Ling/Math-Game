@@ -32,12 +32,28 @@ const games = [
     idx: "04",
     code: "M24",
     name: "Make 24",
-    blurb: "Same four cards. First to make 24 scores.",
+    blurb: "Same four poker cards. First to make 24 scores.",
     preview: "m24" as const,
   },
   {
-    to: "/play/uno",
+    to: "/play/holdem",
     idx: "05",
+    code: "HOLD",
+    name: "Texas Hold’em",
+    blurb: "Heads-up Hold’em on a standard deck. Blinds, streets, showdown.",
+    preview: "hold" as const,
+  },
+  {
+    to: "/play/guandan",
+    idx: "06",
+    code: "GDAN",
+    name: "Guandan",
+    blurb: "Four players. Partners sit across. Two decks plus jokers.",
+    preview: "gdan" as const,
+  },
+  {
+    to: "/play/uno",
+    idx: "07",
     code: "UNO",
     name: "UNO",
     blurb: "Classic four-color ovals. Empty your hand to win.",
@@ -71,6 +87,15 @@ function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
       </div>
     );
   }
+  if (kind === "m24" || kind === "hold" || kind === "gdan") {
+    return (
+      <div className="preview-row">
+        <MiniPoker rank="A" suit="S" />
+        <MiniPoker rank="K" suit="H" />
+        <MiniPoker rank="7" suit="D" />
+      </div>
+    );
+  }
   if (kind === "uno") {
     return (
       <div className="preview-row">
@@ -97,18 +122,19 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="kicker">Five tables · Two players</p>
+          <p className="kicker">Seven tables · Invite play</p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
             Card art follows the physical decks. Practice against the CPU, or sign in and invite someone who is online.
           </p>
         </div>
         <div className="hero-stage" aria-hidden>
+          <MiniPoker rank="Q" suit="S" />
           <UnoFace card={{ id: "h1", color: "red", kind: "number", value: 0 }} />
           <FlipFace card={{ id: "h2", kind: "number", value: 12 }} />
-          <MahjongTile mini hide={false} tile={{ color: "black", value: 7, revealed: true }} />
+          <MahjongTile hide={false} tile={{ color: "black", value: 7, revealed: true }} />
           <UnoFace card={{ id: "h3", color: "blue", kind: "draw2" }} />
-          <MahjongTile mini hide={false} tile={{ color: "white", value: "joker", revealed: true }} />
+          <MahjongTile hide={false} tile={{ color: "white", value: "joker", revealed: true }} />
         </div>
       </section>
       <div className="game-grid">

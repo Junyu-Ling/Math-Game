@@ -1,8 +1,8 @@
 import { useId, type CSSProperties } from "react";
 import type { UnoCard, UnoColor } from "../games/uno/engine";
 import type { FlipCard } from "../games/flip7/engine";
-import type { BjCard, Suit } from "../games/blackjack/engine";
-import { isRed, suitGlyph } from "../games/blackjack/engine";
+import type { PokerCard, Suit } from "../lib/poker";
+import { isRed, suitGlyph } from "../lib/poker";
 
 const NAMES = ["ZERO", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN", "ELEVEN", "TWELVE"];
 
@@ -310,31 +310,176 @@ export function FlipFace({ card }: { card: FlipCard }) {
   return <FlipArt card={card} />;
 }
 
-export function PokerFace({ card }: { card: BjCard }) {
+export function PokerFace({
+  card,
+  selected,
+  onClick,
+}: {
+  card: PokerCard;
+  selected?: boolean;
+  onClick?: () => void;
+}) {
+  const art = <PokerArt card={card} />;
+  if (!onClick) return art;
+  return (
+    <button type="button" className={`card-svg-btn ${selected ? "selected" : ""}`} onClick={onClick}>
+      {art}
+    </button>
+  );
+}
+
+const PIP_MAP: Record<string, Array<[number, number]>> = {
+  A: [[31.5, 44]],
+  "2": [
+    [31.5, 20],
+    [31.5, 68],
+  ],
+  "3": [
+    [31.5, 18],
+    [31.5, 44],
+    [31.5, 70],
+  ],
+  "4": [
+    [18, 20],
+    [45, 20],
+    [18, 68],
+    [45, 68],
+  ],
+  "5": [
+    [18, 20],
+    [45, 20],
+    [31.5, 44],
+    [18, 68],
+    [45, 68],
+  ],
+  "6": [
+    [18, 20],
+    [45, 20],
+    [18, 44],
+    [45, 44],
+    [18, 68],
+    [45, 68],
+  ],
+  "7": [
+    [18, 20],
+    [45, 20],
+    [31.5, 32],
+    [18, 44],
+    [45, 44],
+    [18, 68],
+    [45, 68],
+  ],
+  "8": [
+    [18, 18],
+    [45, 18],
+    [18, 36],
+    [45, 36],
+    [18, 52],
+    [45, 52],
+    [18, 70],
+    [45, 70],
+  ],
+  "9": [
+    [18, 16],
+    [45, 16],
+    [18, 32],
+    [45, 32],
+    [31.5, 44],
+    [18, 56],
+    [45, 56],
+    [18, 72],
+    [45, 72],
+  ],
+  "10": [
+    [18, 14],
+    [45, 14],
+    [18, 28],
+    [45, 28],
+    [31.5, 21],
+    [31.5, 67],
+    [18, 60],
+    [45, 60],
+    [18, 74],
+    [45, 74],
+  ],
+};
+
+function PokerArt({ card }: { card: PokerCard }) {
+  const uid = useId().replace(/:/g, "");
+  const box = cardBox();
   if (card.hidden) {
     return (
-      <article className="fcard back">
-        <span className="back-sig">AX</span>
-      </article>
+      <svg className="card-svg poker-svg" viewBox="0 0 63 88" style={box}>
+        <rect x="0.6" y="0.6" width="61.8" height="86.8" rx="4.2" fill="#f7f4ef" stroke="#d8d2c8" />
+        <rect x="4.2" y="4.2" width="54.6" height="79.6" rx="2.4" fill="#1c1c1c" />
+        <text x="31.5" y="48" textAnchor="middle" fill="#f4f2ee" fontSize="11" fontFamily="Georgia, serif" letterSpacing="1.4">
+          AX
+        </text>
+      </svg>
     );
   }
-  const red = isRed(card.suit);
+  const red = isRed(card.suit, card.rank);
+  const ink = red ? "#C0392B" : "#1A1A1A";
   const g = suitGlyph(card.suit);
+  const label = card.rank === "BJ" || card.rank === "RJ" ? "J" : card.rank;
+  if (card.suit === "J") {
+    return (
+      <svg className="card-svg poker-svg" viewBox="0 0 63 88" style={box}>
+        <rect x="0.6" y="0.6" width="61.8" height="86.8" rx="4.2" fill="#fffdf8" stroke="#d8d2c8" />
+        <text x="8" y="14" fill={ink} fontSize="11" fontFamily="Georgia, serif" fontWeight="700">
+          {label}
+        </text>
+        <text x="31.5" y="42" textAnchor="middle" fill={ink} fontSize="18" fontFamily="Georgia, serif">
+          ★
+        </text>
+        <text x="31.5" y="58" textAnchor="middle" fill={ink} fontSize="7" fontFamily="Inter, sans-serif" letterSpacing="1.6">
+          JOKER
+        </text>
+      </svg>
+    );
+  }
+  const pips = PIP_MAP[card.rank];
   return (
-    <article className={`fcard poker ${red ? "red" : "ink"}`}>
-      <span className="idx tl">
-        {card.rank}
-        <small>{g}</small>
-      </span>
-      <span className="idx br">
-        {card.rank}
-        <small>{g}</small>
-      </span>
-      <span className="center">
-        <b className="suit-xl">{g}</b>
-      </span>
-    </article>
+    <svg className="card-svg poker-svg" viewBox="0 0 63 88" style={box}>
+      <defs>
+        <clipPath id={`${uid}c`}>
+          <rect x="0.6" y="0.6" width="61.8" height="86.8" rx="4.2" />
+        </clipPath>
+      </defs>
+      <rect x="0.6" y="0.6" width="61.8" height="86.8" rx="4.2" fill="#fffdf8" stroke="#d8d2c8" />
+      <g clipPath={`url(#${uid}c)`} fill={ink} fontFamily="Georgia, 'Times New Roman', serif">
+        <text x="6" y="13" fontSize={card.rank === "10" ? "8.5" : "11"} fontWeight="700">
+          {label}
+        </text>
+        <text x="6.2" y="23" fontSize="8">
+          {g}
+        </text>
+        <g transform="rotate(180 31.5 44)">
+          <text x="6" y="13" fontSize={card.rank === "10" ? "8.5" : "11"} fontWeight="700">
+            {label}
+          </text>
+          <text x="6.2" y="23" fontSize="8">
+            {g}
+          </text>
+        </g>
+        {pips
+          ? pips.map(([x, y], i) => (
+              <text key={i} x={x} y={y} textAnchor="middle" fontSize="12">
+                {g}
+              </text>
+            ))
+          : (
+            <text x="31.5" y="50" textAnchor="middle" fontSize="22" fontWeight="700">
+              {label}
+            </text>
+          )}
+      </g>
+    </svg>
   );
+}
+
+export function MiniPoker({ rank, suit }: { rank: string; suit: Suit }) {
+  return <PokerArt card={{ id: "mini", rank: rank as PokerCard["rank"], suit }} />;
 }
 
 export function DeckStack({
@@ -356,21 +501,6 @@ export function DeckStack({
         <strong>{count}</strong>
       </span>
     </button>
-  );
-}
-
-export function MiniPoker({ rank, suit }: { rank: string; suit: Suit }) {
-  const red = isRed(suit);
-  return (
-    <article className={`fcard mini poker ${red ? "red" : "ink"}`}>
-      <span className="idx tl">
-        {rank}
-        <small>{suitGlyph(suit)}</small>
-      </span>
-      <span className="center">
-        <b className="suit-xl">{suitGlyph(suit)}</b>
-      </span>
-    </article>
   );
 }
 

@@ -7,8 +7,10 @@ export type Invite = {
   game: string;
   fromId: string;
   fromName: string;
+  fromAvatar?: string;
   toId: string;
   toName: string;
+  toAvatar?: string;
   meta?: Record<string, unknown>;
 };
 
@@ -64,5 +66,7 @@ export const GAME_PATH: Record<string, string> = {
   flip7: "/play/flip7",
   bj: "/play/blackjack",
   m24: "/play/24",
+  holdem: "/play/holdem",
+  guandan: "/play/guandan",
   uno: "/play/uno",
 };
