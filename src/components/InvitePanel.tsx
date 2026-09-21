@@ -33,27 +33,28 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       {game === "guandan" ? <p>Guandan needs four players. Host invites three people; the deal starts at 4/4.</p> : null}
       {gdWait ? <p>Seated {seated.size}/4.</p> : null}
       {online.length === 0 ? (
-        <>
-          <button className="btn" type="button" disabled>
-            Invite
-          </button>
-          <p>You are online. When another signed-in player opens this game, Invite will unlock.</p>
-        </>
+        <p>No other players yet. Anyone who logs in will appear here.</p>
       ) : (
-        online.map((p) => (
+        online.map((p) => {
+          const live = p.online !== false;
+          return (
           <div key={p.id} className="person-row">
             <Avatar src={p.avatar} name={p.name} />
-            <span className="person-name">{p.name}</span>
+            <span className="person-name">
+              {p.name}
+              <em className={`presence ${live ? "on" : "off"}`}>{live ? "Online" : "Offline"}</em>
+            </span>
             <button
               className="btn"
               type="button"
-              disabled={!canInviteMore || Boolean(p.roomId) || seated.has(p.id)}
+              disabled={!canInviteMore || !live || Boolean(p.roomId) || seated.has(p.id)}
               onClick={() => void invite(p.id, game, meta).catch((ex) => alert(ex.message))}
             >
-              Invite{cooling ? ` (${waitSec})` : ""}
+              {live ? (cooling ? `Invite (${waitSec})` : "Invite") : "Offline"}
             </button>
           </div>
-        ))
+          );
+        })
       )}
     </div>
   );

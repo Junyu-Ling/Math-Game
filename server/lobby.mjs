@@ -5,6 +5,7 @@ const ONLINE_SEC = 20;
 const INVITE_SEC = 60;
 const ROOM_SEC = 7200;
 const INVITE_COOLDOWN_MS = 5000;
+const USER_SEC = 90 * 24 * 3600;
 
 const mem = new Map();
 let redis = null;
@@ -103,7 +104,7 @@ async function sadd(key, member, ttlSec) {
   }
   const cur = JSON.parse(memGet(key) || "[]");
   if (!cur.includes(member)) cur.push(member);
-  memSet(key, JSON.stringify(cur), ttlSec);
+  memSet(key, JSON.stringify(cur), ttlSec || 0);
 }
 
 async function srem(key, member) {
@@ -196,6 +197,69 @@ async function listPresence() {
   return out;
 }
 
+async function rememberPlayer(user) {
+  const id = String(user.id);
+  const rec = {
+    id,
+    name: playerName(user),
+    avatar: user.avatar || "",
+  };
+  await kvSet(`axiom:u:${id}`, rec, USER_SEC);
+  await sadd("axiom:users", id);
+}
+
+async function listRoster(viewerId) {
+  const live = await listPresence();
+  const liveMap = new Map(live.map((p) => [String(p.id), p]));
+  let ids = await smembers("axiom:users");
+  for (const p of live) {
+    const id = String(p.id);
+    if (!ids.includes(id)) ids.push(id);
+  }
+  ids = [...new Set(ids.map(String))].filter((id) => id !== String(viewerId)).slice(0, 200);
+  const r = client();
+  const profiles = new Map();
+  if (r && ids.length) {
+    try {
+      const rows = await r.mget(...ids.map((id) => `axiom:u:${id}`));
+      for (let i = 0; i < ids.length; i++) {
+        const raw = rows[i];
+        if (!raw) continue;
+        try {
+          profiles.set(ids[i], JSON.parse(raw));
+        } catch {
+          /* skip */
+        }
+      }
+    } catch {
+      /* fallback */
+    }
+  }
+  if (!profiles.size) {
+    for (const id of ids) {
+      const p = (await readJson(`axiom:u:${id}`)) || liveMap.get(id);
+      if (p) profiles.set(id, p);
+    }
+  }
+  const out = [];
+  for (const id of ids) {
+    const saved = profiles.get(id);
+    const liveP = liveMap.get(id);
+    const name = liveP?.name || saved?.name || "PLAYER";
+    const avatar = liveP?.avatar || saved?.avatar || "";
+    if (!saved && !liveP) continue;
+    out.push({
+      id,
+      name,
+      avatar,
+      online: Boolean(liveP),
+      roomId: liveP?.roomId || null,
+    });
+  }
+  out.sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
+  return out;
+}
+
 async function getSeat(userId) {
   return (await kvGet(`axiom:seat:${userId}`)) || null;
 }
@@ -236,15 +300,12 @@ export async function heartbeat(user, href = "", light = false) {
   };
   await kvSet(`axiom:p:${id}`, rec, ONLINE_SEC);
   await sadd("axiom:online", id, ONLINE_SEC + 5);
+  await rememberPlayer(user);
   return snapshot(id, light);
 }
 
 export async function snapshot(userId, light = false) {
-  const online = light
-    ? []
-    : (await listPresence())
-        .filter((p) => p.id !== userId)
-        .map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, roomId: p.roomId }));
+  const online = light ? [] : await listRoster(userId);
   const inviteIds = await smembers(`axiom:uinv:${userId}`);
   const invites = [];
   for (const id of inviteIds) {
