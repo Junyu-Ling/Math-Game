@@ -23,6 +23,7 @@ export type AuthPayload = {
 
 const isProd = import.meta.env.PROD;
 const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+const liveApi = Boolean(apiBase) || isProd;
 
 export type HealthInfo = {
   ok: boolean;
@@ -84,8 +85,32 @@ function mockToken(email: string) {
   return `mock.${btoa(unescape(encodeURIComponent(email)))}.${Date.now()}`;
 }
 
+function userFromJwt(token: string): User | null {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const pad = part.replace(/-/g, "+").replace(/_/g, "/");
+    const json = atob(pad.padEnd(Math.ceil(pad.length / 4) * 4, "="));
+    const payload = JSON.parse(json) as User & { id?: string };
+    if (!payload.id) return null;
+    return {
+      id: payload.id,
+      email: payload.email || "",
+      chips: payload.chips ?? 1000,
+      createdAt: payload.createdAt || new Date().toISOString(),
+      provider: payload.provider,
+      login: payload.login,
+      name: payload.name,
+      avatar: payload.avatar,
+      githubId: payload.githubId,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export const authApi = {
-  live: Boolean(apiBase) || isProd,
+  live: liveApi,
 
   getStored(): AuthPayload | null {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -169,12 +194,18 @@ export const authApi = {
   },
 
   async me(token: string): Promise<User> {
-    if (apiBase) {
-      const data = await request<{ user: User }>("/api/me", {
-        method: "GET",
-        headers: headers(token),
-      });
-      return data.user;
+    if (liveApi) {
+      try {
+        const data = await request<{ user: User }>("/api/me", {
+          method: "GET",
+          headers: headers(token),
+        });
+        return data.user;
+      } catch {
+        const fromJwt = userFromJwt(token);
+        if (fromJwt) return fromJwt;
+        throw new Error("未登录");
+      }
     }
     const stored = this.getStored();
     if (!stored || stored.token !== token) throw new Error("未登录");
@@ -187,7 +218,7 @@ export const authApi = {
   },
 
   async updateChips(token: string, chips: number): Promise<User> {
-    if (apiBase) {
+    if (liveApi) {
       const data = await request<{ user: User }>("/api/me/chips", {
         method: "PATCH",
         headers: headers(token),
@@ -210,6 +241,6 @@ export const authApi = {
   },
 
   githubStartUrl() {
-    return `${apiBase}/api/auth/github/start`;
+    return liveApi ? `${apiBase}/api/auth/github/start` : "";
   },
 };
