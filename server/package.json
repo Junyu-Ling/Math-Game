@@ -1,0 +1,19 @@
+{
+  "name": "axiom-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs",
+    "build:engine": "npx --yes esbuild ../src/games/davinci/engine.ts --bundle --format=esm --outfile=coda-engine.mjs --platform=neutral"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "ioredis": "^5.7.0",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.10.1",
+    "ws": "^8.21.3"
+  }
+}
