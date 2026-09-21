@@ -1,14 +1,11 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 
 const GITHUB_UA = "AXIOM-Math-Game";
-const TOEFL_CLIENT_ID = "Ov23li2dm43mGcix56sF";
-const NEW_APP_CLIENT_ID = "Ov231ijfLsR5fwRzdTxg";
 const STATE_COOKIE = "axiom_gh_state";
 
 export function githubConfig() {
-  const raw = process.env.GITHUB_CLIENT_ID || TOEFL_CLIENT_ID;
   return {
-    clientId: raw === NEW_APP_CLIENT_ID ? TOEFL_CLIENT_ID : raw,
+    clientId: process.env.GITHUB_CLIENT_ID || "Ov231ijfLsR5fwRzdTxg",
     clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
     callbackUrl: process.env.GITHUB_CALLBACK_URL || "",
     frontend: (process.env.FRONTEND_ORIGIN || "").replace(/\/$/, ""),
