@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 export function AuthCallback() {
   const { acceptToken } = useAuth();
   const nav = useNavigate();
-  const [msg, setMsg] = useState("正在完成 GitHub 登录…");
+  const [msg, setMsg] = useState("Finishing GitHub login…");
   const once = useRef(false);
 
   useEffect(() => {
@@ -20,15 +20,15 @@ export function AuthCallback() {
     acceptToken(token)
       .then(() => nav("/account", { replace: true }))
       .catch(() => {
-        setMsg("登录失败，请重试。");
+        setMsg("Login failed. Try again.");
         nav("/login?gh_error=server", { replace: true });
       });
   }, [acceptToken, nav]);
 
   return (
     <div className="auth-wrap">
-      <p className="kicker">GITHUB</p>
-      <h1>登录中</h1>
+      <p className="kicker">GitHub</p>
+      <h1>Signing in</h1>
       <p className="lede">{msg}</p>
     </div>
   );

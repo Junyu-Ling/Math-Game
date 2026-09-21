@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run bundle:games && tsc --noEmit && vite build",
-    "bundle:games": "npx esbuild src/games/davinci/engine.ts --bundle --format=esm --outfile=server/bundled/coda.mjs --platform=neutral && npx esbuild src/games/flip7/engine.ts --bundle --format=esm --outfile=server/bundled/flip.mjs --platform=neutral && npx esbuild src/games/blackjack/engine.ts --bundle --format=esm --outfile=server/bundled/bj.mjs --platform=neutral && npx esbuild src/games/math24/engine.ts --bundle --format=esm --outfile=server/bundled/m24.mjs --platform=neutral",
+    "bundle:games": "npx esbuild src/games/davinci/engine.ts --bundle --format=esm --outfile=server/bundled/coda.mjs --platform=neutral && npx esbuild src/games/flip7/engine.ts --bundle --format=esm --outfile=server/bundled/flip.mjs --platform=neutral && npx esbuild src/games/blackjack/engine.ts --bundle --format=esm --outfile=server/bundled/bj.mjs --platform=neutral && npx esbuild src/games/math24/engine.ts --bundle --format=esm --outfile=server/bundled/m24.mjs --platform=neutral && npx esbuild src/games/uno/engine.ts --bundle --format=esm --outfile=server/bundled/uno.mjs --platform=neutral",
     "server": "npm run bundle:games && npm start --prefix server",
     "preview": "vite preview"
   },
   "dependencies": {
+    "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
@@ -20,8 +21,8 @@
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.2",
+    "esbuild": "^0.25.9",
     "typescript": "^5.9.2",
-    "vite": "^7.1.5",
-    "esbuild": "^0.25.9"
+    "vite": "^7.1.5"
   }
 }

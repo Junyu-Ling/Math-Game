@@ -154,6 +154,10 @@ function shuffleDeck() {
   const deck = shuffle(Array.from({ length: 40 }, (_, i) => i % 10 + 1));
   return deck;
 }
+function startM24Practice() {
+  const state = startM24Duel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU" });
+  return { ...state, message: "\u7EC3\u4E60\u4EBA\u673A\u3002CPU \u7EA6 8 \u79D2\u540E\u4F1A\u4EA4\u5377\uFF0C\u62A2\u5148\u51D1\u51FA 24\u3002" };
+}
 function startM24Duel(a, b) {
   const puzzle = newPuzzle();
   return {
@@ -209,6 +213,7 @@ export {
   shuffleDeck,
   solve24,
   startM24Duel,
+  startM24Practice,
   tokenize,
   viewM24
 };

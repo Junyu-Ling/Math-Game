@@ -15,6 +15,7 @@ import {
   createInvite,
   heartbeat,
   leaveRoom,
+  lobbyStoreKind,
   respondInvite,
 } from "./lobby.mjs";
 import { loadMods } from "./game-mods.mjs";
@@ -89,7 +90,8 @@ function query(req, key) {
 function authUser(req) {
   const h = req.headers.authorization || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : "";
-  return jwt.verify(token, JWT_SECRET);
+  const payload = jwt.verify(token, JWT_SECRET);
+  return { ...payload, id: String(payload.id) };
 }
 
 async function readBody(req) {
@@ -110,6 +112,7 @@ export async function handle(req, res, path) {
       githubSecretIsUrl: githubSecretLooksLikeUrl(),
       match: false,
       lobby: true,
+      lobbyStore: lobbyStoreKind(),
       vercel: true,
       ws: matchWs,
     });
@@ -168,36 +171,36 @@ export async function handle(req, res, path) {
     try {
       const user = authUser(req);
       if (req.method === "GET" || req.method === "HEAD") {
-        send(res, 200, heartbeat(user, query(req, "href")));
+        send(res, 200, await heartbeat(user, query(req, "href")));
         return;
       }
       const body = await readBody(req);
       const op = String(body.op || "");
       if (op === "invite") {
-        const invite = createInvite(user, String(body.toId || ""), String(body.game || ""), body.meta || {});
-        send(res, 200, { invite, ...heartbeat(user) });
+        const invite = await createInvite(user, String(body.toId || ""), String(body.game || ""), body.meta || {});
+        send(res, 200, { invite, ...(await heartbeat(user)) });
         return;
       }
       if (op === "respond") {
         const mods = await loadMods();
         const result = await respondInvite(user, String(body.id || ""), Boolean(body.accept), mods);
-        send(res, 200, { ...heartbeat(user), ...result });
+        send(res, 200, { ...(await heartbeat(user)), ...result });
         return;
       }
       if (op === "action") {
         const mods = await loadMods();
-        const room = applyRoomAction(user, String(body.roomId || ""), body.action, mods);
-        send(res, 200, { room, ...heartbeat(user) });
+        const room = await applyRoomAction(user, String(body.roomId || ""), body.action, mods);
+        send(res, 200, { room, ...(await heartbeat(user)) });
         return;
       }
       if (op === "leave") {
-        send(res, 200, leaveRoom(user.id));
+        send(res, 200, await leaveRoom(user.id));
         return;
       }
-      send(res, 400, { error: "未知操作" });
+      send(res, 400, { error: "Unknown operation" });
     } catch (err) {
-      const msg = String(err.message || "失败");
-      send(res, /jwt|token|未登录/i.test(msg) ? 401 : 400, { error: /jwt|token/i.test(msg) ? "未登录" : msg });
+      const msg = String(err.message || "Failed");
+      send(res, /jwt|token|Not signed in|未登录/i.test(msg) ? 401 : 400, { error: /jwt|token/i.test(msg) ? "Not signed in" : msg });
     }
     return;
   }
@@ -210,7 +213,7 @@ export async function handle(req, res, path) {
       const stored = users.get(payload.id);
       send(res, 200, { user: publicUser(stored || payload) });
     } catch {
-      send(res, 401, { error: "未登录" });
+      send(res, 401, { error: "Not signed in" });
     }
     return;
   }

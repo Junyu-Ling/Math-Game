@@ -1,90 +1,285 @@
-const ONLINE_MS = 15000;
-const presence = new Map();
-const invites = new Map();
-const rooms = new Map();
-const userRoom = new Map();
+import Redis from "ioredis";
+import { loadMods } from "./game-mods.mjs";
+
+const ONLINE_SEC = 20;
+const INVITE_SEC = 60;
+const ROOM_SEC = 7200;
+
+const mem = new Map();
+let redis = null;
+let redisTried = false;
+let modsCache = null;
 
 function uid(prefix) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
 }
 
-function prune() {
-  const now = Date.now();
-  for (const [id, p] of presence) {
-    if (now - p.seenAt > ONLINE_MS) presence.delete(id);
+export function lobbyStoreKind() {
+  return process.env.REDIS_URL ? "redis" : "memory";
+}
+
+function client() {
+  const url = process.env.REDIS_URL;
+  if (!url) return null;
+  if (!redis && !redisTried) {
+    redisTried = true;
+    const tls = url.startsWith("rediss://") ? { rejectUnauthorized: true } : undefined;
+    redis = new Redis(url, {
+      maxRetriesPerRequest: 2,
+      enableOfflineQueue: true,
+      connectTimeout: 8000,
+      tls,
+    });
+    redis.on("error", () => {});
   }
-  for (const [id, inv] of invites) {
-    if (now - inv.createdAt > 60000) invites.delete(id);
+  return redis;
+}
+
+function memGet(key) {
+  const row = mem.get(key);
+  if (!row) return null;
+  if (row.exp && Date.now() > row.exp) {
+    mem.delete(key);
+    return null;
+  }
+  return row.raw;
+}
+
+function memSet(key, raw, ttlSec) {
+  mem.set(key, { raw, exp: ttlSec ? Date.now() + ttlSec * 1000 : 0 });
+}
+
+async function kvGet(key) {
+  const r = client();
+  if (r) {
+    try {
+      const v = await r.get(key);
+      if (v != null) return v;
+    } catch {
+      /* memory */
+    }
+  }
+  return memGet(key);
+}
+
+async function kvSet(key, value, ttlSec) {
+  const raw = typeof value === "string" ? value : JSON.stringify(value);
+  const r = client();
+  if (r) {
+    try {
+      if (ttlSec) await r.set(key, raw, "EX", ttlSec);
+      else await r.set(key, raw);
+      return;
+    } catch {
+      /* memory */
+    }
+  }
+  memSet(key, raw, ttlSec);
+}
+
+async function kvDel(key) {
+  const r = client();
+  if (r) {
+    try {
+      await r.del(key);
+    } catch {
+      /* memory */
+    }
+  }
+  mem.delete(key);
+}
+
+async function sadd(key, member, ttlSec) {
+  const r = client();
+  if (r) {
+    try {
+      await r.sadd(key, member);
+      if (ttlSec) await r.expire(key, ttlSec);
+      return;
+    } catch {
+      /* memory */
+    }
+  }
+  const cur = JSON.parse(memGet(key) || "[]");
+  if (!cur.includes(member)) cur.push(member);
+  memSet(key, JSON.stringify(cur), ttlSec);
+}
+
+async function srem(key, member) {
+  const r = client();
+  if (r) {
+    try {
+      await r.srem(key, member);
+      return;
+    } catch {
+      /* memory */
+    }
+  }
+  const cur = JSON.parse(memGet(key) || "[]").filter((x) => x !== member);
+  memSet(key, JSON.stringify(cur), 3600);
+}
+
+async function smembers(key) {
+  const r = client();
+  if (r) {
+    try {
+      return await r.smembers(key);
+    } catch {
+      /* memory */
+    }
+  }
+  return JSON.parse(memGet(key) || "[]");
+}
+
+async function getMods() {
+  if (!modsCache) modsCache = await loadMods();
+  return modsCache;
+}
+
+function playerName(user) {
+  return user.name || user.login || user.email || "PLAYER";
+}
+
+async function readJson(key) {
+  const raw = await kvGet(key);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
   }
 }
 
-export function heartbeat(user, href = "") {
-  prune();
-  const name = user.name || user.login || user.email || "PLAYER";
-  presence.set(user.id, {
-    id: user.id,
-    name,
+async function listPresence() {
+  const ids = await smembers("axiom:online");
+  const now = Date.now();
+  const out = [];
+  for (const id of ids) {
+    const p = await readJson(`axiom:p:${id}`);
+    if (!p || now - p.seenAt > ONLINE_SEC * 1000) {
+      await srem("axiom:online", id);
+      await kvDel(`axiom:p:${id}`);
+      continue;
+    }
+    out.push(p);
+  }
+  return out;
+}
+
+async function getSeat(userId) {
+  return (await kvGet(`axiom:seat:${userId}`)) || null;
+}
+
+async function getRoomRecord(roomId) {
+  return readJson(`axiom:room:${roomId}`);
+}
+
+async function saveRoom(room) {
+  const rec = {
+    id: room.id,
+    game: room.game,
+    seats: room.seats,
+    state: room.state,
+    endsAt: room.endsAt,
+  };
+  await kvSet(`axiom:room:${room.id}`, rec, ROOM_SEC);
+  for (const id of room.seats) await kvSet(`axiom:seat:${id}`, room.id, ROOM_SEC);
+}
+
+async function attachMods(rec) {
+  if (!rec) return null;
+  return { ...rec, mods: await getMods() };
+}
+
+export async function heartbeat(user, href = "") {
+  const id = String(user.id);
+  const seat = await getSeat(id);
+  const rec = {
+    id,
+    name: playerName(user),
     email: user.email || "",
     avatar: user.avatar || "",
     seenAt: Date.now(),
     href,
-    roomId: userRoom.get(user.id) || null,
-  });
-  return snapshot(user.id);
+    roomId: seat,
+  };
+  await kvSet(`axiom:p:${id}`, rec, ONLINE_SEC);
+  await sadd("axiom:online", id, ONLINE_SEC + 5);
+  return snapshot(id);
 }
 
-export function snapshot(userId) {
-  prune();
-  expireArrange();
-  const online = [...presence.values()]
+export async function snapshot(userId) {
+  const onlinePeople = await listPresence();
+  const online = onlinePeople
     .filter((p) => p.id !== userId)
     .map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, roomId: p.roomId }));
-  const mine = [...invites.values()].filter((i) => i.toId === userId || i.fromId === userId);
-  const rid = userRoom.get(userId);
-  const room = rid ? publicRoom(rooms.get(rid), userId) : null;
-  return { online, invites: mine, room };
-}
-
-function expireArrange() {
-  for (const room of rooms.values()) {
-    if (room.game !== "coda" || !room.endsAt || Date.now() < room.endsAt) continue;
-    room.state = room.mods.finishArrange(room.state);
-    room.endsAt = null;
+  const inviteIds = await smembers(`axiom:uinv:${userId}`);
+  const invites = [];
+  for (const id of inviteIds) {
+    const inv = await readJson(`axiom:inv:${id}`);
+    if (!inv) {
+      await srem(`axiom:uinv:${userId}`, id);
+      continue;
+    }
+    invites.push(inv);
   }
+  const rid = await getSeat(userId);
+  let room = null;
+  if (rid) {
+    const rec = await attachMods(await getRoomRecord(rid));
+    if (rec) {
+      await expireArrange(rec);
+      room = publicRoom(rec, userId);
+    }
+  }
+  return { online, invites, room, store: lobbyStoreKind() };
 }
 
-export function createInvite(from, toId, game, meta = {}) {
-  prune();
-  if (from.id === toId) throw new Error("不能邀请自己");
-  const target = presence.get(toId);
-  if (!target) throw new Error("对方不在线");
-  if (userRoom.get(from.id) || userRoom.get(toId)) throw new Error("有人已在对局中");
+async function expireArrange(room) {
+  if (room.game !== "coda" || !room.endsAt || Date.now() < room.endsAt) return;
+  room.state = room.mods.coda.finishArrange(room.state);
+  room.endsAt = null;
+  await saveRoom(room);
+}
+
+export async function createInvite(from, toId, game, meta = {}) {
+  const fromId = String(from.id);
+  toId = String(toId);
+  if (fromId === toId) throw new Error("You cannot invite yourself");
+  const target = await readJson(`axiom:p:${toId}`);
+  if (!target) throw new Error("They are not online");
+  if ((await getSeat(fromId)) || (await getSeat(toId))) throw new Error("Someone is already in a game");
   const id = uid("inv");
   const invite = {
     id,
     game,
-    fromId: from.id,
-    fromName: from.name || from.login || from.email || "PLAYER",
+    fromId,
+    fromName: playerName(from),
     toId,
     toName: target.name,
     meta,
     createdAt: Date.now(),
   };
-  invites.set(id, invite);
+  await kvSet(`axiom:inv:${id}`, invite, INVITE_SEC);
+  await sadd(`axiom:uinv:${fromId}`, id, INVITE_SEC);
+  await sadd(`axiom:uinv:${toId}`, id, INVITE_SEC);
   return invite;
 }
 
 export async function respondInvite(user, inviteId, accept, mods) {
-  const invite = invites.get(inviteId);
-  if (!invite) throw new Error("邀请已失效");
-  if (invite.toId !== user.id) throw new Error("不是给你的邀请");
-  invites.delete(inviteId);
+  const invite = await readJson(`axiom:inv:${inviteId}`);
+  if (!invite) throw new Error("Invite expired");
+  if (invite.toId !== user.id) throw new Error("This invite is not for you");
+  await kvDel(`axiom:inv:${inviteId}`);
+  await srem(`axiom:uinv:${invite.fromId}`, inviteId);
+  await srem(`axiom:uinv:${invite.toId}`, inviteId);
   if (!accept) return { ok: true, declined: true };
-  if (userRoom.get(invite.fromId) || userRoom.get(invite.toId)) throw new Error("有人已在对局中");
-  const from = presence.get(invite.fromId);
-  if (!from) throw new Error("对方已离线");
+  if ((await getSeat(invite.fromId)) || (await getSeat(invite.toId))) throw new Error("Someone is already in a game");
+  const from = await readJson(`axiom:p:${invite.fromId}`);
+  if (!from) throw new Error("They went offline");
   const room = startRoom(invite, from, user, mods);
-  return { ok: true, room: publicRoom(room, user.id) };
+  await saveRoom(room);
+  return { ok: true, room: publicRoom({ ...room, mods }, user.id) };
 }
 
 function startRoom(invite, from, to, mods) {
@@ -104,29 +299,25 @@ function startRoom(invite, from, to, mods) {
     state = mods.bj.startBjDuel(a, b);
   } else if (invite.game === "m24") {
     state = mods.m24.startM24Duel(a, b);
+  } else if (invite.game === "uno") {
+    state = mods.uno.startUnoDuel(a, b);
   } else {
-    throw new Error("未知游戏");
+    throw new Error("Unknown game");
   }
-  const room = {
+  return {
     id: uid("room"),
     game: invite.game,
     seats: [a.id, b.id],
     state,
     endsAt,
-    mods,
   };
-  rooms.set(room.id, room);
-  userRoom.set(a.id, room.id);
-  userRoom.set(b.id, room.id);
-  if (presence.get(a.id)) presence.get(a.id).roomId = room.id;
-  if (presence.get(b.id)) presence.get(b.id).roomId = room.id;
-  return room;
 }
 
-export function applyRoomAction(user, roomId, action, mods) {
-  expireArrange();
-  const room = rooms.get(roomId);
-  if (!room || !room.seats.includes(user.id)) throw new Error("对局不存在");
+export async function applyRoomAction(user, roomId, action, mods) {
+  const rec = await getRoomRecord(roomId);
+  if (!rec || !rec.seats.includes(user.id)) throw new Error("Game not found");
+  const room = { ...rec, mods };
+  await expireArrange(room);
   const before = room.state;
   if (room.game === "coda") {
     room.state = mods.coda.applyAction(room.state, user.id, action);
@@ -139,36 +330,42 @@ export function applyRoomAction(user, roomId, action, mods) {
     room.state = mods.bj.applyBjDuelAction(room.state, user.id, action);
   } else if (room.game === "m24") {
     room.state = mods.m24.applyM24Action(room.state, user.id, action);
+  } else if (room.game === "uno") {
+    room.state = mods.uno.applyUnoAction(room.state, user.id, action);
   }
+  await saveRoom(room);
   return publicRoom(room, user.id);
 }
 
-export function leaveRoom(userId) {
-  const rid = userRoom.get(userId);
+export async function leaveRoom(userId) {
+  const rid = await getSeat(userId);
   if (!rid) return snapshot(userId);
-  const room = rooms.get(rid);
-  if (room && room.state?.phase !== "over") {
-    room.state = {
-      ...room.state,
+  const rec = await attachMods(await getRoomRecord(rid));
+  if (rec && rec.state?.phase !== "over") {
+    rec.state = {
+      ...rec.state,
       phase: "over",
-      winnerId: room.seats.find((id) => id !== userId) || null,
-      message: "对手离开。",
+      winnerId: rec.seats.find((id) => id !== userId) || null,
+      message: "Rival left.",
     };
+    await saveRoom(rec);
   }
-  for (const id of room?.seats || []) {
-    userRoom.delete(id);
-    if (presence.get(id)) presence.get(id).roomId = null;
-  }
-  rooms.delete(rid);
+  for (const id of rec?.seats || [userId]) await kvDel(`axiom:seat:${id}`);
+  await kvDel(`axiom:room:${rid}`);
   return snapshot(userId);
 }
 
 function publicRoom(room, viewerId) {
   if (!room) return null;
   let view = room.state;
-  if (room.game === "coda") view = room.mods.coda.viewFor(room.state, viewerId);
-  if (room.game === "bj") view = room.mods.bj.viewBjDuel(room.state, viewerId);
-  if (room.game === "m24") view = room.mods.m24.viewM24(room.state, viewerId);
+  const mods = room.mods;
+  if (mods) {
+    if (room.game === "coda") view = mods.coda.viewFor(room.state, viewerId);
+    if (room.game === "bj") view = mods.bj.viewBjDuel(room.state, viewerId);
+    if (room.game === "m24") view = mods.m24.viewM24(room.state, viewerId);
+    if (room.game === "uno") view = mods.uno.viewUno(room.state, viewerId);
+    if (room.game === "flip7") view = mods.flip.viewFlip7(room.state, viewerId);
+  }
   return {
     id: room.id,
     game: room.game,

@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
+  aiDrawColor,
   aiGuess,
   ARRANGE_MS,
   continueGuess,
   currentPlayer,
+  deckCounts,
   drawCard,
   finishArrange,
   guessTile,
@@ -25,7 +27,7 @@ import { DeckStack } from "../../components/PlayingCard";
 import { wait } from "../../lib/shuffle";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
-import { InvitePanel } from "../../components/InvitePanel";
+import { InviteList, InvitePanel } from "../../components/InvitePanel";
 
 type Flash = {
   kind: "hit" | "miss" | "win" | "lose";
@@ -34,27 +36,27 @@ type Flash = {
 };
 
 function statusText(state: CodaState, myTurn: boolean, remain: number, matching: boolean): string {
-  if (matching) return "等待对手接受邀请。";
+  if (matching) return "Waiting for the invite to be accepted.";
   if (state.phase === "over") {
     const w = state.players.find((p) => p.id === state.winnerId);
-    return w ? `${w.name} 获胜` : "结束";
+    return w ? `${w.name} wins` : "Game over";
   }
   if (state.phase === "rps") {
-    return "石头剪刀布，输的人先摸牌再猜。";
+    return "Rock-paper-scissors. The loser draws first, then guesses.";
   }
   if (state.phase === "arrange") {
     if (state.resume === "draw") {
-      return `开局整理 ${remain.toFixed(1)}s · 杠在外面，点空隙插入`;
+      return `Opening arrange ${remain.toFixed(1)}s · tile stays out — tap a gap to insert`;
     }
-    return `整理 ${remain.toFixed(1)}s · 选好位置也要等满 5 秒`;
+    return `Arrange ${remain.toFixed(1)}s · wait the full 5 seconds even after you pick a slot`;
   }
   if (state.phase === "guess" && state.selected) {
-    return myTurn ? "已锁定对面的牌，猜数字。双方都能看见箭头。" : "对手正在瞄准一张牌。";
+    return myTurn ? "Tile locked. Guess the number. Both of you see the arrow." : "Your rival is aiming at a tile.";
   }
-  if (!myTurn) return "对手思考中…";
-  if (state.phase === "draw") return "从牌堆摸一张。";
-  if (state.phase === "guess") return "点对手未翻开的牌，再猜数字。";
-  if (state.phase === "continue") return "猜中了。继续进攻，或停牌秘密插入。";
+  if (!myTurn) return "Rival is thinking…";
+  if (state.phase === "draw") return myTurn ? "Pick black or white and draw that color." : "Rival is choosing a draw color.";
+  if (state.phase === "guess") return "Tap a hidden rival tile, then guess its number.";
+  if (state.phase === "continue") return "Hit. Keep guessing, or stay and insert in secret.";
   return "";
 }
 
@@ -97,7 +99,7 @@ function Row({
             className={`gap on ${chosen ? "ghost" : ""}`}
             type="button"
             onClick={() => onGap?.(i)}
-            aria-label="插入位置"
+            aria-label="Insert slot"
           >
             {chosen ? <span className="mj-arrow" aria-hidden /> : null}
           </button>
@@ -168,17 +170,17 @@ function applyGuess(state: CodaState, value: CodaValue, youId: string): { next: 
   const end = outcomeFlash(next, youId);
   if (end) return { next, flash: { ...end, playerId: sel.playerId, index: sel.index } };
   const added = next.log.slice(state.log.length);
-  const hit = added.some((l) => l.text.includes("猜中"));
-  const miss = added.some((l) => l.text.includes("猜错"));
+  const hit = added.some((l) => l.text.includes("guessed"));
+  const miss = added.some((l) => l.text.includes("missed"));
   const kind = hit ? "hit" : miss ? "miss" : null;
   return { next, flash: kind ? { kind, playerId: sel.playerId, index: sel.index } : null };
 }
 
 const BURST: Record<Flash["kind"], { title: string; sub: string }> = {
-  hit: { title: "HIT", sub: "猜中，牌翻倒" },
-  miss: { title: "MISS", sub: "猜错，公开手牌" },
-  win: { title: "WIN", sub: "对手出局，你赢了" },
-  lose: { title: "LOSE", sub: "你的牌全部翻开" },
+  hit: { title: "HIT", sub: "Correct. The tile knocks down." },
+  miss: { title: "MISS", sub: "Wrong. Your drawn tile is shown." },
+  win: { title: "WIN", sub: "Rival is out. You win." },
+  lose: { title: "LOSE", sub: "All of your tiles are open." },
 };
 
 export function DaVinciPage() {
@@ -225,7 +227,7 @@ export function DaVinciPage() {
       void lobby.sendAction(action);
       return;
     }
-    if (action.type === "draw") setState((s) => (s ? drawCard(s) : s));
+    if (action.type === "draw") setState((s) => (s ? drawCard(s, action.color) : s));
     else if (action.type === "select") setState((s) => (s ? selectTile(s, action.playerId, action.index) : s));
     else if (action.type === "guess") {
       if (!state || !you) return;
@@ -278,7 +280,7 @@ export function DaVinciPage() {
       await wait(650);
       if (stop) return;
       if (state.phase === "draw") {
-        setState((s) => (s ? drawCard(s) : s));
+        setState((s) => (s ? drawCard(s, aiDrawColor(s)) : s));
         return;
       }
       if (state.phase === "guess") {
@@ -355,9 +357,9 @@ export function DaVinciPage() {
       if (prev && view.log.length > prev.log.length) {
         const added = view.log.slice(prev.log.length);
         const sel = view.selected ?? prev.selected;
-        if (added.some((l) => l.text.includes("猜中")) && sel) {
+        if (added.some((l) => l.text.includes("guessed")) && sel) {
           setFlash({ kind: "hit", playerId: sel.playerId, index: sel.index });
-        } else if (added.some((l) => l.text.includes("猜错")) && sel) {
+        } else if (added.some((l) => l.text.includes("missed")) && sel) {
           setFlash({ kind: "miss", playerId: sel.playerId, index: sel.index });
         }
       }
@@ -372,7 +374,7 @@ export function DaVinciPage() {
       <div className="game-head">
         <div>
           <p className="kicker">01 / CODA</p>
-          <h1>达芬奇密码</h1>
+          <h1>Da Vinci Code</h1>
         </div>
         <div className="row-actions">
           <button
@@ -400,11 +402,11 @@ export function DaVinciPage() {
           {!playing || !you || !rival || !state ? (
             <div className="coda-deal">
               <p className="kicker">{matching ? "INVITE" : "OPENING DRAW"}</p>
-              <h2>{matching ? "正在邀请对手" : "选择开局摸牌"}</h2>
+              <h2>{matching ? "Invite pending" : "Opening draw"}</h2>
               <p>
                 {matching
-                  ? "等待对方接受邀请。"
-                  : `开局 ${OPENING} 张。登录后邀请在线玩家，双人对战。右侧列表可邀请。`}
+                  ? "Waiting for them to accept."
+                  : `Start with ${OPENING} tiles. Sign in to invite an online player. Use the list on the right.`}
               </p>
               {!matching ? (
                 <>
@@ -443,22 +445,15 @@ export function DaVinciPage() {
                     ))}
                   </div>
                   <div className="row-actions" style={{ justifyContent: "center" }}>
-                    <button className="btn btn-ghost" type="button" onClick={beginPractice}>
-                      练习人机
+                    <button className="btn" type="button" onClick={beginPractice}>
+                      Practice vs CPU
                     </button>
                   </div>
-                  <p>对战请登录后在右侧邀请在线玩家。练习人机仅本机。</p>
-                  {!user ? (
-                    <p>
-                      对战需先 <Link to="/login">登录</Link>
-                    </p>
-                  ) : (
-                    <p>当前账号 {user.email}</p>
-                  )}
+                  <InviteList game="coda" meta={{ useJokers: jokers, black: blackN, white: whiteN }} />
                 </>
               ) : (
                 <button className="btn btn-ghost" type="button" onClick={resetTable}>
-                  取消邀请
+                  Cancel invite
                 </button>
               )}
             </div>
@@ -468,14 +463,14 @@ export function DaVinciPage() {
             <div className="seat-plaque">
               <b>{rival.name}</b>
               <span>
-                {rival.out ? "OUT" : opening ? "整理" : me?.id === rival.id ? "回合" : "等待"}
+                {rival.out ? "OUT" : opening ? "Arrange" : me?.id === rival.id ? "Turn" : "Wait"}
               </span>
             </div>
             <div className="tiles-wrap">
               {opening ? (
                 <div className="arrange-veil" aria-hidden>
-                  <strong>整理中</strong>
-                  <span>5 秒后揭晓顺序</span>
+                  <strong>Arranging</strong>
+                  <span>Order revealed in 5 seconds</span>
                 </div>
               ) : null}
               <Row
@@ -494,17 +489,33 @@ export function DaVinciPage() {
             {arranging ? (
               <div className="arrange-clock" aria-live="polite">
                 <b>{Math.ceil(remain)}</b>
-                <span>{opening ? "开局整理" : "插入中"}</span>
+                <span>{opening ? "Opening" : "Insert"}</span>
               </div>
             ) : (
-              <DeckStack
-                count={state.deck.length}
-                label="牌堆"
-                onClick={() => myTurn && state.phase === "draw" && dispatch({ type: "draw" })}
-              />
+              <div className="draw-picks">
+                <DeckStack count={state.deck.length} label="Deck" />
+                {state.phase === "draw" && myTurn ? (
+                  <div className="draw-colors">
+                    {(["black", "white"] as const).map((color) => {
+                      const n = deckCounts(state)[color];
+                      return (
+                        <button
+                          key={color}
+                          className={`btn draw-color-btn ${color}`}
+                          type="button"
+                          disabled={n <= 0}
+                          onClick={() => dispatch({ type: "draw", color })}
+                        >
+                          Draw {color === "black" ? "black" : "white"} · {n}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
             )}
             <div className="hand-card">
-              <div className="seat-label">{arranging ? "待插入" : "摸到的牌"}</div>
+              <div className="seat-label">{arranging ? "To insert" : "Drawn tile"}</div>
               {showDrawn && drawnTile ? (
                 <MahjongTile tile={drawnTile} hide={!drawnTile.revealed && me?.id !== you.id} />
               ) : (
@@ -517,7 +528,7 @@ export function DaVinciPage() {
             <div className="seat-plaque you">
               <b>{you.name}</b>
               <span>
-                {you.out ? "OUT" : opening ? "整理" : arranging ? "插入" : me?.id === you.id ? "回合" : "等待"}
+                {you.out ? "OUT" : opening ? "Arrange" : arranging ? "Insert" : me?.id === you.id ? "Turn" : "Wait"}
               </span>
             </div>
             <div className="tiles-wrap">
@@ -541,13 +552,13 @@ export function DaVinciPage() {
           {rpsing ? (
             <div className="coda-deal coda-rps">
               <p className="kicker">FIRST MOVE</p>
-              <h2>石头剪刀布</h2>
-              <p>输的人先摸一张，再开始猜。</p>
+              <h2>Rock paper scissors</h2>
+              <p>The loser draws one tile, then guessing starts.</p>
               <div className="rps-row">
                 {([
-                  ["rock", "石头"],
-                  ["scissors", "剪刀"],
-                  ["paper", "布"],
+                  ["rock", "Rock"],
+                  ["scissors", "Scissors"],
+                  ["paper", "Paper"],
                 ] as const).map(([id, label]) => (
                   <button
                     key={id}
@@ -568,8 +579,8 @@ export function DaVinciPage() {
                 <strong>{BURST[flash.kind].title}</strong>
                 <span>{BURST[flash.kind].sub}</span>
                 {(flash.kind === "win" || flash.kind === "lose") && (
-                  <button className="btn btn-gold burst-again" type="button" onClick={resetTable}>
-                    再来一局
+                  <button className="btn burst-again" type="button" onClick={resetTable}>
+                    Play again
                   </button>
                 )}
               </div>
@@ -579,8 +590,9 @@ export function DaVinciPage() {
           )}
         </div>
 
+        <div className="side-stack">
+        <InvitePanel game="coda" meta={{ useJokers: jokers, black: blackN, white: whiteN }} />
         <aside className="side coda-panel">
-          <InvitePanel game="coda" meta={{ useJokers: jokers, black: blackN, white: whiteN }} />
           <div>
             <h3>STATUS</h3>
             <p className="status-line">
@@ -588,12 +600,12 @@ export function DaVinciPage() {
                 ? statusText(state ?? ({} as CodaState), false, remain, true)
                 : playing && state
                   ? statusText(state, myTurn, remain, false)
-                  : `选择开局：黑 ${blackN} · 白 ${whiteN}${online ? " · 对战" : ""}`}
+                  : `Opening mix: black ${blackN} · white ${whiteN}${online ? " · duel" : ""}`}
             </p>
           </div>
           {playing && state?.phase === "guess" && myTurn && (
             <div>
-              <h3>GUESS {state.selected ? "· 已锁定" : "· 先点对面的牌"}</h3>
+              <h3>Guess {state.selected ? "· locked" : "· tap a rival tile first"}</h3>
               <div className="pad">
                 {numbers.map((n) => (
                   <button key={n} type="button" disabled={!state.selected} onClick={() => dispatch({ type: "guess", value: n })}>
@@ -621,10 +633,10 @@ export function DaVinciPage() {
           <div>
             <h3>RULE</h3>
             <ul>
-              <li>登录后邀请在线玩家，双人对战。</li>
-              <li>开局 4 张在手里。摸到 — 才插入锁定；没摸到不用插入。</li>
-              <li>仅开局蒙版。插入都要等满 5 秒，选好位置也不提前入列。</li>
-              <li>开局 4 张后猜拳，输的人先摸再猜。</li>
+              <li>On your draw, pick black or white. You cannot draw a color that is gone.</li>
+              <li>Opening hand is 4 tiles. Only a drawn dash needs an insert lock.</li>
+              <li>The veil is opening-only. Inserts wait the full 5 seconds even after you pick a slot.</li>
+              <li>After the opening 4, play RPS. The loser draws first, then guesses.</li>
             </ul>
           </div>
           <div>
@@ -640,6 +652,7 @@ export function DaVinciPage() {
             </div>
           </div>
         </aside>
+        </div>
       </div>
     </div>
   );

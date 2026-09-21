@@ -25,7 +25,9 @@ import {
   createInvite,
   heartbeat,
   leaveRoom,
+  lobbyStoreKind,
   respondInvite,
+  snapshot,
 } from "./lobby.mjs";
 import { loadMods } from "./game-mods.mjs";
 
@@ -201,10 +203,11 @@ function auth(req, res, next) {
   const h = req.headers.authorization || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : "";
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = { ...payload, id: String(payload.id) };
     next();
   } catch {
-    res.status(401).json({ error: "未登录" });
+    res.status(401).json({ error: "Not signed in" });
   }
 }
 
@@ -216,13 +219,14 @@ app.get("/api/health", async (_req, res) => {
     github: githubReady(),
     match: false,
     lobby: true,
+    lobbyStore: lobbyStoreKind(),
     ws: "",
   });
 });
 
 app.get("/api/auth/github/start", (req, res) => {
   if (!githubReady()) {
-    return res.status(503).send("未配置 GitHub 登录。请在 server/.env 填写 GITHUB_CLIENT_ID 和 GITHUB_CLIENT_SECRET。");
+    return res.status(503).send("GitHub login is not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in server/.env.");
   }
   const { callbackUrl } = oauthUrls(req);
   const state = createOauthState();
@@ -255,11 +259,11 @@ app.post("/api/auth/register", async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   const password = String(req.body?.password || "");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ error: "邮箱格式不正确" });
+    return res.status(400).json({ error: "Invalid email" });
   }
-  if (password.length < 6) return res.status(400).json({ error: "密码至少 6 位" });
+  if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
   if (readUsers().some((u) => u.email === email)) {
-    return res.status(400).json({ error: "该邮箱已注册" });
+    return res.status(400).json({ error: "That email is already registered" });
   }
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const hash = bcrypt.hashSync(password, 10);
@@ -268,10 +272,10 @@ app.post("/api/auth/register", async (req, res) => {
     await mailer.sendMail({
       from: process.env.SMTP_FROM,
       to: email,
-      subject: "AXIOM 验证码",
-      text: `你的验证码是 ${code}，10 分钟内有效。`,
+      subject: "Axiom verification code",
+      text: `Your code is ${code}. It expires in 10 minutes.`,
     });
-    res.json({ needCode: true, hint: "验证码已发到邮箱，10 分钟内有效。" });
+    res.json({ needCode: true, hint: "A code was sent to your email. It expires in 10 minutes." });
     return;
   }
   console.log(`[mock mail] ${email} code = ${code}`);
@@ -471,29 +475,29 @@ app.patch("/api/me/chips", auth, (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
-app.get("/api/lobby", auth, (req, res) => {
-  res.json(heartbeat(req.user, String(req.query.href || "")));
+app.get("/api/lobby", auth, async (req, res) => {
+  res.json(await heartbeat(req.user, String(req.query.href || "")));
 });
 
 app.post("/api/lobby", auth, async (req, res) => {
   try {
     const op = String(req.body?.op || "");
     if (op === "invite") {
-      const invite = createInvite(req.user, String(req.body.toId || ""), String(req.body.game || ""), req.body.meta || {});
-      return res.json({ invite, ...snapshot(req.user.id) });
+      const invite = await createInvite(req.user, String(req.body.toId || ""), String(req.body.game || ""), req.body.meta || {});
+      return res.json({ invite, ...(await snapshot(req.user.id)) });
     }
     if (op === "respond") {
       const mods = await loadMods();
       const result = await respondInvite(req.user, String(req.body.id || ""), Boolean(req.body.accept), mods);
-      return res.json({ ...snapshot(req.user.id), ...result });
+      return res.json({ ...(await snapshot(req.user.id)), ...result });
     }
     if (op === "action") {
       const mods = await loadMods();
-      const room = applyRoomAction(req.user, String(req.body.roomId || ""), req.body.action, mods);
-      return res.json({ room, ...snapshot(req.user.id) });
+      const room = await applyRoomAction(req.user, String(req.body.roomId || ""), req.body.action, mods);
+      return res.json({ room, ...(await snapshot(req.user.id)) });
     }
     if (op === "leave") {
-      return res.json(leaveRoom(req.user.id));
+      return res.json(await leaveRoom(req.user.id));
     }
     res.status(400).json({ error: "未知操作" });
   } catch (err) {

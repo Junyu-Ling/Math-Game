@@ -253,6 +253,14 @@ function settleDuel(state) {
   } else message = `${ta} \u5E73\u5C40\u3002`;
   return { ...state, phase: "over", winnerId, message };
 }
+function startBjPractice() {
+  return startBjDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU" });
+}
+function aiBjAction(state) {
+  const me = state.players[state.turn];
+  if (!me) return { type: "stand" };
+  return hardSoft(me.cards).total < 17 ? { type: "hit" } : { type: "stand" };
+}
 function applyBjDuelAction(state, actorId, action) {
   if (state.phase !== "play") return state;
   const me = state.players[state.turn];
@@ -306,6 +314,7 @@ function isRed(suit) {
   return suit === "H" || suit === "D";
 }
 export {
+  aiBjAction,
   applyBjDuelAction,
   deal,
   doubleDown,
@@ -319,6 +328,7 @@ export {
   stand,
   startBj,
   startBjDuel,
+  startBjPractice,
   suitGlyph,
   viewBjDuel
 };

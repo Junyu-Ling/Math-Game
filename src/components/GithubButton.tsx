@@ -5,7 +5,7 @@ export function GithubButton() {
 
   function go() {
     if (!live || !githubStartUrl) {
-      window.alert("GitHub 登录需要 LIVE API。请配置 VITE_API_URL 并启动 server/。");
+      window.alert("GitHub login needs the live API. Set VITE_API_URL and start server/.");
       return;
     }
     window.location.href = githubStartUrl;
@@ -13,7 +13,7 @@ export function GithubButton() {
 
   return (
     <button className="btn" type="button" onClick={go}>
-      使用 GitHub 登录
+      Continue with GitHub
     </button>
   );
 }

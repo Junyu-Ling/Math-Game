@@ -45,7 +45,7 @@ export function startBj(chips: number): BjState {
     chips,
     bet: 50,
     phase: "bet",
-    message: "下注后发牌。目标 21，不超过。",
+    message: "Bet, then deal. Get close to 21 without going over.",
   };
 }
 
@@ -85,7 +85,7 @@ export function isBlackjack(cards: BjCard[]): boolean {
 export function deal(state: BjState): BjState {
   if (state.phase !== "bet") return state;
   if (state.chips < state.bet || state.bet <= 0) {
-    return { ...state, message: "筹码不足。" };
+    return { ...state, message: "Not enough chips." };
   }
   let next: BjState = { ...state, chips: state.chips - state.bet, dealer: [], hands: [] };
   const player: BjCard[] = [];
@@ -109,12 +109,12 @@ export function deal(state: BjState): BjState {
     next.chips += Math.floor(state.bet * 2.5);
     next.dealer = next.dealer.map((c) => ({ ...c, hidden: false }));
     next.phase = "settle";
-    next.message = "Blackjack。赔付 3:2。";
+    next.message = "Blackjack. Pays 3:2.";
     next.hands = next.hands.map((h) => ({ ...h, stood: true }));
     return next;
   }
   next.phase = "player";
-  next.message = "要牌、停牌、加倍；对子可分牌。";
+  next.message = "Hit, stand, or double. Split pairs if you can.";
   return next;
 }
 
@@ -137,7 +137,7 @@ export function hit(state: BjState): BjState {
   const cards = [...hand.cards, pulled.card];
   const hands = state.hands.map((h, i) => (i === state.active ? { ...h, cards, stood: hardSoft(cards).total >= 21 } : h));
   const total = hardSoft(cards).total;
-  let next: BjState = { ...pulled.state, hands, message: total > 21 ? "爆牌。" : `当前 ${total}` };
+  let next: BjState = { ...pulled.state, hands, message: total > 21 ? "Bust." : `Total ${total}` };
   if (hands[state.active] && handDone(hands[state.active]!)) return nextHand(next);
   return next;
 }
@@ -151,7 +151,7 @@ export function stand(state: BjState): BjState {
 export function doubleDown(state: BjState): BjState {
   if (state.phase !== "player") return state;
   const hand = state.hands[state.active];
-  if (!hand || hand.cards.length !== 2 || state.chips < hand.bet) return { ...state, message: "无法加倍。" };
+  if (!hand || hand.cards.length !== 2 || state.chips < hand.bet) return { ...state, message: "Cannot double." };
   let next: BjState = { ...state, chips: state.chips - hand.bet };
   const pulled = draw(next);
   const cards = [...hand.cards, pulled.card];
@@ -169,7 +169,7 @@ export function split(state: BjState): BjState {
   if (!a || !b) return state;
   const va = hardSoft([a]).total;
   const vb = hardSoft([b]).total;
-  if (va !== vb || state.chips < hand.bet) return { ...state, message: "无法分牌。" };
+  if (va !== vb || state.chips < hand.bet) return { ...state, message: "Cannot split." };
   let next: BjState = { ...state, chips: state.chips - hand.bet };
   let c1: BjCard;
   let c2: BjCard;
@@ -179,7 +179,7 @@ export function split(state: BjState): BjState {
   const right: Hand = { cards: [b, c2], bet: hand.bet, stood: false, doubled: false };
   const hands = [...state.hands];
   hands.splice(state.active, 1, left, right);
-  return { ...next, hands, chips: next.chips, active: state.active, phase: "player", message: "已分牌。" };
+  return { ...next, hands, chips: next.chips, active: state.active, phase: "player", message: "Split." };
 }
 
 function playDealer(state: BjState): BjState {
@@ -202,17 +202,17 @@ function settle(state: BjState): BjState {
     const t = hardSoft(hand.cards).total;
     const bj = isBlackjack(hand.cards) && state.hands.length === 1;
     if (t > 21) {
-      notes.push("玩家爆，输。");
+      notes.push("Player busts. Loss.");
     } else if (bj && !dealerBj) {
       chips += Math.floor(hand.bet * 2.5);
-      notes.push("Blackjack 赢。");
+      notes.push("Blackjack win.");
     } else if (dealerTotal > 21 || t > dealerTotal) {
       chips += hand.bet * 2;
-      notes.push(`赢 ${hand.bet}。`);
+      notes.push(`Win ${hand.bet}.`);
     } else if (t === dealerTotal) {
       chips += hand.bet;
-      notes.push("平局，退注。");
-    } else notes.push("庄家较大，输。");
+      notes.push("Push. Bet returned.");
+    } else notes.push("Dealer is higher. Loss.");
   }
   return { ...state, chips, phase: "settle", message: notes.join(" ") };
 }
@@ -224,7 +224,7 @@ export function nextRound(state: BjState): BjState {
     hands: [],
     active: 0,
     phase: "bet",
-    message: "再下一注。",
+    message: "Place another bet.",
   };
 }
 
@@ -267,7 +267,7 @@ export function startBjDuel(a: { id: string; name: string }, b: { id: string; na
     turn: 0,
     phase: "play",
     winnerId: null,
-    message: `${a.name} 先手。比点数，不超过 21。`,
+    message: `${a.name} acts first. Closest to 21 without going over.`,
   };
 }
 
@@ -281,24 +281,34 @@ function settleDuel(state: BjDuelState): BjDuelState {
   let winnerId: string | null = null;
   let message = "";
   if (ba && bb) {
-    message = "双方爆牌，平局。";
+    message = "Both bust. Push.";
   } else if (ba) {
     winnerId = b.id;
-    message = `${a.name} 爆牌，${b.name} 获胜。`;
+    message = `${a.name} busts. ${b.name} wins.`;
   } else if (bb) {
     winnerId = a.id;
-    message = `${b.name} 爆牌，${a.name} 获胜。`;
+    message = `${b.name} busts. ${a.name} wins.`;
   } else if (ta > tb) {
     winnerId = a.id;
-    message = `${a.name} ${ta} 对 ${tb}，获胜。`;
+    message = `${a.name} ${ta} vs ${tb} wins.`;
   } else if (tb > ta) {
     winnerId = b.id;
-    message = `${b.name} ${tb} 对 ${ta}，获胜。`;
-  } else message = `${ta} 平局。`;
+    message = `${b.name} ${tb} vs ${ta} wins.`;
+  } else message = `${ta} push.`;
   return { ...state, phase: "over", winnerId, message };
 }
 
 export type BjDuelAction = { type: "hit" } | { type: "stand" };
+
+export function startBjPractice(): BjDuelState {
+  return startBjDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU" });
+}
+
+export function aiBjAction(state: BjDuelState): BjDuelAction {
+  const me = state.players[state.turn];
+  if (!me) return { type: "stand" };
+  return hardSoft(me.cards).total < 17 ? { type: "hit" } : { type: "stand" };
+}
 
 export function applyBjDuelAction(state: BjDuelState, actorId: string, action: BjDuelAction): BjDuelState {
   if (state.phase !== "play") return state;
@@ -318,7 +328,7 @@ export function applyBjDuelAction(state: BjDuelState, actorId: string, action: B
       ...state,
       players,
       deck,
-      message: total > 21 ? `${me.name} 爆牌。` : `${me.name} ${total}`,
+      message: total > 21 ? `${me.name} busts.` : `${me.name} ${total}`,
     };
     if (stood && players.every((p) => p.stood)) return settleDuel(next);
     if (stood) {
@@ -328,7 +338,7 @@ export function applyBjDuelAction(state: BjDuelState, actorId: string, action: B
     return next;
   }
   players = players.map((p) => (p.id === me.id ? { ...p, stood: true } : p));
-  const next: BjDuelState = { ...state, players, message: `${me.name} 停牌。` };
+  const next: BjDuelState = { ...state, players, message: `${me.name} stands.` };
   if (players.every((p) => p.stood)) return settleDuel(next);
   return { ...next, turn: (state.turn + 1) % players.length };
 }

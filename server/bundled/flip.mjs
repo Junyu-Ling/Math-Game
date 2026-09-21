@@ -18,14 +18,15 @@ function uid(prefix = "id") {
 // src/games/flip7/engine.ts
 function deckBuild() {
   const cards = [];
+  cards.push({ id: uid("f"), kind: "number", value: 0 });
   for (let n = 1; n <= 12; n++) {
     for (let i = 0; i < n; i++) cards.push({ id: uid("f"), kind: "number", value: n });
   }
-  for (const n of [2, 3, 4]) {
-    for (let i = 0; i < 4; i++) cards.push({ id: uid("f"), kind: "plus", value: n });
+  for (const n of [2, 4, 6, 8, 10]) {
+    cards.push({ id: uid("f"), kind: "plus", value: n });
   }
+  cards.push({ id: uid("f"), kind: "double" });
   for (let i = 0; i < 3; i++) {
-    cards.push({ id: uid("f"), kind: "double" });
     cards.push({ id: uid("f"), kind: "freeze" });
     cards.push({ id: uid("f"), kind: "flip3" });
     cards.push({ id: uid("f"), kind: "chance" });
@@ -76,7 +77,17 @@ function startFlip7Duel(a, b) {
   };
 }
 function startFlip7() {
-  return startFlip7Duel({ id: uid("p"), name: "YOU" }, { id: uid("p"), name: "RIVAL" });
+  const you = { id: uid("you"), name: "YOU" };
+  const cpu = { id: uid("cpu"), name: "CPU" };
+  const state = startFlip7Duel(you, cpu);
+  return {
+    ...state,
+    players: state.players.map((p) => p.id === cpu.id ? { ...p, human: false } : p),
+    log: [{ id: uid("l"), text: "\u7EC3\u4E60\u4EBA\u673A\u3002Hit / Stay\uFF0C\u5148\u5230 200\u3002" }]
+  };
+}
+function viewFlip7(state, _viewerId) {
+  return state;
 }
 function currentFlip(state) {
   return state.players[state.turn] ?? state.players[0];
@@ -277,5 +288,6 @@ export {
   hit,
   startFlip7,
   startFlip7Duel,
-  stay
+  stay,
+  viewFlip7
 };

@@ -14,7 +14,7 @@ type Props = {
 
 export function MahjongTile({ tile, hide, selected, aimed, flash, down, dim, mini, onClick }: Props) {
   const show = tile.revealed || !hide;
-  const num = tile.value === "joker" ? "—" : tile.value;
+  const num = tile.value === "joker" ? "-" : String(tile.value);
   const className = [
     "mj",
     tile.color,
@@ -33,10 +33,14 @@ export function MahjongTile({ tile, hide, selected, aimed, flash, down, dim, min
       <span className="mj-shade" />
       <span className="coda-flip">
         <span className="coda-face">
-          <span className="coda-idx">{show ? num : ""}</span>
-          <span className="coda-num">{show ? num : <i className="mark" />}</span>
-          <span className="coda-idx coda-br">{show ? num : ""}</span>
-          <span className="coda-frame" />
+          {show ? (
+            <span className="coda-num">
+              <b>{num}</b>
+              {tile.value === "joker" ? null : <i className="coda-rule" />}
+            </span>
+          ) : (
+            <span className="coda-blank" />
+          )}
         </span>
         <span className="coda-side coda-top" />
         <span className="coda-side coda-right" />

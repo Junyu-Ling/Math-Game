@@ -45,6 +45,7 @@ export type CodaState = {
   resume: "draw" | "next" | null;
   rpsThrows: Partial<Record<string, RpsThrow>>;
   stashSlots: Partial<Record<string, number>>;
+  leftByColor?: { black: number; white: number };
 };
 
 function makeNumberDeck(): CodaTile[] {
@@ -223,7 +224,7 @@ export function startCodaMatch(
     log: [
       {
         id: uid("l"),
-        text: wait ? "联机开局：有人摸到 — 则整理 5 秒。" : "联机开局 4 张已在手里。猜拳定先手。",
+        text: wait ? "Online opening: if anyone drew a dash, arrange for 5 seconds." : "Online opening of 4 tiles in hand. RPS decides who starts.",
       },
     ],
   };
@@ -267,10 +268,10 @@ export function startCoda(useJokers = true, youBlack = 2, youWhite = 2): CodaSta
       {
         id: uid("l"),
         text: you.stash
-          ? "开局摸到 —，插入后仍是 4 张并锁定。"
+          ? "Opening dash drawn. Insert, still 4 tiles, then lock."
           : wait
-            ? "开局 4 张已在手里。对手摸到 —，整理后猜拳。"
-            : "开局 4 张已在手里，没有 —。猜拳定先手。",
+            ? "Opening 4 in hand. Rival drew a dash. Arrange, then RPS."
+            : "Opening 4 in hand, no dash. RPS decides who starts.",
       },
     ],
   };
@@ -282,7 +283,7 @@ function enterArrange(state: CodaState, pending: CodaTile | null, resume: "draw"
     return instantInsert(
       {
         ...state,
-        log: [...state.log, { id: uid("l"), text: "位置唯一，数字自动入列。" }],
+        log: [...state.log, { id: uid("l"), text: "Only one legal slot. Number inserts automatically." }],
       },
       pending,
       resume,
@@ -307,8 +308,8 @@ function enterArrange(state: CodaState, pending: CodaTile | null, resume: "draw"
         id: uid("l"),
         text:
           resume === "draw"
-            ? "开局整理 5 秒：杠在外面，插入后锁定。"
-            : "整理 5 秒：新牌停在外面，选好位置也要等到时间结束。",
+            ? "Opening arrange 5s: the tile stays out, then locks after insert."
+            : "Arrange 5s: the new tile stays out. Wait out the timer even after you pick a slot.",
       },
     ],
   };
@@ -330,7 +331,7 @@ function checkEliminations(state: CodaState): CodaState {
       players,
       phase: "over",
       winnerId: remaining[0].id,
-      log: [...state.log, { id: uid("l"), text: `${remaining[0].name} 留下未翻开的密码，胜出。`, tone: "you" }],
+      log: [...state.log, { id: uid("l"), text: `${remaining[0].name} still has a hidden code and wins.`, tone: "you" }],
     };
   }
   return { ...state, players };
@@ -354,20 +355,41 @@ export function currentPlayer(state: CodaState): CodaPlayer {
   return state.players[state.turn] ?? state.players[0]!;
 }
 
-export function drawCard(state: CodaState): CodaState {
+export function deckCounts(state: Pick<CodaState, "deck" | "leftByColor">): { black: number; white: number } {
+  if (state.leftByColor) return state.leftByColor;
+  return {
+    black: state.deck.filter((t) => t.color === "black").length,
+    white: state.deck.filter((t) => t.color === "white").length,
+  };
+}
+
+export function aiDrawColor(state: CodaState): Color {
+  const { black, white } = deckCounts(state);
+  if (black <= 0 && white <= 0) return "black";
+  if (black <= 0) return "white";
+  if (white <= 0) return "black";
+  return Math.random() < 0.5 ? "black" : "white";
+}
+
+export function drawCard(state: CodaState, color?: Color): CodaState {
   if (state.phase !== "draw") return state;
   if (state.deck.length === 0) {
-    return { ...state, phase: "guess", drawn: null, log: [...state.log, { id: uid("l"), text: "牌堆已空，直接猜牌。" }] };
+    return { ...state, phase: "guess", drawn: null, log: [...state.log, { id: uid("l"), text: "Deck is empty. Guess now." }] };
   }
-  const [card, ...rest] = state.deck;
+  const want = color ?? aiDrawColor(state);
+  const idx = state.deck.findIndex((t) => t.color === want);
+  if (idx < 0) return state;
+  const card = state.deck[idx];
   if (!card) return state;
+  const rest = state.deck.filter((_, i) => i !== idx);
   const who = currentPlayer(state).name;
+  const colorName = want === "black" ? "black" : "white";
   return {
     ...state,
     deck: rest,
     drawn: { ...card, revealed: false },
     phase: "guess",
-    log: [...state.log, { id: uid("l"), text: `${who} 摸了一张牌。`, tone: currentPlayer(state).human ? "you" : "ai" }],
+    log: [...state.log, { id: uid("l"), text: `${who} draws a ${colorName} tile.`, tone: currentPlayer(state).human ? "you" : "ai" }],
   };
 }
 
@@ -398,7 +420,7 @@ export function guessTile(state: CodaState, guess: CodaValue): CodaState {
   const tile = target?.tiles[state.selected.index];
   if (!target || !tile) return state;
   const me = currentPlayer(state);
-  const label = guess === "joker" ? "Joker" : `${tile.color === "black" ? "黑" : "白"} ${guess}`;
+  const label = guess === "joker" ? "Joker" : `${tile.color === "black" ? "black" : "white"} ${guess}`;
   const hit = tileMatches(tile, guess);
 
   if (hit) {
@@ -417,7 +439,7 @@ export function guessTile(state: CodaState, guess: CodaValue): CodaState {
       phase: "continue",
       log: [
         ...state.log,
-        { id: uid("l"), text: `${me.name} 猜中 ${target.name} 的 ${label}。`, tone: me.human ? "you" : "ai" },
+        { id: uid("l"), text: `${me.name} guessed ${target.name}'s ${label}.`, tone: me.human ? "you" : "ai" },
       ],
     };
     next = checkEliminations(next);
@@ -435,7 +457,7 @@ export function guessTile(state: CodaState, guess: CodaValue): CodaState {
         selected: null,
         log: [
           ...state.log,
-          { id: uid("l"), text: `${me.name} 猜错（${label}）。公开手牌，进入整理。`, tone: "bad" },
+          { id: uid("l"), text: `${me.name} missed (${label}). Drawn tile is shown. Arrange.`, tone: "bad" },
         ],
       },
       revealedDrawn,
@@ -446,7 +468,7 @@ export function guessTile(state: CodaState, guess: CodaValue): CodaState {
     ...state,
     drawn: null,
     selected: null,
-    log: [...state.log, { id: uid("l"), text: `${me.name} 猜错（${label}）。`, tone: "bad" }],
+    log: [...state.log, { id: uid("l"), text: `${me.name} missed (${label}).`, tone: "bad" }],
   };
   next = checkEliminations(next);
   if (next.phase === "over") return next;
@@ -467,7 +489,7 @@ export function stay(state: CodaState): CodaState {
     {
       ...state,
       selected: null,
-      log: [...state.log, { id: uid("l"), text: `${me.name} 停牌，进入整理。` }],
+      log: [...state.log, { id: uid("l"), text: `${me.name} stays. Arrange.` }],
     },
     hidden,
     "next",
@@ -536,11 +558,11 @@ export function finishArrange(state: CodaState): CodaState {
   return {
     ...next,
     phase: "rps",
-    log: [...next.log, { id: uid("l"), text: "整理结束，杠已锁定。石头剪刀布，输的人先摸。" }],
+    log: [...next.log, { id: uid("l"), text: "Arrange done. Tiles locked. RPS — loser draws first." }],
   };
 }
 
-const RPS_LABEL: Record<RpsThrow, string> = { rock: "石头", paper: "布", scissors: "剪刀" };
+const RPS_LABEL: Record<RpsThrow, string> = { rock: "rock", paper: "paper", scissors: "scissors" };
 
 function rpsWins(a: RpsThrow, b: RpsThrow): boolean {
   return (
@@ -555,7 +577,7 @@ function resolveRps(state: CodaState, aId: string, a: RpsThrow, bId: string, b: 
     return {
       ...state,
       rpsThrows: {},
-      log: [...state.log, { id: uid("l"), text: `平局，都是${RPS_LABEL[a]}。再来一次。` }],
+      log: [...state.log, { id: uid("l"), text: `Tie, both ${RPS_LABEL[a]}. Again.` }],
     };
   }
   const aWins = rpsWins(a, b);
@@ -572,7 +594,7 @@ function resolveRps(state: CodaState, aId: string, a: RpsThrow, bId: string, b: 
       ...state.log,
       {
         id: uid("l"),
-        text: `${state.players.find((p) => p.id === aId)?.name} 出${RPS_LABEL[a]}，${state.players.find((p) => p.id === bId)?.name} 出${RPS_LABEL[b]}。输的人先摸。`,
+        text: `${state.players.find((p) => p.id === aId)?.name} plays ${RPS_LABEL[a]}, ${state.players.find((p) => p.id === bId)?.name} plays ${RPS_LABEL[b]}. Loser draws first.`,
       },
     ],
   };
@@ -593,7 +615,7 @@ export function playRps(state: CodaState, you: RpsThrow, actorId?: string): Coda
     return {
       ...state,
       rpsThrows: { ...state.rpsThrows, [me.id]: mine },
-      log: [...state.log, { id: uid("l"), text: `${me.name} 已出拳，等待对手。` }],
+      log: [...state.log, { id: uid("l"), text: `${me.name} has thrown. Waiting.` }],
     };
   }
   return resolveRps({ ...state, rpsThrows: { ...state.rpsThrows, [me.id]: mine } }, me.id, mine, foe.id, theirs);
@@ -639,13 +661,13 @@ export function aiGuess(state: CodaState): { playerId: string; index: number; va
 }
 
 export function formatTile(tile: CodaTile, hidden: boolean): string {
-  if (hidden && !tile.revealed) return tile.color === "black" ? "黑" : "白";
-  if (tile.value === "joker") return tile.color === "black" ? "黑 —" : "白 —";
-  return `${tile.color === "black" ? "黑" : "白"} ${tile.value}`;
+  if (hidden && !tile.revealed) return tile.color === "black" ? "black" : "white";
+  if (tile.value === "joker") return tile.color === "black" ? "black -" : "white -";
+  return `${tile.color === "black" ? "black" : "white"} ${tile.value}`;
 }
 
 export type CodaAction =
-  | { type: "draw" }
+  | { type: "draw"; color?: Color }
   | { type: "select"; playerId: string; index: number }
   | { type: "guess"; value: CodaValue }
   | { type: "continue" }
@@ -661,7 +683,7 @@ export function applyAction(state: CodaState, actorId: string, action: CodaActio
   if (!state.players.some((p) => p.id === actorId)) return state;
   switch (action.type) {
     case "draw":
-      return isActorTurn(state, actorId) ? drawCard(state) : state;
+      return isActorTurn(state, actorId) ? drawCard(state, action.color) : state;
     case "select":
       return isActorTurn(state, actorId) ? selectTile(state, action.playerId, action.index) : state;
     case "guess":
@@ -696,6 +718,10 @@ export function viewFor(state: CodaState, viewerId: string): CodaState {
       value: 0,
       revealed: false,
     })),
+    leftByColor: {
+      black: state.deck.filter((t) => t.color === "black").length,
+      white: state.deck.filter((t) => t.color === "white").length,
+    },
     rpsThrows: {},
     stashSlots:
       state.stashSlots[viewerId] !== undefined ? { [viewerId]: state.stashSlots[viewerId] } : {},

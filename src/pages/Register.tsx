@@ -19,10 +19,10 @@ export function Register() {
     try {
       const res = await register(email.trim().toLowerCase(), password);
       setNeedCode(true);
-      setMsg(res.hint || "验证码已发到邮箱。");
+      setMsg(res.hint || "A code was sent to your email.");
     } catch (ex) {
       setErr(true);
-      setMsg(ex instanceof Error ? ex.message : "注册失败");
+      setMsg(ex instanceof Error ? ex.message : "Registration failed");
     }
   }
 
@@ -34,26 +34,26 @@ export function Register() {
       nav("/account");
     } catch (ex) {
       setErr(true);
-      setMsg(ex instanceof Error ? ex.message : "验证失败");
+      setMsg(ex instanceof Error ? ex.message : "Verification failed");
     }
   }
 
   return (
     <div className="auth-wrap">
-      <p className="kicker">{live ? "LIVE API" : "LOCAL MOCK"}</p>
-      <h1>注册</h1>
-      <p className="lede">也可以直接用 GitHub 注册并登录。</p>
+      <p className="kicker">{live ? "Live API" : "Local mock"}</p>
+      <h1>Register</h1>
+      <p className="lede">Or continue with GitHub to create an account in one step.</p>
       <div className="row-actions" style={{ marginBottom: 18 }}>
         <GithubButton />
       </div>
       {!needCode ? (
         <form onSubmit={onRegister}>
           <div className="field">
-            <label>EMAIL</label>
+            <label>Email</label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div className="field">
-            <label>PASSWORD</label>
+            <label>Password</label>
             <input
               type="password"
               minLength={6}
@@ -64,22 +64,22 @@ export function Register() {
           </div>
           <div className="row-actions">
             <button className="btn" type="submit">
-              SEND CODE
+              Send code
             </button>
             <Link to="/login" className="btn btn-ghost">
-              LOGIN
+              Log in
             </Link>
           </div>
         </form>
       ) : (
         <form onSubmit={onVerify}>
           <div className="field">
-            <label>CODE</label>
+            <label>Code</label>
             <input value={code} onChange={(e) => setCode(e.target.value)} maxLength={6} required />
           </div>
           <div className="row-actions">
             <button className="btn" type="submit">
-              VERIFY
+              Verify
             </button>
           </div>
         </form>

@@ -4,12 +4,12 @@ import { useAuth } from "../context/AuthContext";
 import { GithubButton } from "../components/GithubButton";
 
 const GH_ERR: Record<string, string> = {
-  config: "未配置 GITHUB_CLIENT_SECRET。请写入 server/.env 后重启后端。",
-  denied: "已取消 GitHub 授权。",
-  missing_code: "GitHub 未返回授权码。",
-  bad_state: "登录状态失效，请再点一次。",
-  server: "GitHub 登录失败，请重试。",
-  missing_token: "没有收到登录令牌。",
+  config: "GITHUB_CLIENT_SECRET is missing. Add it to server/.env and restart.",
+  denied: "GitHub authorization was cancelled.",
+  missing_code: "GitHub did not return a code.",
+  bad_state: "Login state expired. Try again.",
+  server: "GitHub login failed. Try again.",
+  missing_token: "No login token received.",
 };
 
 export function Login() {
@@ -30,21 +30,21 @@ export function Login() {
       nav("/account");
     } catch (ex) {
       setErr(true);
-      setMsg(ex instanceof Error ? ex.message : "登录失败");
+      setMsg(ex instanceof Error ? ex.message : "Login failed");
     }
   }
 
   return (
     <div className="auth-wrap">
-      <p className="kicker">{live ? "LIVE API" : "LOCAL MOCK"}</p>
-      <h1>登录</h1>
-      <p className="lede">正式账号请用 GitHub。登录后可邀请当前在线玩家进行双人对战。</p>
+      <p className="kicker">{live ? "Live API" : "Local mock"}</p>
+      <h1>Log in</h1>
+      <p className="lede">Use GitHub for a real account. After that you can invite anyone who is online.</p>
       <div className="row-actions" style={{ marginBottom: 18 }}>
         <GithubButton />
       </div>
       <form onSubmit={onSubmit}>
         <div className="field">
-          <label>EMAIL</label>
+          <label>Email</label>
           <input
             type="email"
             autoComplete="email"
@@ -54,7 +54,7 @@ export function Login() {
           />
         </div>
         <div className="field">
-          <label>PASSWORD</label>
+          <label>Password</label>
           <input
             type="password"
             autoComplete="current-password"
@@ -65,10 +65,10 @@ export function Login() {
         </div>
         <div className="row-actions">
           <button className="btn" type="submit">
-            ENTER
+            Enter
           </button>
           <Link to="/register" className="btn btn-ghost">
-            REGISTER
+            Register
           </Link>
         </div>
         <p className={`msg ${err ? "err" : ""}`}>{msg}</p>

@@ -8,6 +8,7 @@ type LobbyCtx = {
   invites: Invite[];
   room: RoomSnap | null;
   error: string;
+  store: "redis" | "memory" | "";
   invite: (toId: string, game: string, meta?: Record<string, unknown>) => Promise<void>;
   respond: (id: string, accept: boolean) => Promise<void>;
   sendAction: (action: object) => Promise<void>;
@@ -19,13 +20,13 @@ const Ctx = createContext<LobbyCtx | null>(null);
 export function LobbyProvider({ children }: { children: ReactNode }) {
   const { token, user } = useAuth();
   const nav = useNavigate();
-  const [snap, setSnap] = useState<LobbySnap>({ online: [], invites: [], room: null });
+  const [snap, setSnap] = useState<LobbySnap>({ online: [], invites: [], room: null, store: "memory" });
   const [error, setError] = useState("");
   const roomGame = useRef<string | null>(null);
 
   useEffect(() => {
     if (!token || !user) {
-      setSnap({ online: [], invites: [], room: null });
+      setSnap({ online: [], invites: [], room: null, store: "memory" });
       return;
     }
     let stop = false;
@@ -42,7 +43,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         }
         roomGame.current = g;
       } catch (ex) {
-        if (!stop) setError(ex instanceof Error ? ex.message : "大厅同步失败");
+        if (!stop) setError(ex instanceof Error ? ex.message : "Lobby sync failed");
       }
     };
     void tick();
@@ -59,13 +60,14 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       invites: snap.invites,
       room: snap.room,
       error,
+      store: snap.store || "",
       async invite(toId, game, meta = {}) {
-        if (!token) throw new Error("请先登录");
+        if (!token) throw new Error("Sign in first");
         const next = await lobbyApi.invite(token, toId, game, meta);
         setSnap(next);
       },
       async respond(id, accept) {
-        if (!token) throw new Error("请先登录");
+        if (!token) throw new Error("Sign in first");
         const next = await lobbyApi.respond(token, id, accept);
         setSnap(next);
         if (accept && next.room) {

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { applyM24Action, startM24Practice, type M24DuelState } from "./engine";
+import { GameSetup } from "../../components/GameSetup";
+import { InvitePanel } from "../../components/InvitePanel";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
-import { InvitePanel } from "../../components/InvitePanel";
-import type { M24DuelState } from "./engine";
 
 const OPS = ["+", "-", "×", "÷", "(", ")"];
 
@@ -11,17 +12,31 @@ export function Math24Page() {
   const { user } = useAuth();
   const lobby = useLobby();
   const room = lobby.room?.game === "m24" ? lobby.room : null;
-  const state = (room?.view as M24DuelState | undefined) ?? null;
+  const [local, setLocal] = useState<M24DuelState | null>(null);
+  const state = (room?.view as M24DuelState | undefined) ?? local;
+  const practice = Boolean(local && !room);
   const [used, setUsed] = useState<boolean[]>([false, false, false, false]);
   const [expr, setExpr] = useState("");
-  const youId = user?.id;
+  const youId = practice ? "you" : user?.id;
   const myScore = youId && state ? state.scores[youId] || 0 : 0;
   const rival = state?.players.find((p) => p.id !== youId);
+
+  useEffect(() => {
+    if (room) setLocal(null);
+  }, [room]);
 
   useEffect(() => {
     setUsed([false, false, false, false]);
     setExpr("");
   }, [state?.round]);
+
+  useEffect(() => {
+    if (!practice || !local || local.phase !== "play") return;
+    const t = window.setTimeout(() => {
+      setLocal((s) => (s && s.phase === "play" && s.solution ? applyM24Action(s, "cpu", { type: "submit", expr: s.solution }) : s));
+    }, 8000);
+    return () => window.clearTimeout(t);
+  }, [practice, local?.round, local?.phase, local?.solution]);
 
   function tapNum(i: number) {
     if (!state || used[i]) return;
@@ -32,7 +47,11 @@ export function Math24Page() {
   }
 
   async function submit() {
-    await lobby.sendAction({ type: "submit", expr });
+    if (room) {
+      await lobby.sendAction({ type: "submit", expr });
+    } else {
+      setLocal((s) => (s ? applyM24Action(s, "you", { type: "submit", expr }) : s));
+    }
     setExpr("");
     setUsed([false, false, false, false]);
   }
@@ -41,10 +60,17 @@ export function Math24Page() {
     <div className="page-wide">
       <div className="game-head">
         <div>
-          <p className="kicker">04 / M24 · 双人对战 · {state ? `${myScore} : ${rival && youId ? state.scores[rival.id] || 0 : 0}` : "0 : 0"}</p>
-          <h1>二十四点</h1>
+          <p className="kicker">
+            04 / M24 · Duel · {state ? `${myScore} : ${rival && youId ? state.scores[rival.id] || 0 : 0}` : "0 : 0"}
+          </p>
+          <h1>Make 24</h1>
         </div>
         <div className="row-actions">
+          {practice ? (
+            <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
+              RESET
+            </button>
+          ) : null}
           <Link className="btn btn-ghost" to="/">
             LEAVE
           </Link>
@@ -53,11 +79,13 @@ export function Math24Page() {
       <div className="game-layout">
         <div className="table table-m24">
           {!state ? (
-            <div className="coda-deal">
-              <p className="kicker">DUEL</p>
-              <h2>邀请一名在线玩家</h2>
-              <p>同一组四张牌，谁先凑出 24 得分，先到 3 分获胜。</p>
-            </div>
+            <GameSetup
+              kicker="MATH 24"
+              title="First to make 24"
+              blurb="Same four cards. First to 3 points wins. In practice, the CPU submits in about 8 seconds."
+              game="m24"
+              onPractice={() => setLocal(startM24Practice())}
+            />
           ) : (
             <>
               <div className="m24-board">

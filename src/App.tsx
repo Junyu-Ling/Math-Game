@@ -11,6 +11,7 @@ import { DaVinciPage } from "./games/davinci/DaVinciPage";
 import { Flip7Page } from "./games/flip7/Flip7Page";
 import { BlackjackPage } from "./games/blackjack/BlackjackPage";
 import { Math24Page } from "./games/math24/Math24Page";
+import { UnoPage } from "./games/uno/UnoPage";
 
 export function App() {
   return (
@@ -28,6 +29,7 @@ export function App() {
             <Route path="/play/flip7" element={<Flip7Page />} />
             <Route path="/play/blackjack" element={<BlackjackPage />} />
             <Route path="/play/24" element={<Math24Page />} />
+            <Route path="/play/uno" element={<UnoPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Shell>

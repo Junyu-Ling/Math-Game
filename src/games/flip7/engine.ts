@@ -39,14 +39,15 @@ export type FlipState = {
 
 function deckBuild(): FlipCard[] {
   const cards: FlipCard[] = [];
+  cards.push({ id: uid("f"), kind: "number", value: 0 });
   for (let n = 1; n <= 12; n++) {
     for (let i = 0; i < n; i++) cards.push({ id: uid("f"), kind: "number", value: n });
   }
-  for (const n of [2, 3, 4]) {
-    for (let i = 0; i < 4; i++) cards.push({ id: uid("f"), kind: "plus", value: n });
+  for (const n of [2, 4, 6, 8, 10]) {
+    cards.push({ id: uid("f"), kind: "plus", value: n });
   }
+  cards.push({ id: uid("f"), kind: "double" });
   for (let i = 0; i < 3; i++) {
-    cards.push({ id: uid("f"), kind: "double" });
     cards.push({ id: uid("f"), kind: "freeze" });
     cards.push({ id: uid("f"), kind: "flip3" });
     cards.push({ id: uid("f"), kind: "chance" });
@@ -96,12 +97,23 @@ export function startFlip7Duel(a: { id: string; name: string }, b: { id: string;
     lastCard: null,
     winnerId: null,
     goal: 200,
-    log: [{ id: uid("l"), text: `${a.name} vs ${b.name}。Hit / Stay，先到 200。` }],
+    log: [{ id: uid("l"), text: `${a.name} vs ${b.name}. Hit / Stay. First to 200.` }],
   };
 }
 
 export function startFlip7(): FlipState {
-  return startFlip7Duel({ id: uid("p"), name: "YOU" }, { id: uid("p"), name: "RIVAL" });
+  const you = { id: uid("you"), name: "YOU" };
+  const cpu = { id: uid("cpu"), name: "CPU" };
+  const state = startFlip7Duel(you, cpu);
+  return {
+    ...state,
+    players: state.players.map((p) => (p.id === cpu.id ? { ...p, human: false } : p)),
+    log: [{ id: uid("l"), text: "Practice vs CPU. Hit / Stay. First to 200." }],
+  };
+}
+
+export function viewFlip7(state: FlipState, _viewerId: string): FlipState {
+  return state;
 }
 
 export function currentFlip(state: FlipState): FlipPlayer {
@@ -142,12 +154,12 @@ export function hit(state: FlipState): FlipState {
       const area = me.area.filter((c) => c.id !== chance.id);
       next = withPlayer(next, me.id, (p) => ({ ...p, area, pendingFlip3: Math.max(0, p.pendingFlip3 - 1) }));
       next.discard = [...next.discard, chance, card];
-      next.log = [...next.log, { id: uid("l"), text: `${me.name} 触发重复 ${card.value}，消耗 Second Chance。`, tone: whoTone }];
+      next.log = [...next.log, { id: uid("l"), text: `${me.name} hit a duplicate ${card.value} and spent Second Chance.`, tone: whoTone }];
       return afterHit(next, me.id);
     }
     next = withPlayer(next, me.id, (p) => ({ ...p, area: [], status: "bust", pendingFlip3: 0 }));
     next.discard = [...next.discard, ...me.area, card];
-    next.log = [...next.log, { id: uid("l"), text: `${me.name} 爆牌（重复 ${card.value}），本轮 0 分。`, tone: "bad" }];
+    next.log = [...next.log, { id: uid("l"), text: `${me.name} busts (duplicate ${card.value}). Round scores 0.`, tone: "bad" }];
     return advance(next);
   }
 
@@ -156,7 +168,7 @@ export function hit(state: FlipState): FlipState {
     area: [...p.area, card],
     pendingFlip3: Math.max(0, p.pendingFlip3 - 1),
   }));
-  next.log = [...next.log, { id: uid("l"), text: `${me.name} 翻开 ${cardLabel(card)}。`, tone: whoTone }];
+  next.log = [...next.log, { id: uid("l"), text: `${me.name} flips ${cardLabel(card)}.`, tone: whoTone }];
 
   if (card.kind === "freeze" || card.kind === "flip3") {
     return { ...next, phase: "target", pendingAction: card.kind };
@@ -176,7 +188,7 @@ function afterHit(state: FlipState, playerId: string): FlipState {
       area: [],
     }));
     next.discard = [...next.discard, ...me.area];
-    next.log = [...next.log, { id: uid("l"), text: `${me.name} Flip 7！+${scored.score}（含 15 暴击）。`, tone: "you" }];
+    next.log = [...next.log, { id: uid("l"), text: `${me.name} Flip 7! +${scored.score} (includes +15).`, tone: "you" }];
     next = checkWin(next, me.id);
     if (next.phase === "over") return next;
     return advance(next);
@@ -191,7 +203,7 @@ export function stay(state: FlipState): FlipState {
   const scored = areaScore(me.area).score;
   let next = withPlayer(state, me.id, (p) => ({ ...p, area: [], status: "stayed", total: p.total + scored }));
   next.discard = [...next.discard, ...me.area];
-  next.log = [...next.log, { id: uid("l"), text: `${me.name} 停牌，本轮 +${scored}。`, tone: me.human ? "you" : "ai" }];
+  next.log = [...next.log, { id: uid("l"), text: `${me.name} stays. Round +${scored}.`, tone: me.human ? "you" : "ai" }];
   next = checkWin(next, me.id);
   if (next.phase === "over") return next;
   return advance(next);
@@ -204,10 +216,10 @@ export function applyTarget(state: FlipState, targetId: string): FlipState {
   let next = state;
   if (action === "freeze") {
     next = withPlayer(next, targetId, (p) => ({ ...p, pendingFreeze: true }));
-    next.log = [...next.log, { id: uid("l"), text: `${me.name} 对 ${nameOf(state, targetId)} 使用 Freeze。` }];
+    next.log = [...next.log, { id: uid("l"), text: `${me.name} uses Freeze on ${nameOf(state, targetId)}.` }];
   } else {
     next = withPlayer(next, targetId, (p) => ({ ...p, pendingFlip3: p.pendingFlip3 + 3 }));
-    next.log = [...next.log, { id: uid("l"), text: `${me.name} 对 ${nameOf(state, targetId)} 使用 Flip Three。` }];
+    next.log = [...next.log, { id: uid("l"), text: `${me.name} uses Flip Three on ${nameOf(state, targetId)}.` }];
   }
   next.pendingAction = null;
   next.phase = "action";
@@ -225,7 +237,7 @@ function checkWin(state: FlipState, playerId: string): FlipState {
       ...state,
       phase: "over",
       winnerId: p.id,
-      log: [...state.log, { id: uid("l"), text: `${p.name} 达到 ${p.total}，胜出。`, tone: "you" }],
+      log: [...state.log, { id: uid("l"), text: `${p.name} reaches ${p.total} and wins.`, tone: "you" }],
     };
   }
   return state;
@@ -250,7 +262,7 @@ function newRound(state: FlipState): FlipState {
     turn: (state.round) % state.players.length,
     phase: "action",
     lastCard: null,
-    log: [...state.log, { id: uid("l"), text: `第 ${state.round + 1} 轮开始。` }],
+    log: [...state.log, { id: uid("l"), text: `Round ${state.round + 1} starts.` }],
   };
 }
 
@@ -270,7 +282,7 @@ export function advance(state: FlipState): FlipState {
         status: "stayed",
         total: x.total + scored,
       }));
-      next.log = [...next.log, { id: uid("l"), text: `${p.name} 被冻结，强制停牌 +${scored}。` }];
+      next.log = [...next.log, { id: uid("l"), text: `${p.name} is frozen and must stay +${scored}.` }];
       next = checkWin(next, p.id);
       if (next.phase === "over") return next;
       next.turn = i;

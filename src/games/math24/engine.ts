@@ -78,7 +78,7 @@ export function tokenize(src: string): string[] {
       out.push(n);
       continue;
     }
-    throw new Error(`无法识别的符号：${ch}`);
+    throw new Error(`Unknown symbol: ${ch}`);
   }
   return out;
 }
@@ -88,7 +88,7 @@ function parseExpr(tokens: string[]): { value: number; used: number[] } {
   const peek = () => tokens[i];
   const eat = (t?: string) => {
     const v = tokens[i];
-    if (t && v !== t) throw new Error("表达式不合法");
+    if (t && v !== t) throw new Error("Invalid expression");
     i += 1;
     return v;
   };
@@ -107,7 +107,7 @@ function parseExpr(tokens: string[]): { value: number; used: number[] } {
       used.push(Number(t));
       return Number(t);
     }
-    throw new Error("表达式不合法");
+    throw new Error("Invalid expression");
   };
 
   const parseMul = (): number => {
@@ -131,7 +131,7 @@ function parseExpr(tokens: string[]): { value: number; used: number[] } {
   };
 
   const value = parseAdd();
-  if (i !== tokens.length) throw new Error("表达式不完整");
+  if (i !== tokens.length) throw new Error("Incomplete expression");
   return { value, used };
 }
 
@@ -141,14 +141,14 @@ export function checkSolution(nums: number[], expr: string): { ok: boolean; valu
     const a = [...used].sort((x, y) => x - y);
     const b = [...nums].sort((x, y) => x - y);
     if (a.length !== b.length || a.some((n, i) => n !== b[i])) {
-      return { ok: false, error: "必须用完这四张牌，且每张只用一次。" };
+      return { ok: false, error: "Use all four cards, each once." };
     }
     if (!Number.isFinite(value) || Math.abs(value - 24) > 1e-6) {
-      return { ok: false, value, error: `结果是 ${Number(value.toFixed(4))}，不是 24。` };
+      return { ok: false, value, error: `Got ${Number(value.toFixed(4))}, not 24.` };
     }
     return { ok: true, value: 24 };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "无法计算" };
+    return { ok: false, error: e instanceof Error ? e.message : "Cannot evaluate" };
   }
 }
 
@@ -170,6 +170,11 @@ export type M24DuelState = {
   message: string;
 };
 
+export function startM24Practice(): M24DuelState {
+  const state = startM24Duel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU" });
+  return { ...state, message: "Practice vs CPU. The CPU submits in about 8 seconds. Make 24 first." };
+}
+
 export function startM24Duel(a: { id: string; name: string }, b: { id: string; name: string }): M24DuelState {
   const puzzle = newPuzzle();
   return {
@@ -182,7 +187,7 @@ export function startM24Duel(a: { id: string; name: string }, b: { id: string; n
     round: 1,
     goal: 3,
     winnerId: null,
-    message: "同一组牌，谁先凑出 24 得分。先到 3 分。",
+    message: "Same cards. First to make 24 scores. First to 3 points.",
   };
 }
 
@@ -195,7 +200,7 @@ export function applyM24Action(state: M24DuelState, actorId: string, action: M24
   const res = checkSolution(state.nums, action.expr);
   const actor = state.players.find((p) => p.id === actorId);
   if (!res.ok) {
-    return { ...state, message: `${actor?.name || "玩家"}：${res.error}` };
+    return { ...state, message: `${actor?.name || "Player"}: ${res.error}` };
   }
   const scores = { ...state.scores, [actorId]: (state.scores[actorId] || 0) + 1 };
   if (scores[actorId]! >= state.goal) {
@@ -204,7 +209,7 @@ export function applyM24Action(state: M24DuelState, actorId: string, action: M24
       scores,
       phase: "over",
       winnerId: actorId,
-      message: `${actor?.name} 凑出 24，先到 ${state.goal} 分获胜。`,
+      message: `${actor?.name} made 24. First to ${state.goal} wins.`,
     };
   }
   const puzzle = newPuzzle();
@@ -214,7 +219,7 @@ export function applyM24Action(state: M24DuelState, actorId: string, action: M24
     nums: puzzle.nums,
     solution: puzzle.solution,
     round: state.round + 1,
-    message: `${actor?.name} 得分！${scores[actorId]} / ${state.goal}。下一题。`,
+    message: `${actor?.name} scores! ${scores[actorId]} / ${state.goal}. Next hand.`,
   };
 }
 

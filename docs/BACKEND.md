@@ -1,52 +1,46 @@
-# 后端配置（邮箱登录 + Redis 匹配联机）
+# 后端配置
 
-达芬奇密码正式模式是：**邮箱登录 → WebSocket 入队 → Redis `queue:coda` 凑齐两人 → 服务端权威同步对局**。
+邀请对战的在线列表存在 Redis。不配 Redis 时，Vercel 每个函数实例各记一份内存，两个账号会互相看不见。
 
-前端必须能连上 API。在**项目根目录**放 `.env`（可从 `.env.example` 复制）：
+---
+
+## Redis：线上（Vercel，必配）
+
+推荐 [Upstash Redis](https://console.upstash.com/) 免费库：
+
+1. 注册 Upstash → Create database → 区域选靠近用户（如 `ap-southeast-1`）。
+2. 打开数据库 → **REST / Connect** 里复制 **`REDIS_URL`**（形如 `rediss://default:密码@xxx.upstash.io:6379`，注意是 `rediss`）。
+3. Vercel 项目 → Settings → Environment Variables，对 Production / Preview 都加上：
 
 ```
-VITE_API_URL=http://localhost:8787
+REDIS_URL=rediss://default:你的密码@你的主机.upstash.io:6379
+JWT_SECRET=和 GitHub 登录用的那串完全相同
 ```
 
-改完后重新执行 `npm run dev`。登录页应显示 `LIVE API`，不是 `LOCAL MOCK`。
+4. Redeploy。打开 `https://math31415926.vercel.app/api/health`，应看到 `"lobbyStore":"redis"`。
+5. 用两个已登录账号同时打开同一游戏，桌上会出现可点的「邀请加入」。
+
+不要把密码提交进 Git。只放 Vercel 环境变量。
 
 ---
 
-## 演示账号（开箱即用）
-
-启动 `server/` 后会自动写入两个本地账号（仅本机 `server/data/users.json`）：
-
-| 邮箱 | 密码 |
-| --- | --- |
-| `player1@axiom.local` | `axiom123` |
-| `player2@axiom.local` | `axiom123` |
-
-自己注册也可以：未配 SMTP 时，6 位验证码打印在运行 `npm start` 的**后端终端**。
-
----
-
-## 怎么打一局匹配联机
-
-1. 先按下面「安装 Redis + 启动 API」把 `8787` 跑起来。  
-2. 项目根目录配置 `VITE_API_URL`，启动前端。  
-3. 浏览器 A：打开 `/login`，用 `player1@axiom.local` / `axiom123`。  
-4. 进入达芬奇 → 选黑白张数 → **匹配联机**。  
-5. 浏览器 B（无痕或另一台机器）：登录 `player2@axiom.local` → 同样点匹配。  
-6. Redis 弹出两人后自动开局；猜拳、摸牌、猜牌都走 WebSocket，对手牌面是掩码的。
-
-练习人机仍可在未登录时点「练习人机」。
-
----
-
-## 一、安装 Redis
+## Redis：本机
 
 Windows 任选其一：
 
-- [Memurai](https://www.memurai.com/)（Redis 兼容）
 - Docker：`docker run -d --name redis -p 6379:6379 redis:7`
+- [Memurai](https://www.memurai.com/)
 - WSL：`sudo apt install redis-server`
 
 确认：`redis-cli ping` 应返回 `PONG`。
+
+`server/.env`：
+
+```
+REDIS_URL=redis://127.0.0.1:6379
+```
+
+然后 `npm run server`。健康检查 `http://localhost:8787/api/health` 里 `lobbyStore` 为 `redis`。
 
 ---
 

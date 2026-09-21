@@ -33,7 +33,7 @@ export type HealthInfo = {
 
 export async function fetchHealth(): Promise<HealthInfo> {
   const res = await fetch(`${apiBase}/api/health`);
-  if (!res.ok) throw new Error(`健康检查失败 (${res.status})`);
+  if (!res.ok) throw new Error(`Health check failed (${res.status})`);
   return (await res.json()) as HealthInfo;
 }
 
@@ -46,7 +46,7 @@ function headers(token?: string): HeadersInit {
 async function request<T>(path: string, init: RequestInit): Promise<T> {
   const res = await fetch(`${apiBase}${path}`, init);
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(data.error || `请求失败 (${res.status})`);
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
 
@@ -123,12 +123,12 @@ export const authApi = {
       });
     }
     const users = readMockUsers();
-    if (users.some((u) => u.email === email)) throw new Error("该邮箱已注册");
+    if (users.some((u) => u.email === email)) throw new Error("That email is already registered");
     sessionStorage.setItem(
       "axiom.pending",
       JSON.stringify({ email, password, code: "000000" }),
     );
-    return { needCode: true, hint: "本地模式验证码：000000" };
+    return { needCode: true, hint: "Local code: 000000" };
   },
 
   async verify(email: string, code: string): Promise<AuthPayload> {
@@ -142,8 +142,8 @@ export const authApi = {
     const pending = JSON.parse(sessionStorage.getItem("axiom.pending") || "null") as
       | { email: string; password: string; code: string }
       | null;
-    if (!pending || pending.email !== email) throw new Error("没有待验证的注册");
-    if (code !== pending.code) throw new Error("验证码不正确");
+    if (!pending || pending.email !== email) throw new Error("No pending registration");
+    if (code !== pending.code) throw new Error("Wrong code");
     const user: User = {
       id: `u_${Date.now()}`,
       email,
@@ -167,7 +167,7 @@ export const authApi = {
     }
     const users = readMockUsers();
     const found = users.find((u) => u.email === email && u.password === password);
-    if (!found) throw new Error("邮箱或密码错误");
+    if (!found) throw new Error("Wrong email or password");
     const { password: _pw, ...user } = found;
     void _pw;
     return { token: mockToken(email), user };
@@ -184,14 +184,14 @@ export const authApi = {
       } catch {
         const fromJwt = userFromJwt(token);
         if (fromJwt) return fromJwt;
-        throw new Error("未登录");
+        throw new Error("Not signed in");
       }
     }
     const stored = this.getStored();
-    if (!stored || stored.token !== token) throw new Error("未登录");
+    if (!stored || stored.token !== token) throw new Error("Not signed in");
     const users = readMockUsers();
     const found = users.find((u) => u.email === stored.user.email);
-    if (!found) throw new Error("用户不存在");
+    if (!found) throw new Error("User not found");
     const { password: _pw, ...user } = found;
     void _pw;
     return user;
@@ -207,12 +207,12 @@ export const authApi = {
       return data.user;
     }
     const stored = this.getStored();
-    if (!stored || stored.token !== token) throw new Error("未登录");
+    if (!stored || stored.token !== token) throw new Error("Not signed in");
     const users = readMockUsers();
     const idx = users.findIndex((u) => u.email === stored.user.email);
-    if (idx < 0) throw new Error("用户不存在");
+    if (idx < 0) throw new Error("User not found");
     const current = users[idx];
-    if (!current) throw new Error("用户不存在");
+    if (!current) throw new Error("User not found");
     current.chips = chips;
     writeMockUsers(users);
     const { password: _pw, ...user } = current;

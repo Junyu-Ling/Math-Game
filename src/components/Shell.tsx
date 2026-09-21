@@ -8,33 +8,34 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="shell">
       <header className="topbar">
         <NavLink to="/" className="brand">
-          <strong>AXIOM</strong>
-          <span>TABLE</span>
+          <strong>Axiom</strong>
+          <span>Play</span>
         </NavLink>
         <nav className="nav">
-          <NavLink to="/play/davinci">CODA</NavLink>
-          <NavLink to="/play/flip7">FLIP7</NavLink>
-          <NavLink to="/play/blackjack">BJ21</NavLink>
-          <NavLink to="/play/24">M24</NavLink>
+          <NavLink to="/play/davinci">Coda</NavLink>
+          <NavLink to="/play/flip7">Flip 7</NavLink>
+          <NavLink to="/play/blackjack">21</NavLink>
+          <NavLink to="/play/24">24</NavLink>
+          <NavLink to="/play/uno">UNO</NavLink>
           {user ? (
             <>
-              <span className="chip-pill">{user.chips} CHIPS</span>
+              <span className="chip-pill">{user.chips}</span>
               <NavLink to="/account" title={user.email}>
                 {user.login || user.name || user.email.split("@")[0]}
               </NavLink>
               <button className="linkish" type="button" onClick={logout}>
-                OUT
+                Log out
               </button>
             </>
           ) : (
-            <NavLink to="/login">LOGIN</NavLink>
+            <NavLink to="/login">Log in</NavLink>
           )}
         </nav>
       </header>
       <main>{children}</main>
       <footer className="foot">
-        <span>AXIOM / GITHUB AUTH</span>
-        <span>NO SUPABASE · REDIS OPTIONAL</span>
+        <span>Axiom</span>
+        <span>Invite duels · GitHub</span>
       </footer>
     </div>
   );

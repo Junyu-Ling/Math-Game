@@ -24,6 +24,7 @@ export type LobbySnap = {
   online: OnlinePlayer[];
   invites: Invite[];
   room: RoomSnap | null;
+  store?: "redis" | "memory";
 };
 
 async function call(token: string, path: string, init: RequestInit = {}): Promise<LobbySnap & Record<string, unknown>> {
@@ -36,7 +37,7 @@ async function call(token: string, path: string, init: RequestInit = {}): Promis
     },
   });
   const data = (await res.json().catch(() => ({}))) as LobbySnap & { error?: string };
-  if (!res.ok) throw new Error(data.error || `请求失败 (${res.status})`);
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
 
@@ -63,4 +64,5 @@ export const GAME_PATH: Record<string, string> = {
   flip7: "/play/flip7",
   bj: "/play/blackjack",
   m24: "/play/24",
+  uno: "/play/uno",
 };

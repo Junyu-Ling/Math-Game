@@ -1,39 +1,47 @@
 import { Link } from "react-router-dom";
 import { MahjongTile } from "../components/MahjongTile";
-import { FlipFace, MiniPoker } from "../components/PlayingCard";
+import { FlipFace, MiniPoker, UnoFace } from "../components/PlayingCard";
 
 const games = [
   {
     to: "/play/davinci",
     idx: "01",
     code: "CODA",
-    name: "达芬奇密码",
-    blurb: "登录后邀请在线玩家，双人猜牌对战。",
+    name: "Da Vinci Code",
+    blurb: "Black and white acrylic tiles. Choose a color to draw, then guess the numbers in your rival’s row.",
     preview: "coda" as const,
   },
   {
     to: "/play/flip7",
     idx: "02",
     code: "FLIP7",
-    name: "七翻天",
-    blurb: "两人轮流翻牌累分，先到 200。",
+    name: "Flip 7",
+    blurb: "Number wreaths. Seven distinct values score a bonus. First to 200 wins.",
     preview: "flip" as const,
   },
   {
     to: "/play/blackjack",
     idx: "03",
     code: "BJ21",
-    name: "二十一点",
-    blurb: "双人比点数，不超过 21。",
+    name: "Blackjack",
+    blurb: "Head-to-head poker. The rival hole card stays down until they stand.",
     preview: "bj" as const,
   },
   {
     to: "/play/24",
     idx: "04",
     code: "M24",
-    name: "二十四点",
-    blurb: "同一组四张牌，谁先凑成 24。",
+    name: "Make 24",
+    blurb: "Same four cards. First to make 24 scores.",
     preview: "m24" as const,
+  },
+  {
+    to: "/play/uno",
+    idx: "05",
+    code: "UNO",
+    name: "UNO",
+    blurb: "Classic four-color ovals. Empty your hand to win.",
+    preview: "uno" as const,
   },
 ];
 
@@ -42,8 +50,8 @@ function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
     return (
       <div className="preview-row">
         <MahjongTile mini hide={false} tile={{ color: "black", value: 2, revealed: true }} />
-        <MahjongTile mini hide={false} down tile={{ color: "white", value: 5, revealed: true }} />
-        <MahjongTile mini hide tile={{ color: "black", value: 8, revealed: false }} />
+        <MahjongTile mini hide={false} tile={{ color: "white", value: 5, revealed: true }} />
+        <MahjongTile mini hide={false} tile={{ color: "white", value: "joker", revealed: true }} />
       </div>
     );
   }
@@ -60,6 +68,15 @@ function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
       <div className="preview-row">
         <MiniPoker rank="A" suit="S" />
         <MiniPoker rank="K" suit="H" />
+      </div>
+    );
+  }
+  if (kind === "uno") {
+    return (
+      <div className="preview-row">
+        <UnoFace card={{ id: "u1", color: "red", kind: "number", value: 7 }} />
+        <UnoFace card={{ id: "u2", color: "yellow", kind: "skip" }} />
+        <UnoFace card={{ id: "u3", color: "black", kind: "wild4" }} />
       </div>
     );
   }
@@ -80,17 +97,18 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="kicker">NUMERICAL TABLE</p>
-          <h1>四术同桌。</h1>
+          <p className="kicker">Five tables · Two players</p>
+          <h1>Play on a quiet table.</h1>
           <p className="lede">
-            骨牌立桌，纸牌铺毡。登录后邀请当前在线玩家，四款都是双人对战。
+            Card art follows the physical decks. Practice against the CPU, or sign in and invite someone who is online.
           </p>
         </div>
         <div className="hero-stage" aria-hidden>
-          <MahjongTile mini hide={false} tile={{ color: "white", value: 3, revealed: true }} />
+          <UnoFace card={{ id: "h1", color: "red", kind: "number", value: 0 }} />
+          <FlipFace card={{ id: "h2", kind: "number", value: 12 }} />
           <MahjongTile mini hide={false} tile={{ color: "black", value: 7, revealed: true }} />
-          <MahjongTile mini hide={false} down tile={{ color: "white", value: "joker", revealed: true }} />
-          <MiniPoker rank="Q" suit="D" />
+          <UnoFace card={{ id: "h3", color: "blue", kind: "draw2" }} />
+          <MahjongTile mini hide={false} tile={{ color: "white", value: "joker", revealed: true }} />
         </div>
       </section>
       <div className="game-grid">
@@ -104,11 +122,11 @@ export function Home() {
               <p>{g.blurb}</p>
               <Preview kind={g.preview} />
             </div>
-            <div className="enter">ENTER →</div>
+            <div className="enter">Open →</div>
           </Link>
         ))}
       </div>
-      <p className="section-note">登录后可见在线玩家并邀请入座 · 暂为双人</p>
+      <p className="section-note">Practice needs no account. Duels are invite-only, two players.</p>
     </div>
   );
 }
