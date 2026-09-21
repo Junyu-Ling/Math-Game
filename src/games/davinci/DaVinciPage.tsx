@@ -12,6 +12,7 @@ import {
   guessTile,
   insertIndices,
   selectTile,
+  triedOnTile,
   setPendingSlot,
   playRps,
   startCoda,
@@ -72,6 +73,7 @@ function Row({
   gaps,
   ghostAt,
   reserveSlot,
+  triedById,
 }: {
   tiles: CodaTile[];
   hide: boolean;
@@ -84,6 +86,7 @@ function Row({
   gaps?: number[];
   ghostAt?: number | null;
   reserveSlot?: boolean;
+  triedById?: Record<string, CodaValue[]>;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -123,6 +126,7 @@ function Row({
             aimed={aimed && !tile.revealed}
             flash={fx}
             down={Boolean(downRevealed && tile.revealed)}
+            tried={tile.revealed ? undefined : triedById?.[tile.id]}
             onClick={onTile ? () => onTile(i) : undefined}
           />
         ),
@@ -326,6 +330,9 @@ export function DaVinciPage() {
   const drawnTile = opening && you?.stash ? you.stash : state?.drawn;
   const aimedRival = state?.selected && rival && state.selected.playerId === rival.id ? state.selected.index : undefined;
   const aimedYou = state?.selected && you && state.selected.playerId === you.id ? state.selected.index : undefined;
+  const selectedTried = new Set(
+    playing && state?.selected ? triedOnTile(state, state.selected.playerId, state.selected.index) : [],
+  );
 
   function setBlack(n: number) {
     const black = Math.max(0, Math.min(OPENING, n));
@@ -486,6 +493,7 @@ export function DaVinciPage() {
                 selectedIndex={aimedRival}
                 flash={flash}
                 reserveSlot
+                triedById={state.tried}
                 onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: rival.id, index: i })}
               />
             </div>
@@ -561,6 +569,7 @@ export function DaVinciPage() {
                 selectedIndex={aimedYou}
                 flash={flash}
                 reserveSlot
+                triedById={state.tried}
                 gaps={arrangeGaps}
                 ghostAt={myInsert ? autoSlot : null}
                 onGap={(i) => {
@@ -630,20 +639,26 @@ export function DaVinciPage() {
               <div className={state.phase === "guess" && myTurn ? "" : "is-idle"}>
                 <h3>Guess {state.selected ? "· locked" : "· tap a rival tile first"}</h3>
                 <div className="pad">
-                  {numbers.map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      disabled={!(state.phase === "guess" && myTurn && state.selected)}
-                      onClick={() => dispatch({ type: "guess", value: n })}
-                    >
-                      {n}
-                    </button>
-                  ))}
+                  {numbers.map((n) => {
+                    const used = selectedTried.has(n);
+                    const canGuess = state.phase === "guess" && myTurn && Boolean(state.selected) && !used;
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        className={used ? "tried" : ""}
+                        disabled={!canGuess}
+                        onClick={() => dispatch({ type: "guess", value: n })}
+                      >
+                        {n}
+                      </button>
+                    );
+                  })}
                   {jokers ? (
                     <button
                       type="button"
-                      disabled={!(state.phase === "guess" && myTurn && state.selected)}
+                      className={selectedTried.has("joker") ? "tried" : ""}
+                      disabled={!(state.phase === "guess" && myTurn && state.selected) || selectedTried.has("joker")}
                       onClick={() => dispatch({ type: "guess", value: "joker" })}
                     >
                       —

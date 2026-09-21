@@ -45,6 +45,7 @@ export type CodaState = {
   resume: "draw" | "next" | null;
   rpsThrows: Partial<Record<string, RpsThrow>>;
   stashSlots: Partial<Record<string, number>>;
+  tried: Record<string, CodaValue[]>;
   leftByColor?: { black: number; white: number };
 };
 
@@ -264,6 +265,7 @@ export function startCoda(useJokers = true, youBlack = 2, youWhite = 2): CodaSta
     resume: wait ? "draw" : null,
     rpsThrows: {},
     stashSlots,
+    tried: {},
     log: [
       {
         id: uid("l"),
@@ -407,6 +409,18 @@ function tileMatches(tile: CodaTile, guess: CodaValue): boolean {
   return tile.value === guess;
 }
 
+export function triedOnTile(state: Pick<CodaState, "players" | "tried">, playerId: string, index: number): CodaValue[] {
+  const tile = state.players.find((p) => p.id === playerId)?.tiles[index];
+  if (!tile) return [];
+  return (state.tried ?? {})[tile.id] ?? [];
+}
+
+function rememberGuess(state: CodaState, tileId: string, guess: CodaValue): Record<string, CodaValue[]> {
+  const prev = (state.tried ?? {})[tileId] ?? [];
+  if (prev.some((v) => v === guess)) return state.tried;
+  return { ...(state.tried ?? {}), [tileId]: [...prev, guess] };
+}
+
 function insertInto(player: CodaPlayer, card: CodaTile, index?: number): CodaPlayer {
   const idx = index ?? insertIndices(player.tiles, card)[0] ?? player.tiles.length;
   const tiles = [...player.tiles];
@@ -419,9 +433,11 @@ export function guessTile(state: CodaState, guess: CodaValue): CodaState {
   const target = state.players.find((p) => p.id === state.selected?.playerId);
   const tile = target?.tiles[state.selected.index];
   if (!target || !tile) return state;
+  if ((state.tried?.[tile.id] ?? []).some((v) => v === guess)) return state;
   const me = currentPlayer(state);
   const label = guess === "joker" ? "Joker" : `${tile.color === "black" ? "black" : "white"} ${guess}`;
   const hit = tileMatches(tile, guess);
+  const tried = rememberGuess(state, tile.id, guess);
 
   if (hit) {
     const players = state.players.map((p) =>
@@ -434,6 +450,7 @@ export function guessTile(state: CodaState, guess: CodaValue): CodaState {
     );
     let next: CodaState = {
       ...state,
+      tried,
       players,
       selected: null,
       phase: "continue",
@@ -454,6 +471,7 @@ export function guessTile(state: CodaState, guess: CodaValue): CodaState {
     return enterArrange(
       {
         ...state,
+        tried,
         selected: null,
         log: [
           ...state.log,
@@ -466,6 +484,7 @@ export function guessTile(state: CodaState, guess: CodaValue): CodaState {
   }
   let next: CodaState = {
     ...state,
+    tried,
     drawn: null,
     selected: null,
     log: [...state.log, { id: uid("l"), text: `${me.name} missed (${label}).`, tone: "bad" }],
@@ -649,9 +668,11 @@ export function aiGuess(state: CodaState): { playerId: string; index: number; va
     for (let index = 0; index < p.tiles.length; index++) {
       const tile = p.tiles[index];
       if (!tile || tile.revealed) continue;
-      const opts = possibleValues(p, index).filter((v) => v === "joker" || typeof v === "number");
+      const used = new Set((state.tried?.[tile.id] ?? []).map((v) => String(v)));
+      const opts = possibleValues(p, index).filter((v) => !used.has(String(v)));
+      if (!opts.length) continue;
       const nums = opts.filter((v): v is number => v !== "joker");
-      const pick = nums.length ? nums[Math.floor(nums.length / 2)]! : "joker";
+      const pick = nums.length ? nums[Math.floor(nums.length / 2)]! : opts[0]!;
       const score = 100 - opts.length;
       if (!best || score > best.score) best = { playerId: p.id, index, value: pick, score };
     }

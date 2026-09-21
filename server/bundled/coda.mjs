@@ -176,7 +176,7 @@ function startCodaMatch(useJokers, a, b) {
     log: [
       {
         id: uid("l"),
-        text: wait ? "\u8054\u673A\u5F00\u5C40\uFF1A\u6709\u4EBA\u6478\u5230 \u2014 \u5219\u6574\u7406 5 \u79D2\u3002" : "\u8054\u673A\u5F00\u5C40 4 \u5F20\u5DF2\u5728\u624B\u91CC\u3002\u731C\u62F3\u5B9A\u5148\u624B\u3002"
+        text: wait ? "Online opening: if anyone drew a dash, arrange for 5 seconds." : "Online opening of 4 tiles in hand. RPS decides who starts."
       }
     ]
   };
@@ -215,10 +215,11 @@ function startCoda(useJokers = true, youBlack = 2, youWhite = 2) {
     resume: wait ? "draw" : null,
     rpsThrows: {},
     stashSlots,
+    tried: {},
     log: [
       {
         id: uid("l"),
-        text: you.stash ? "\u5F00\u5C40\u6478\u5230 \u2014\uFF0C\u63D2\u5165\u540E\u4ECD\u662F 4 \u5F20\u5E76\u9501\u5B9A\u3002" : wait ? "\u5F00\u5C40 4 \u5F20\u5DF2\u5728\u624B\u91CC\u3002\u5BF9\u624B\u6478\u5230 \u2014\uFF0C\u6574\u7406\u540E\u731C\u62F3\u3002" : "\u5F00\u5C40 4 \u5F20\u5DF2\u5728\u624B\u91CC\uFF0C\u6CA1\u6709 \u2014\u3002\u731C\u62F3\u5B9A\u5148\u624B\u3002"
+        text: you.stash ? "Opening dash drawn. Insert, still 4 tiles, then lock." : wait ? "Opening 4 in hand. Rival drew a dash. Arrange, then RPS." : "Opening 4 in hand, no dash. RPS decides who starts."
       }
     ]
   };
@@ -229,7 +230,7 @@ function enterArrange(state, pending, resume) {
     return instantInsert(
       {
         ...state,
-        log: [...state.log, { id: uid("l"), text: "\u4F4D\u7F6E\u552F\u4E00\uFF0C\u6570\u5B57\u81EA\u52A8\u5165\u5217\u3002" }]
+        log: [...state.log, { id: uid("l"), text: "Only one legal slot. Number inserts automatically." }]
       },
       pending,
       resume
@@ -252,7 +253,7 @@ function enterArrange(state, pending, resume) {
       ...state.log,
       {
         id: uid("l"),
-        text: resume === "draw" ? "\u5F00\u5C40\u6574\u7406 5 \u79D2\uFF1A\u6760\u5728\u5916\u9762\uFF0C\u63D2\u5165\u540E\u9501\u5B9A\u3002" : "\u6574\u7406 5 \u79D2\uFF1A\u65B0\u724C\u505C\u5728\u5916\u9762\uFF0C\u9009\u597D\u4F4D\u7F6E\u4E5F\u8981\u7B49\u5230\u65F6\u95F4\u7ED3\u675F\u3002"
+        text: resume === "draw" ? "Opening arrange 5s: the tile stays out, then locks after insert." : "Arrange 5s: the new tile stays out. Wait out the timer even after you pick a slot."
       }
     ]
   };
@@ -272,7 +273,7 @@ function checkEliminations(state) {
       players,
       phase: "over",
       winnerId: remaining[0].id,
-      log: [...state.log, { id: uid("l"), text: `${remaining[0].name} \u7559\u4E0B\u672A\u7FFB\u5F00\u7684\u5BC6\u7801\uFF0C\u80DC\u51FA\u3002`, tone: "you" }]
+      log: [...state.log, { id: uid("l"), text: `${remaining[0].name} still has a hidden code and wins.`, tone: "you" }]
     };
   }
   return { ...state, players };
@@ -293,20 +294,39 @@ function nextTurn(state) {
 function currentPlayer(state) {
   return state.players[state.turn] ?? state.players[0];
 }
-function drawCard(state) {
+function deckCounts(state) {
+  if (state.leftByColor) return state.leftByColor;
+  return {
+    black: state.deck.filter((t) => t.color === "black").length,
+    white: state.deck.filter((t) => t.color === "white").length
+  };
+}
+function aiDrawColor(state) {
+  const { black, white } = deckCounts(state);
+  if (black <= 0 && white <= 0) return "black";
+  if (black <= 0) return "white";
+  if (white <= 0) return "black";
+  return Math.random() < 0.5 ? "black" : "white";
+}
+function drawCard(state, color) {
   if (state.phase !== "draw") return state;
   if (state.deck.length === 0) {
-    return { ...state, phase: "guess", drawn: null, log: [...state.log, { id: uid("l"), text: "\u724C\u5806\u5DF2\u7A7A\uFF0C\u76F4\u63A5\u731C\u724C\u3002" }] };
+    return { ...state, phase: "guess", drawn: null, log: [...state.log, { id: uid("l"), text: "Deck is empty. Guess now." }] };
   }
-  const [card, ...rest] = state.deck;
+  const want = color ?? aiDrawColor(state);
+  const idx = state.deck.findIndex((t) => t.color === want);
+  if (idx < 0) return state;
+  const card = state.deck[idx];
   if (!card) return state;
+  const rest = state.deck.filter((_, i) => i !== idx);
   const who = currentPlayer(state).name;
+  const colorName = want === "black" ? "black" : "white";
   return {
     ...state,
     deck: rest,
     drawn: { ...card, revealed: false },
     phase: "guess",
-    log: [...state.log, { id: uid("l"), text: `${who} \u6478\u4E86\u4E00\u5F20\u724C\u3002`, tone: currentPlayer(state).human ? "you" : "ai" }]
+    log: [...state.log, { id: uid("l"), text: `${who} draws a ${colorName} tile.`, tone: currentPlayer(state).human ? "you" : "ai" }]
   };
 }
 function selectTile(state, playerId, index) {
@@ -321,6 +341,16 @@ function selectTile(state, playerId, index) {
 function tileMatches(tile, guess) {
   return tile.value === guess;
 }
+function triedOnTile(state, playerId, index) {
+  const tile = state.players.find((p) => p.id === playerId)?.tiles[index];
+  if (!tile) return [];
+  return (state.tried ?? {})[tile.id] ?? [];
+}
+function rememberGuess(state, tileId, guess) {
+  const prev = (state.tried ?? {})[tileId] ?? [];
+  if (prev.some((v) => v === guess)) return state.tried;
+  return { ...state.tried ?? {}, [tileId]: [...prev, guess] };
+}
 function insertInto(player, card, index) {
   const idx = index ?? insertIndices(player.tiles, card)[0] ?? player.tiles.length;
   const tiles = [...player.tiles];
@@ -332,9 +362,11 @@ function guessTile(state, guess) {
   const target = state.players.find((p) => p.id === state.selected?.playerId);
   const tile = target?.tiles[state.selected.index];
   if (!target || !tile) return state;
+  if ((state.tried?.[tile.id] ?? []).some((v) => v === guess)) return state;
   const me = currentPlayer(state);
-  const label = guess === "joker" ? "Joker" : `${tile.color === "black" ? "\u9ED1" : "\u767D"} ${guess}`;
+  const label = guess === "joker" ? "Joker" : `${tile.color === "black" ? "black" : "white"} ${guess}`;
   const hit = tileMatches(tile, guess);
+  const tried = rememberGuess(state, tile.id, guess);
   if (hit) {
     const players = state.players.map(
       (p) => p.id !== target.id ? p : {
@@ -344,12 +376,13 @@ function guessTile(state, guess) {
     );
     let next2 = {
       ...state,
+      tried,
       players,
       selected: null,
       phase: "continue",
       log: [
         ...state.log,
-        { id: uid("l"), text: `${me.name} \u731C\u4E2D ${target.name} \u7684 ${label}\u3002`, tone: me.human ? "you" : "ai" }
+        { id: uid("l"), text: `${me.name} guessed ${target.name}'s ${label}.`, tone: me.human ? "you" : "ai" }
       ]
     };
     next2 = checkEliminations(next2);
@@ -363,10 +396,11 @@ function guessTile(state, guess) {
     return enterArrange(
       {
         ...state,
+        tried,
         selected: null,
         log: [
           ...state.log,
-          { id: uid("l"), text: `${me.name} \u731C\u9519\uFF08${label}\uFF09\u3002\u516C\u5F00\u624B\u724C\uFF0C\u8FDB\u5165\u6574\u7406\u3002`, tone: "bad" }
+          { id: uid("l"), text: `${me.name} missed (${label}). Drawn tile is shown. Arrange.`, tone: "bad" }
         ]
       },
       revealedDrawn,
@@ -375,9 +409,10 @@ function guessTile(state, guess) {
   }
   let next = {
     ...state,
+    tried,
     drawn: null,
     selected: null,
-    log: [...state.log, { id: uid("l"), text: `${me.name} \u731C\u9519\uFF08${label}\uFF09\u3002`, tone: "bad" }]
+    log: [...state.log, { id: uid("l"), text: `${me.name} missed (${label}).`, tone: "bad" }]
   };
   next = checkEliminations(next);
   if (next.phase === "over") return next;
@@ -396,7 +431,7 @@ function stay(state) {
     {
       ...state,
       selected: null,
-      log: [...state.log, { id: uid("l"), text: `${me.name} \u505C\u724C\uFF0C\u8FDB\u5165\u6574\u7406\u3002` }]
+      log: [...state.log, { id: uid("l"), text: `${me.name} stays. Arrange.` }]
     },
     hidden,
     "next"
@@ -459,10 +494,10 @@ function finishArrange(state) {
   return {
     ...next,
     phase: "rps",
-    log: [...next.log, { id: uid("l"), text: "\u6574\u7406\u7ED3\u675F\uFF0C\u6760\u5DF2\u9501\u5B9A\u3002\u77F3\u5934\u526A\u5200\u5E03\uFF0C\u8F93\u7684\u4EBA\u5148\u6478\u3002" }]
+    log: [...next.log, { id: uid("l"), text: "Arrange done. Tiles locked. RPS \u2014 loser draws first." }]
   };
 }
-var RPS_LABEL = { rock: "\u77F3\u5934", paper: "\u5E03", scissors: "\u526A\u5200" };
+var RPS_LABEL = { rock: "rock", paper: "paper", scissors: "scissors" };
 function rpsWins(a, b) {
   return a === "rock" && b === "scissors" || a === "paper" && b === "rock" || a === "scissors" && b === "paper";
 }
@@ -471,7 +506,7 @@ function resolveRps(state, aId, a, bId, b) {
     return {
       ...state,
       rpsThrows: {},
-      log: [...state.log, { id: uid("l"), text: `\u5E73\u5C40\uFF0C\u90FD\u662F${RPS_LABEL[a]}\u3002\u518D\u6765\u4E00\u6B21\u3002` }]
+      log: [...state.log, { id: uid("l"), text: `Tie, both ${RPS_LABEL[a]}. Again.` }]
     };
   }
   const aWins = rpsWins(a, b);
@@ -488,7 +523,7 @@ function resolveRps(state, aId, a, bId, b) {
       ...state.log,
       {
         id: uid("l"),
-        text: `${state.players.find((p) => p.id === aId)?.name} \u51FA${RPS_LABEL[a]}\uFF0C${state.players.find((p) => p.id === bId)?.name} \u51FA${RPS_LABEL[b]}\u3002\u8F93\u7684\u4EBA\u5148\u6478\u3002`
+        text: `${state.players.find((p) => p.id === aId)?.name} plays ${RPS_LABEL[a]}, ${state.players.find((p) => p.id === bId)?.name} plays ${RPS_LABEL[b]}. Loser draws first.`
       }
     ]
   };
@@ -508,7 +543,7 @@ function playRps(state, you, actorId) {
     return {
       ...state,
       rpsThrows: { ...state.rpsThrows, [me.id]: mine },
-      log: [...state.log, { id: uid("l"), text: `${me.name} \u5DF2\u51FA\u62F3\uFF0C\u7B49\u5F85\u5BF9\u624B\u3002` }]
+      log: [...state.log, { id: uid("l"), text: `${me.name} has thrown. Waiting.` }]
     };
   }
   return resolveRps({ ...state, rpsThrows: { ...state.rpsThrows, [me.id]: mine } }, me.id, mine, foe.id, theirs);
@@ -539,9 +574,11 @@ function aiGuess(state) {
     for (let index = 0; index < p.tiles.length; index++) {
       const tile = p.tiles[index];
       if (!tile || tile.revealed) continue;
-      const opts = possibleValues(p, index).filter((v) => v === "joker" || typeof v === "number");
+      const used = new Set((state.tried?.[tile.id] ?? []).map((v) => String(v)));
+      const opts = possibleValues(p, index).filter((v) => !used.has(String(v)));
+      if (!opts.length) continue;
       const nums = opts.filter((v) => v !== "joker");
-      const pick = nums.length ? nums[Math.floor(nums.length / 2)] : "joker";
+      const pick = nums.length ? nums[Math.floor(nums.length / 2)] : opts[0];
       const score = 100 - opts.length;
       if (!best || score > best.score) best = { playerId: p.id, index, value: pick, score };
     }
@@ -550,9 +587,9 @@ function aiGuess(state) {
   return { playerId: best.playerId, index: best.index, value: best.value };
 }
 function formatTile(tile, hidden) {
-  if (hidden && !tile.revealed) return tile.color === "black" ? "\u9ED1" : "\u767D";
-  if (tile.value === "joker") return tile.color === "black" ? "\u9ED1 \u2014" : "\u767D \u2014";
-  return `${tile.color === "black" ? "\u9ED1" : "\u767D"} ${tile.value}`;
+  if (hidden && !tile.revealed) return tile.color === "black" ? "black" : "white";
+  if (tile.value === "joker") return tile.color === "black" ? "black -" : "white -";
+  return `${tile.color === "black" ? "black" : "white"} ${tile.value}`;
 }
 function isActorTurn(state, actorId) {
   return currentPlayer(state).id === actorId;
@@ -561,7 +598,7 @@ function applyAction(state, actorId, action) {
   if (!state.players.some((p) => p.id === actorId)) return state;
   switch (action.type) {
     case "draw":
-      return isActorTurn(state, actorId) ? drawCard(state) : state;
+      return isActorTurn(state, actorId) ? drawCard(state, action.color) : state;
     case "select":
       return isActorTurn(state, actorId) ? selectTile(state, action.playerId, action.index) : state;
     case "guess":
@@ -594,6 +631,10 @@ function viewFor(state, viewerId) {
       value: 0,
       revealed: false
     })),
+    leftByColor: {
+      black: state.deck.filter((t) => t.color === "black").length,
+      white: state.deck.filter((t) => t.color === "white").length
+    },
     rpsThrows: {},
     stashSlots: state.stashSlots[viewerId] !== void 0 ? { [viewerId]: state.stashSlots[viewerId] } : {},
     pendingSlot: me.id === viewerId ? state.pendingSlot : null,
@@ -610,10 +651,12 @@ function viewFor(state, viewerId) {
 export {
   ARRANGE_MS,
   OPENING,
+  aiDrawColor,
   aiGuess,
   applyAction,
   continueGuess,
   currentPlayer,
+  deckCounts,
   drawCard,
   finishArrange,
   formatTile,
@@ -629,5 +672,6 @@ export {
   startCoda,
   startCodaMatch,
   stay,
+  triedOnTile,
   viewFor
 };
