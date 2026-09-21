@@ -63,12 +63,12 @@ function send(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-function routeOf(req) {
-  const raw = req.query?.__route;
+function apiPath(req) {
+  const raw = req.query?.path;
   if (Array.isArray(raw)) return raw.join("/");
   if (raw) return String(raw);
   try {
-    return new URL(req.url || "/", "http://n").pathname.replace(/^\/api\/?/, "");
+    return new URL(req.url || "/", "http://n").pathname.replace(/^\/api\/?/, "").replace(/\/$/, "");
   } catch {
     return "";
   }
@@ -86,7 +86,7 @@ function query(req, key) {
 }
 
 export default async function handler(req, res) {
-  const path = routeOf(req);
+  const path = apiPath(req);
 
   if (path === "health" || path === "") {
     send(res, 200, { ok: true, github: githubReady(), match: false, vercel: true });
