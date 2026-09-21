@@ -8,7 +8,7 @@ const games = [
     idx: "01",
     code: "CODA",
     name: "达芬奇密码",
-    blurb: "黑白骨牌立成密码。摸牌、指认、见好就收。",
+    blurb: "登录后邀请在线玩家，双人猜牌对战。",
     preview: "coda" as const,
   },
   {
@@ -16,7 +16,7 @@ const games = [
     idx: "02",
     code: "FLIP7",
     name: "七翻天",
-    blurb: "不重复地翻牌累分。七张不同数字触发暴击。",
+    blurb: "两人轮流翻牌累分，先到 200。",
     preview: "flip" as const,
   },
   {
@@ -24,7 +24,7 @@ const games = [
     idx: "03",
     code: "BJ21",
     name: "二十一点",
-    blurb: "贴近 21 且不超过。对庄家，筹码写入账号。",
+    blurb: "双人比点数，不超过 21。",
     preview: "bj" as const,
   },
   {
@@ -32,7 +32,7 @@ const games = [
     idx: "04",
     code: "M24",
     name: "二十四点",
-    blurb: "四张牌，加减乘除各用一次，凑成 24。",
+    blurb: "同一组四张牌，谁先凑成 24。",
     preview: "m24" as const,
   },
 ];
@@ -83,8 +83,7 @@ export function Home() {
           <p className="kicker">NUMERICAL TABLE</p>
           <h1>四术同桌。</h1>
           <p className="lede">
-            骨牌立桌，纸牌铺毡。本地即可开局；邮箱登录已接好前端，后端用你自己的服务加 Redis，不绑第三方
-            BaaS。
+            骨牌立桌，纸牌铺毡。登录后邀请当前在线玩家，四款都是双人对战。
           </p>
         </div>
         <div className="hero-stage" aria-hidden>
@@ -109,7 +108,7 @@ export function Home() {
           </Link>
         ))}
       </div>
-      <p className="section-note">GUEST 可直接玩 · 登录后 21 点筹码写入账号</p>
+      <p className="section-note">登录后可见在线玩家并邀请入座 · 暂为双人</p>
     </div>
   );
 }

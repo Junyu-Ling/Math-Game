@@ -12,10 +12,7 @@ import {
   selectTile,
   setPendingSlot,
   playRps,
-  applyAction,
-  viewFor,
   startCoda,
-  startCodaMatch,
   stay,
   OPENING,
   type CodaAction,
@@ -27,9 +24,8 @@ import { MahjongTile } from "../../components/MahjongTile";
 import { DeckStack } from "../../components/PlayingCard";
 import { wait } from "../../lib/shuffle";
 import { useAuth } from "../../context/AuthContext";
-import { fetchHealth } from "../../lib/api";
-import { connectCoda, sendAction, sendLeave, sendQueue } from "../../lib/realtime";
-import { VIRTUAL_USERS } from "../../lib/virtual";
+import { useLobby } from "../../context/LobbyContext";
+import { InvitePanel } from "../../components/InvitePanel";
 
 type Flash = {
   kind: "hit" | "miss" | "win" | "lose";
@@ -37,19 +33,14 @@ type Flash = {
   index?: number;
 };
 
-function statusText(state: CodaState, myTurn: boolean, remain: number, matching: boolean, hotseat: boolean): string {
-  if (matching) return "正在 Redis 队列里等人，第二位登录玩家点「匹配联机」即可入座。";
-  if (hotseat && !myTurn && state.phase !== "over" && state.phase !== "arrange" && state.phase !== "rps") {
-    return "换到当前回合的虚拟用户再操作。";
-  }
+function statusText(state: CodaState, myTurn: boolean, remain: number, matching: boolean): string {
+  if (matching) return "等待对手接受邀请。";
   if (state.phase === "over") {
     const w = state.players.find((p) => p.id === state.winnerId);
     return w ? `${w.name} 获胜` : "结束";
   }
   if (state.phase === "rps") {
-    return hotseat
-      ? "石头剪刀布：P1、P2 都要出拳，用右上角换座位。输的人先摸。"
-      : "石头剪刀布，输的人先摸牌再猜。";
+    return "石头剪刀布，输的人先摸牌再猜。";
   }
   if (state.phase === "arrange") {
     if (state.resume === "draw") {
@@ -191,23 +182,20 @@ const BURST: Record<Flash["kind"], { title: string; sub: string }> = {
 };
 
 export function DaVinciPage() {
-  const { user, token, live } = useAuth();
+  const { user } = useAuth();
+  const lobby = useLobby();
+  const codaRoom = lobby.room?.game === "coda" ? lobby.room : null;
   const [jokers, setJokers] = useState(true);
   const [blackN, setBlackN] = useState(2);
   const [whiteN, setWhiteN] = useState(2);
   const [state, setState] = useState<CodaState | null>(null);
   const [remain, setRemain] = useState(ARRANGE_MS / 1000);
   const [flash, setFlash] = useState<Flash | null>(null);
-  const [online, setOnline] = useState(false);
-  const [matching, setMatching] = useState(false);
-  const [roomId, setRoomId] = useState<string | null>(null);
   const [youId, setYouId] = useState<string | null>(null);
-  const [hotseat, setHotseat] = useState(false);
-  const [netErr, setNetErr] = useState("");
-  const connRef = useRef<ReturnType<typeof connectCoda> | null>(null);
   const endsAtRef = useRef<number | null>(null);
   const prevLog = useRef(0);
-  const fullRef = useRef<CodaState | null>(null);
+  const online = Boolean(codaRoom);
+  const matching = Boolean(user && lobby.invites.some((i) => i.game === "coda" && i.fromId === user.id));
 
   const playing = state !== null;
   const you = playing ? (youId ? state.players.find((p) => p.id === youId) : state.players[0]) ?? state.players[0] : null;
@@ -232,33 +220,9 @@ export function DaVinciPage() {
     : null;
   const arrangeGaps = arranging && myInsert ? insertOpts : [];
 
-  function publishHotseat(next: CodaState, seat = youId) {
-    fullRef.current = next;
-    const id = seat ?? next.players[0]?.id;
-    if (!id) {
-      setState(next);
-      return;
-    }
-    if (next.log.length > prevLog.current) {
-      const added = next.log.slice(prevLog.current);
-      const sel = next.selected;
-      if (added.some((l) => l.text.includes("猜中")) && sel) {
-        setFlash({ kind: "hit", playerId: sel.playerId, index: sel.index });
-      } else if (added.some((l) => l.text.includes("猜错")) && sel) {
-        setFlash({ kind: "miss", playerId: sel.playerId, index: sel.index });
-      }
-    }
-    prevLog.current = next.log.length;
-    setState(viewFor(next, id));
-  }
-
   function dispatch(action: CodaAction) {
-    if (online && roomId && connRef.current) {
-      sendAction(connRef.current, roomId, action);
-      return;
-    }
-    if (hotseat && fullRef.current && youId) {
-      publishHotseat(applyAction(fullRef.current, youId, action));
+    if (codaRoom) {
+      void lobby.sendAction(action);
       return;
     }
     if (action.type === "draw") setState((s) => (s ? drawCard(s) : s));
@@ -283,14 +247,13 @@ export function DaVinciPage() {
       setRemain(left / 1000);
       if (left <= 0) {
         window.clearInterval(id);
-        if (!online && !hotseat) setState((s) => (s ? finishArrange(s) : s));
-        if (hotseat && fullRef.current) publishHotseat(finishArrange(fullRef.current));
+        if (!online) setState((s) => (s ? finishArrange(s) : s));
       }
     };
     tick();
     const id = window.setInterval(tick, 50);
     return () => window.clearInterval(id);
-  }, [state?.arrangeId, arranging, online, hotseat]);
+  }, [state?.arrangeId, arranging, online]);
 
   useEffect(() => {
     if (!flash) return;
@@ -308,7 +271,7 @@ export function DaVinciPage() {
   }, [state, you]);
 
   useEffect(() => {
-    if (!state || online || hotseat) return;
+    if (!state || online) return;
     if (!me || me.human || state.phase === "over" || arranging || state.phase === "rps") return;
     let stop = false;
     (async () => {
@@ -371,124 +334,38 @@ export function DaVinciPage() {
   function resetTable() {
     setFlash(null);
     setState(null);
-    setOnline(false);
-    setMatching(false);
-    setRoomId(null);
     setYouId(null);
-    setHotseat(false);
-    fullRef.current = null;
     endsAtRef.current = null;
     prevLog.current = 0;
-    if (connRef.current) {
-      sendLeave(connRef.current);
-      connRef.current.close();
-      connRef.current = null;
-    }
+    if (codaRoom) void lobby.leave();
   }
 
   function beginPractice() {
-    resetTable();
+    if (codaRoom) void lobby.leave();
     setFlash(null);
-    setOnline(false);
-    setHotseat(false);
+    setYouId(null);
     setState(startCoda(jokers, blackN, whiteN));
   }
 
-  function beginVirtual() {
-    resetTable();
-    setFlash(null);
-    setOnline(false);
-    setHotseat(true);
-    const [a, b] = VIRTUAL_USERS;
-    const full = startCodaMatch(
-      jokers,
-      { id: a.id, name: a.name, black: blackN, white: whiteN },
-      { id: b.id, name: b.name, black: OPENING - blackN, white: OPENING - whiteN },
-    );
-    fullRef.current = full;
-    setYouId(a.id);
-    prevLog.current = full.log.length;
-    setState(viewFor(full, a.id));
-    if (full.phase === "arrange") endsAtRef.current = Date.now() + ARRANGE_MS;
-  }
-
-  function switchSeat(id: string) {
-    setYouId(id);
-    if (fullRef.current) setState(viewFor(fullRef.current, id));
-  }
-
-  async function beginMatch() {
-    setNetErr("");
-    if (!live) {
-      setNetErr("先在项目根目录配置 VITE_API_URL 并启动 server/，才能匹配。");
-      return;
-    }
-    if (!user || !token) {
-      setNetErr("请先登录 GitHub 或邮箱账号。");
-      return;
-    }
-    let matchWs = "";
-    try {
-      const health = await fetchHealth();
-      if (!health.match) {
-        setNetErr("线上匹配还没开通。把 server/ 部署到长期运行的主机后，在 Vercel 填 MATCH_WS_URL 即可。");
-        return;
+  useEffect(() => {
+    if (!codaRoom) return;
+    const view = codaRoom.view as CodaState;
+    setYouId(user?.id ?? null);
+    setState((prev) => {
+      if (prev && view.log.length > prev.log.length) {
+        const added = view.log.slice(prev.log.length);
+        const sel = view.selected ?? prev.selected;
+        if (added.some((l) => l.text.includes("猜中")) && sel) {
+          setFlash({ kind: "hit", playerId: sel.playerId, index: sel.index });
+        } else if (added.some((l) => l.text.includes("猜错")) && sel) {
+          setFlash({ kind: "miss", playerId: sel.playerId, index: sel.index });
+        }
       }
-      matchWs = health.ws || "";
-    } catch {
-      setNetErr("健康检查失败，暂时无法匹配。");
-      return;
-    }
-    resetTable();
-    setMatching(true);
-    setOnline(true);
-    const conn = connectCoda(
-      token,
-      (msg) => {
-      if (msg.type === "queued") setMatching(true);
-      if (msg.type === "error") {
-        setNetErr(msg.error);
-        setMatching(false);
-      }
-      if (msg.type === "matched") {
-        setMatching(false);
-        setRoomId(msg.roomId);
-        setYouId(msg.youId);
-      }
-      if (msg.type === "left") {
-        setMatching(false);
-        if (!state) setOnline(false);
-      }
-      if (msg.type === "state") {
-        setMatching(false);
-        setOnline(true);
-        setRoomId(msg.roomId);
-        endsAtRef.current = msg.arrangeEndsAt;
-        setState((prev) => {
-          const next = msg.view;
-          if (prev && next.log.length > prev.log.length) {
-            const added = next.log.slice(prev.log.length);
-            const sel = next.selected ?? prev.selected;
-            if (added.some((l) => l.text.includes("猜中")) && sel) {
-              setFlash({ kind: "hit", playerId: sel.playerId, index: sel.index });
-            } else if (added.some((l) => l.text.includes("猜错")) && sel) {
-              setFlash({ kind: "miss", playerId: sel.playerId, index: sel.index });
-            }
-          }
-          prevLog.current = next.log.length;
-          return next;
-        });
-      }
-    },
-      matchWs,
-    );
-    connRef.current = conn;
-    sendQueue(conn, { useJokers: jokers, black: blackN, white: whiteN });
-  }
-
-  useEffect(() => () => {
-    connRef.current?.close();
-  }, []);
+      prevLog.current = view.log.length;
+      return view;
+    });
+    endsAtRef.current = codaRoom.endsAt;
+  }, [codaRoom, user?.id]);
 
   return (
     <div className="page-wide coda-page">
@@ -508,24 +385,9 @@ export function DaVinciPage() {
           >
             {jokers ? "JOKER ON" : "JOKER OFF"}
           </button>
-          <button className="btn btn-ghost" type="button" onClick={() => (playing || matching ? resetTable() : beginVirtual())}>
-            {playing || matching ? "RESET" : "虚拟对战"}
+          <button className="btn btn-ghost" type="button" onClick={() => resetTable()}>
+            RESET
           </button>
-          {hotseat ? (
-            <div className="row-actions">
-              {VIRTUAL_USERS.map((v) => (
-                <button
-                  key={v.id}
-                  className={youId === v.id ? "btn" : "btn btn-ghost"}
-                  type="button"
-                  onClick={() => switchSeat(v.id)}
-                >
-                  {v.name}
-                  {youId === v.id ? " · 操作中" : ""}
-                </button>
-              ))}
-            </div>
-          ) : null}
           <Link className="btn btn-ghost" to="/">
             LEAVE
           </Link>
@@ -537,12 +399,12 @@ export function DaVinciPage() {
           <div className="coda-ring" />
           {!playing || !you || !rival || !state ? (
             <div className="coda-deal">
-              <p className="kicker">{matching ? "MATCHING" : "OPENING DRAW"}</p>
-              <h2>{matching ? "正在匹配对手" : "选择开局摸牌"}</h2>
+              <p className="kicker">{matching ? "INVITE" : "OPENING DRAW"}</p>
+              <h2>{matching ? "正在邀请对手" : "选择开局摸牌"}</h2>
               <p>
                 {matching
-                  ? "已进入 queue:coda。请用另一个浏览器或无痕窗口登录第二个账号再点匹配。"
-                  : `开局 ${OPENING} 张。虚拟对战：P1 / P2 同机轮流；联机需两个账号。`}
+                  ? "等待对方接受邀请。"
+                  : `开局 ${OPENING} 张。登录后邀请在线玩家，双人对战。右侧列表可邀请。`}
               </p>
               {!matching ? (
                 <>
@@ -581,29 +443,22 @@ export function DaVinciPage() {
                     ))}
                   </div>
                   <div className="row-actions" style={{ justifyContent: "center" }}>
-                    <button className="btn btn-gold" type="button" onClick={beginVirtual}>
-                      虚拟对战
-                    </button>
-                    <button className="btn btn-gold" type="button" onClick={beginMatch}>
-                      匹配联机
-                    </button>
                     <button className="btn btn-ghost" type="button" onClick={beginPractice}>
                       练习人机
                     </button>
                   </div>
-                  <p>虚拟对战不登录也能玩。联机再用 P1 / P2 两个窗口。</p>
+                  <p>对战请登录后在右侧邀请在线玩家。练习人机仅本机。</p>
                   {!user ? (
                     <p>
-                      联机需先 <Link to="/login">登录</Link> 或 <Link to="/register">注册</Link>
+                      对战需先 <Link to="/login">登录</Link>
                     </p>
                   ) : (
                     <p>当前账号 {user.email}</p>
                   )}
-                  {netErr ? <p className="msg err">{netErr}</p> : null}
                 </>
               ) : (
                 <button className="btn btn-ghost" type="button" onClick={resetTable}>
-                  取消匹配
+                  取消邀请
                 </button>
               )}
             </div>
@@ -725,14 +580,15 @@ export function DaVinciPage() {
         </div>
 
         <aside className="side coda-panel">
+          <InvitePanel game="coda" meta={{ useJokers: jokers, black: blackN, white: whiteN }} />
           <div>
             <h3>STATUS</h3>
             <p className="status-line">
               {matching
-                ? statusText(state ?? ({} as CodaState), false, remain, true, false)
+                ? statusText(state ?? ({} as CodaState), false, remain, true)
                 : playing && state
-                  ? statusText(state, myTurn, remain, false, hotseat)
-                  : `选择开局：黑 ${blackN} · 白 ${whiteN}${hotseat ? " · 虚拟对战" : online ? " · 联机" : ""}`}
+                  ? statusText(state, myTurn, remain, false)
+                  : `选择开局：黑 ${blackN} · 白 ${whiteN}${online ? " · 对战" : ""}`}
             </p>
           </div>
           {playing && state?.phase === "guess" && myTurn && (
@@ -765,7 +621,7 @@ export function DaVinciPage() {
           <div>
             <h3>RULE</h3>
             <ul>
-              <li>正式模式：登录后点「匹配联机」，服务端 Redis 排队、WebSocket 同步。</li>
+              <li>登录后邀请在线玩家，双人对战。</li>
               <li>开局 4 张在手里。摸到 — 才插入锁定；没摸到不用插入。</li>
               <li>仅开局蒙版。插入都要等满 5 秒，选好位置也不提前入列。</li>
               <li>开局 4 张后猜拳，输的人先摸再猜。</li>

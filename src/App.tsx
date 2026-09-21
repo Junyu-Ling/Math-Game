@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { LobbyProvider } from "./context/LobbyContext";
 import { Shell } from "./components/Shell";
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
@@ -15,6 +16,7 @@ export function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <LobbyProvider>
         <Shell>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -29,6 +31,7 @@ export function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Shell>
+        </LobbyProvider>
       </BrowserRouter>
     </AuthProvider>
   );

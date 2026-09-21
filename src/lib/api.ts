@@ -1,5 +1,3 @@
-import { VIRTUAL_USERS } from "./virtual";
-
 const TOKEN_KEY = "axiom.token";
 const USER_KEY = "axiom.user";
 const MOCK_USERS_KEY = "axiom.mockUsers";
@@ -62,23 +60,6 @@ function readMockUsers(): Array<User & { password: string }> {
 
 function writeMockUsers(users: Array<User & { password: string }>) {
   localStorage.setItem(MOCK_USERS_KEY, JSON.stringify(users));
-}
-
-function ensureVirtualMockUsers() {
-  const users = readMockUsers();
-  let changed = false;
-  for (const v of VIRTUAL_USERS) {
-    if (users.some((u) => u.email === v.email)) continue;
-    users.push({
-      id: v.accountId,
-      email: v.email,
-      password: v.password,
-      chips: 1000,
-      createdAt: new Date().toISOString(),
-    });
-    changed = true;
-  }
-  if (changed) writeMockUsers(users);
 }
 
 function mockToken(email: string) {
@@ -184,7 +165,6 @@ export const authApi = {
         body: JSON.stringify({ email, password }),
       });
     }
-    ensureVirtualMockUsers();
     const users = readMockUsers();
     const found = users.find((u) => u.email === email && u.password === password);
     if (!found) throw new Error("邮箱或密码错误");

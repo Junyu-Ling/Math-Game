@@ -20,6 +20,14 @@ import {
   setOauthStateCookie,
   verifyOauthState,
 } from "./github-auth.mjs";
+import {
+  applyRoomAction,
+  createInvite,
+  heartbeat,
+  leaveRoom,
+  respondInvite,
+} from "./lobby.mjs";
+import { loadMods } from "./game-mods.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(path.join(__dirname, ".env"));
@@ -206,7 +214,8 @@ app.get("/api/health", async (_req, res) => {
     redis: redisReady ? "PONG" : "memory",
     smtp: Boolean(mailer),
     github: githubReady(),
-    match: true,
+    match: false,
+    lobby: true,
     ws: "",
   });
 });
@@ -460,6 +469,36 @@ app.patch("/api/me/chips", auth, (req, res) => {
   user.chips = Math.floor(chips);
   writeUsers(users);
   res.json({ user: publicUser(user) });
+});
+
+app.get("/api/lobby", auth, (req, res) => {
+  res.json(heartbeat(req.user, String(req.query.href || "")));
+});
+
+app.post("/api/lobby", auth, async (req, res) => {
+  try {
+    const op = String(req.body?.op || "");
+    if (op === "invite") {
+      const invite = createInvite(req.user, String(req.body.toId || ""), String(req.body.game || ""), req.body.meta || {});
+      return res.json({ invite, ...snapshot(req.user.id) });
+    }
+    if (op === "respond") {
+      const mods = await loadMods();
+      const result = await respondInvite(req.user, String(req.body.id || ""), Boolean(req.body.accept), mods);
+      return res.json({ ...snapshot(req.user.id), ...result });
+    }
+    if (op === "action") {
+      const mods = await loadMods();
+      const room = applyRoomAction(req.user, String(req.body.roomId || ""), req.body.action, mods);
+      return res.json({ room, ...snapshot(req.user.id) });
+    }
+    if (op === "leave") {
+      return res.json(leaveRoom(req.user.id));
+    }
+    res.status(400).json({ error: "未知操作" });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "失败" });
+  }
 });
 
 const httpServer = createServer(app);

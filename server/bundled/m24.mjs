@@ -1,21 +1,29 @@
-import { shuffle } from "../../lib/shuffle";
-
-export type Puzzle = { nums: number[]; solution: string };
-
-const OPS = [
-  { s: "+", f: (a: number, b: number) => a + b },
-  { s: "-", f: (a: number, b: number) => a - b },
-  { s: "*", f: (a: number, b: number) => a * b },
-  { s: "/", f: (a: number, b: number) => (b !== 0 ? a / b : Number.NaN) },
-];
-
-function nearly(a: number, b: number) {
-  return Math.abs(a - b) < 1e-6;
+// src/lib/shuffle.ts
+function shuffle(items) {
+  const next = [...items];
+  for (let i = next.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const a = next[i];
+    const b = next[j];
+    if (a === void 0 || b === void 0) continue;
+    next[i] = b;
+    next[j] = a;
+  }
+  return next;
 }
 
-export function solve24(nums: number[]): string | null {
-  type Node = { n: number; e: string };
-  const search = (arr: Node[]): string | null => {
+// src/games/math24/engine.ts
+var OPS = [
+  { s: "+", f: (a, b) => a + b },
+  { s: "-", f: (a, b) => a - b },
+  { s: "*", f: (a, b) => a * b },
+  { s: "/", f: (a, b) => b !== 0 ? a / b : Number.NaN }
+];
+function nearly(a, b) {
+  return Math.abs(a - b) < 1e-6;
+}
+function solve24(nums) {
+  const search = (arr) => {
     if (arr.length === 1) {
       const only = arr[0];
       return only && nearly(only.n, 24) ? only.e : null;
@@ -42,8 +50,7 @@ export function solve24(nums: number[]): string | null {
   };
   return search(nums.map((n) => ({ n, e: String(n) })));
 }
-
-export function newPuzzle(max = 10): Puzzle {
+function newPuzzle(max = 10) {
   for (let i = 0; i < 400; i++) {
     const nums = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * max));
     const solution = solve24(nums);
@@ -51,13 +58,11 @@ export function newPuzzle(max = 10): Puzzle {
   }
   return { nums: [1, 3, 4, 6], solution: "(6/(1-(3/4)))" };
 }
-
-export function randomUnsolved(max = 10): number[] {
+function randomUnsolved(max = 10) {
   return Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * max));
 }
-
-export function tokenize(src: string): string[] {
-  const out: string[] = [];
+function tokenize(src) {
+  const out = [];
   let i = 0;
   const s = src.replace(/×/g, "*").replace(/÷/g, "/").replace(/\s+/g, "");
   while (i < s.length) {
@@ -78,23 +83,21 @@ export function tokenize(src: string): string[] {
       out.push(n);
       continue;
     }
-    throw new Error(`无法识别的符号：${ch}`);
+    throw new Error(`\u65E0\u6CD5\u8BC6\u522B\u7684\u7B26\u53F7\uFF1A${ch}`);
   }
   return out;
 }
-
-function parseExpr(tokens: string[]): { value: number; used: number[] } {
+function parseExpr(tokens) {
   let i = 0;
   const peek = () => tokens[i];
-  const eat = (t?: string) => {
+  const eat = (t) => {
     const v = tokens[i];
-    if (t && v !== t) throw new Error("表达式不合法");
+    if (t && v !== t) throw new Error("\u8868\u8FBE\u5F0F\u4E0D\u5408\u6CD5");
     i += 1;
     return v;
   };
-  const used: number[] = [];
-
-  const parsePrimary = (): number => {
+  const used = [];
+  const parsePrimary = () => {
     const t = peek();
     if (t === "(") {
       eat("(");
@@ -107,10 +110,9 @@ function parseExpr(tokens: string[]): { value: number; used: number[] } {
       used.push(Number(t));
       return Number(t);
     }
-    throw new Error("表达式不合法");
+    throw new Error("\u8868\u8FBE\u5F0F\u4E0D\u5408\u6CD5");
   };
-
-  const parseMul = (): number => {
+  const parseMul = () => {
     let v = parsePrimary();
     while (peek() === "*" || peek() === "/") {
       const op = eat();
@@ -119,8 +121,7 @@ function parseExpr(tokens: string[]): { value: number; used: number[] } {
     }
     return v;
   };
-
-  const parseAdd = (): number => {
+  const parseAdd = () => {
     let v = parseMul();
     while (peek() === "+" || peek() === "-") {
       const op = eat();
@@ -129,48 +130,31 @@ function parseExpr(tokens: string[]): { value: number; used: number[] } {
     }
     return v;
   };
-
   const value = parseAdd();
-  if (i !== tokens.length) throw new Error("表达式不完整");
+  if (i !== tokens.length) throw new Error("\u8868\u8FBE\u5F0F\u4E0D\u5B8C\u6574");
   return { value, used };
 }
-
-export function checkSolution(nums: number[], expr: string): { ok: boolean; value?: number; error?: string } {
+function checkSolution(nums, expr) {
   try {
     const { value, used } = parseExpr(tokenize(expr));
     const a = [...used].sort((x, y) => x - y);
     const b = [...nums].sort((x, y) => x - y);
     if (a.length !== b.length || a.some((n, i) => n !== b[i])) {
-      return { ok: false, error: "必须用完这四张牌，且每张只用一次。" };
+      return { ok: false, error: "\u5FC5\u987B\u7528\u5B8C\u8FD9\u56DB\u5F20\u724C\uFF0C\u4E14\u6BCF\u5F20\u53EA\u7528\u4E00\u6B21\u3002" };
     }
     if (!Number.isFinite(value) || Math.abs(value - 24) > 1e-6) {
-      return { ok: false, value, error: `结果是 ${Number(value.toFixed(4))}，不是 24。` };
+      return { ok: false, value, error: `\u7ED3\u679C\u662F ${Number(value.toFixed(4))}\uFF0C\u4E0D\u662F 24\u3002` };
     }
     return { ok: true, value: 24 };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "无法计算" };
+    return { ok: false, error: e instanceof Error ? e.message : "\u65E0\u6CD5\u8BA1\u7B97" };
   }
 }
-
-export function shuffleDeck(): number[] {
-  const deck = shuffle(Array.from({ length: 40 }, (_, i) => (i % 10) + 1));
+function shuffleDeck() {
+  const deck = shuffle(Array.from({ length: 40 }, (_, i) => i % 10 + 1));
   return deck;
 }
-
-export type M24DuelState = {
-  mode: "duel";
-  players: Array<{ id: string; name: string }>;
-  nums: number[];
-  solution: string;
-  scores: Record<string, number>;
-  phase: "play" | "over";
-  round: number;
-  goal: number;
-  winnerId: string | null;
-  message: string;
-};
-
-export function startM24Duel(a: { id: string; name: string }, b: { id: string; name: string }): M24DuelState {
+function startM24Duel(a, b) {
   const puzzle = newPuzzle();
   return {
     mode: "duel",
@@ -182,29 +166,26 @@ export function startM24Duel(a: { id: string; name: string }, b: { id: string; n
     round: 1,
     goal: 3,
     winnerId: null,
-    message: "同一组牌，谁先凑出 24 得分。先到 3 分。",
+    message: "\u540C\u4E00\u7EC4\u724C\uFF0C\u8C01\u5148\u51D1\u51FA 24 \u5F97\u5206\u3002\u5148\u5230 3 \u5206\u3002"
   };
 }
-
-export type M24DuelAction = { type: "submit"; expr: string };
-
-export function applyM24Action(state: M24DuelState, actorId: string, action: M24DuelAction): M24DuelState {
+function applyM24Action(state, actorId, action) {
   if (state.phase !== "play") return state;
   if (!state.players.some((p) => p.id === actorId)) return state;
   if (action.type !== "submit") return state;
   const res = checkSolution(state.nums, action.expr);
   const actor = state.players.find((p) => p.id === actorId);
   if (!res.ok) {
-    return { ...state, message: `${actor?.name || "玩家"}：${res.error}` };
+    return { ...state, message: `${actor?.name || "\u73A9\u5BB6"}\uFF1A${res.error}` };
   }
   const scores = { ...state.scores, [actorId]: (state.scores[actorId] || 0) + 1 };
-  if (scores[actorId]! >= state.goal) {
+  if (scores[actorId] >= state.goal) {
     return {
       ...state,
       scores,
       phase: "over",
       winnerId: actorId,
-      message: `${actor?.name} 凑出 24，先到 ${state.goal} 分获胜。`,
+      message: `${actor?.name} \u51D1\u51FA 24\uFF0C\u5148\u5230 ${state.goal} \u5206\u83B7\u80DC\u3002`
     };
   }
   const puzzle = newPuzzle();
@@ -214,10 +195,20 @@ export function applyM24Action(state: M24DuelState, actorId: string, action: M24
     nums: puzzle.nums,
     solution: puzzle.solution,
     round: state.round + 1,
-    message: `${actor?.name} 得分！${scores[actorId]} / ${state.goal}。下一题。`,
+    message: `${actor?.name} \u5F97\u5206\uFF01${scores[actorId]} / ${state.goal}\u3002\u4E0B\u4E00\u9898\u3002`
   };
 }
-
-export function viewM24(state: M24DuelState, _viewerId: string): M24DuelState {
+function viewM24(state, _viewerId) {
   return { ...state, solution: state.phase === "over" ? state.solution : "" };
 }
+export {
+  applyM24Action,
+  checkSolution,
+  newPuzzle,
+  randomUnsolved,
+  shuffleDeck,
+  solve24,
+  startM24Duel,
+  tokenize,
+  viewM24
+};

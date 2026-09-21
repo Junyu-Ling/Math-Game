@@ -10,6 +10,14 @@ import {
   setOauthStateCookie,
   verifyOauthState,
 } from "./github-auth.mjs";
+import {
+  applyRoomAction,
+  createInvite,
+  heartbeat,
+  leaveRoom,
+  respondInvite,
+} from "./lobby.mjs";
+import { loadMods } from "./game-mods.mjs";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
 const users = new Map();
@@ -78,6 +86,21 @@ function query(req, key) {
   }
 }
 
+function authUser(req) {
+  const h = req.headers.authorization || "";
+  const token = h.startsWith("Bearer ") ? h.slice(7) : "";
+  return jwt.verify(token, JWT_SECRET);
+}
+
+async function readBody(req) {
+  if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) return req.body;
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  const raw = Buffer.concat(chunks).toString("utf8");
+  if (!raw) return {};
+  return JSON.parse(raw);
+}
+
 export async function handle(req, res, path) {
   if (path === "health" || path === "") {
     const matchWs = String(process.env.MATCH_WS_URL || "").trim();
@@ -85,7 +108,8 @@ export async function handle(req, res, path) {
       ok: true,
       github: githubReady(),
       githubSecretIsUrl: githubSecretLooksLikeUrl(),
-      match: Boolean(matchWs),
+      match: false,
+      lobby: true,
       vercel: true,
       ws: matchWs,
     });
@@ -136,6 +160,44 @@ export async function handle(req, res, path) {
     } catch (err) {
       console.error("[auth/github]", err.message);
       return fail("server");
+    }
+    return;
+  }
+
+  if (path === "lobby") {
+    try {
+      const user = authUser(req);
+      if (req.method === "GET" || req.method === "HEAD") {
+        send(res, 200, heartbeat(user, query(req, "href")));
+        return;
+      }
+      const body = await readBody(req);
+      const op = String(body.op || "");
+      if (op === "invite") {
+        const invite = createInvite(user, String(body.toId || ""), String(body.game || ""), body.meta || {});
+        send(res, 200, { invite, ...heartbeat(user) });
+        return;
+      }
+      if (op === "respond") {
+        const mods = await loadMods();
+        const result = await respondInvite(user, String(body.id || ""), Boolean(body.accept), mods);
+        send(res, 200, { ...heartbeat(user), ...result });
+        return;
+      }
+      if (op === "action") {
+        const mods = await loadMods();
+        const room = applyRoomAction(user, String(body.roomId || ""), body.action, mods);
+        send(res, 200, { room, ...heartbeat(user) });
+        return;
+      }
+      if (op === "leave") {
+        send(res, 200, leaveRoom(user.id));
+        return;
+      }
+      send(res, 400, { error: "未知操作" });
+    } catch (err) {
+      const msg = String(err.message || "失败");
+      send(res, /jwt|token|未登录/i.test(msg) ? 401 : 400, { error: /jwt|token/i.test(msg) ? "未登录" : msg });
     }
     return;
   }

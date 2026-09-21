@@ -8,7 +8,7 @@ export function Account() {
       <div className="page">
         <p className="kicker">ACCOUNT</p>
         <h1>未登录</h1>
-        <p className="lede">登录后筹码会跟着邮箱走，匹配上线时同一套余额。</p>
+        <p className="lede">登录后可邀请在线玩家双人对战。</p>
         <div className="row-actions">
           <Link className="btn" to="/login">
             LOGIN
@@ -24,7 +24,7 @@ export function Account() {
       <p className="lede">
         {user.provider === "github" || user.githubId
           ? `GitHub 账号 @${user.login || user.email}。筹码跟这个正式账号走。`
-          : "账号已建立。达芬奇可登录后匹配联机；筹码跟这套账号走。"}
+          : "账号已建立。登录后可邀请在线玩家。"}
       </p>
       <div className="account-grid">
         <div className="stat">
@@ -41,7 +41,7 @@ export function Account() {
         </div>
         <div className="stat">
           <span>NEXT</span>
-          <b style={{ fontSize: 16 }}>MATCH QUEUE</b>
+          <b style={{ fontSize: 16 }}>INVITE</b>
         </div>
       </div>
     </div>
