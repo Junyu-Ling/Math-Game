@@ -205,7 +205,7 @@ export async function rememberPlayer(user) {
     avatar: user.avatar || "",
     email: user.email || "",
   };
-  await kvSet(`axiom:u:${id}`, rec, USER_SEC);
+  await kvSet(`axiom:u:${id}`, rec);
   await sadd("axiom:users", id);
 }
 
@@ -214,8 +214,8 @@ export async function saveAccount(user) {
   const prev = (await findAccountById(id)) || {};
   const merged = { ...prev, ...user, id };
   if (prev.passwordHash && !user.passwordHash) merged.passwordHash = prev.passwordHash;
-  await kvSet(`axiom:acct:${id}`, merged, USER_SEC);
-  if (merged.email) await kvSet(`axiom:acctemail:${String(merged.email).toLowerCase()}`, id, USER_SEC);
+  await kvSet(`axiom:acct:${id}`, merged);
+  if (merged.email) await kvSet(`axiom:acctemail:${String(merged.email).toLowerCase()}`, id);
   await rememberPlayer(merged);
 }
 
@@ -345,6 +345,26 @@ async function saveRoom(room) {
   };
   await kvSet(`axiom:room:${room.id}`, rec, ROOM_SEC);
   for (const id of room.seats) await kvSet(`axiom:seat:${id}`, room.id, ROOM_SEC);
+  await rememberSeats(room);
+}
+
+async function rememberSeats(room) {
+  const seen = new Set();
+  const add = async (p) => {
+    if (!p || p.id == null) return;
+    const id = String(p.id);
+    if (seen.has(id) || /^(cpu|bot|ai)/i.test(id)) return;
+    seen.add(id);
+    const live = (await readJson(`axiom:p:${id}`)) || {};
+    await rememberPlayer({
+      id,
+      name: p.name || live.name,
+      avatar: p.avatar || live.avatar || "",
+      email: live.email || p.email || "",
+    });
+  };
+  for (const id of room.seats || []) await add({ id });
+  for (const p of room.state?.players || []) await add(p);
 }
 
 async function attachMods(rec) {
