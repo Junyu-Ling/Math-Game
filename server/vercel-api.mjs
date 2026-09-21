@@ -1,10 +1,13 @@
 import jwt from "jsonwebtoken";
 import {
+  createOauthState,
   exchangeGithubCode,
   fetchGithubIdentity,
   githubAuthorizeUrl,
   githubReady,
   oauthUrls,
+  setOauthStateCookie,
+  verifyOauthState,
 } from "./github-auth.mjs";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
@@ -95,7 +98,8 @@ export async function handle(req, res, path) {
       return;
     }
     const { callbackUrl } = oauthUrls(req);
-    const state = jwt.sign({ gh: 1, n: Date.now() }, JWT_SECRET, { expiresIn: "10m" });
+    const state = createOauthState();
+    setOauthStateCookie(req, res, state);
     res.statusCode = 302;
     res.setHeader("Location", githubAuthorizeUrl(state, callbackUrl));
     res.end();
@@ -114,11 +118,7 @@ export async function handle(req, res, path) {
     const code = query(req, "code");
     const state = query(req, "state");
     if (!code) return fail("missing_code");
-    try {
-      jwt.verify(state, JWT_SECRET);
-    } catch {
-      return fail("bad_state");
-    }
+    if (!verifyOauthState(req, state)) return fail("bad_state");
     try {
       const access = await exchangeGithubCode(code, callbackUrl);
       const identity = await fetchGithubIdentity(access);

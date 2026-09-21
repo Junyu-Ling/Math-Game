@@ -1,8 +1,14 @@
+import { randomBytes, timingSafeEqual } from "node:crypto";
+
 const GITHUB_UA = "AXIOM-Math-Game";
+const TOEFL_CLIENT_ID = "Ov23li2dm43mGcix56sF";
+const NEW_APP_CLIENT_ID = "Ov231ijfLsR5fwRzdTxg";
+const STATE_COOKIE = "axiom_gh_state";
 
 export function githubConfig() {
+  const raw = process.env.GITHUB_CLIENT_ID || TOEFL_CLIENT_ID;
   return {
-    clientId: process.env.GITHUB_CLIENT_ID || "",
+    clientId: raw === NEW_APP_CLIENT_ID ? TOEFL_CLIENT_ID : raw,
     clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
     callbackUrl: process.env.GITHUB_CALLBACK_URL || "",
     frontend: (process.env.FRONTEND_ORIGIN || "").replace(/\/$/, ""),
@@ -34,6 +40,57 @@ export function oauthUrls(req) {
     callbackUrl: cfg.callbackUrl || `${origin}/api/auth/github/callback`,
     frontend: cfg.frontend || origin,
   };
+}
+
+export function createOauthState() {
+  return randomBytes(16).toString("hex");
+}
+
+function readCookie(req, name) {
+  const raw = String(req.headers?.cookie || "");
+  for (const part of raw.split(/;\s*/)) {
+    const index = part.indexOf("=");
+    if (index === -1) continue;
+    if (part.slice(0, index) === name) {
+      try {
+        return decodeURIComponent(part.slice(index + 1));
+      } catch {
+        return part.slice(index + 1);
+      }
+    }
+  }
+  return "";
+}
+
+export function setOauthStateCookie(req, res, state) {
+  const secure = requestOrigin(req).startsWith("https:");
+  const parts = [
+    `${STATE_COOKIE}=${encodeURIComponent(state)}`,
+    "Path=/",
+    "Max-Age=600",
+    "HttpOnly",
+    "SameSite=Lax",
+  ];
+  if (secure) parts.push("Secure");
+  const prev = res.getHeader?.("Set-Cookie");
+  const cookie = parts.join("; ");
+  if (!prev) {
+    res.setHeader("Set-Cookie", cookie);
+    return;
+  }
+  res.setHeader("Set-Cookie", [...(Array.isArray(prev) ? prev : [prev]), cookie]);
+}
+
+export function verifyOauthState(req, state) {
+  const expected = readCookie(req, STATE_COOKIE);
+  const a = String(state || "");
+  const b = String(expected || "");
+  if (!a || !b || a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  } catch {
+    return false;
+  }
 }
 
 export function githubAuthorizeUrl(state, callbackUrl) {

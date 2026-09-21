@@ -13,9 +13,12 @@ import { applyAction, ARRANGE_MS, finishArrange, startCodaMatch, viewFor } from 
 import {
   fetchGithubIdentity,
   exchangeGithubCode,
+  createOauthState,
   githubAuthorizeUrl,
   githubReady,
   oauthUrls,
+  setOauthStateCookie,
+  verifyOauthState,
 } from "./github-auth.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -213,7 +216,8 @@ app.get("/api/auth/github/start", (req, res) => {
     return res.status(503).send("未配置 GitHub 登录。请在 server/.env 填写 GITHUB_CLIENT_ID 和 GITHUB_CLIENT_SECRET。");
   }
   const { callbackUrl } = oauthUrls(req);
-  const state = jwt.sign({ gh: 1, n: Date.now() }, JWT_SECRET, { expiresIn: "10m" });
+  const state = createOauthState();
+  setOauthStateCookie(req, res, state);
   res.redirect(githubAuthorizeUrl(state, callbackUrl));
 });
 
@@ -225,11 +229,7 @@ app.get("/api/auth/github/callback", async (req, res) => {
   const code = String(req.query.code || "");
   const state = String(req.query.state || "");
   if (!code) return fail("missing_code");
-  try {
-    jwt.verify(state, JWT_SECRET);
-  } catch {
-    return fail("bad_state");
-  }
+  if (!verifyOauthState(req, state)) return fail("bad_state");
   try {
     const access = await exchangeGithubCode(code, callbackUrl);
     const identity = await fetchGithubIdentity(access);
