@@ -129,12 +129,9 @@ export function Home() {
           </p>
         </div>
         <div className="hero-stage" aria-hidden>
-          <MiniPoker rank="Q" suit="S" />
-          <UnoFace card={{ id: "h1", color: "red", kind: "number", value: 0 }} />
-          <FlipFace card={{ id: "h2", kind: "number", value: 12 }} />
-          <MahjongTile hide={false} tile={{ color: "black", value: 7, revealed: true }} />
-          <UnoFace card={{ id: "h3", color: "blue", kind: "draw2" }} />
+          <FlipFace card={{ id: "h1", kind: "number", value: 12 }} />
           <MahjongTile hide={false} tile={{ color: "white", value: "joker", revealed: true }} />
+          <UnoFace card={{ id: "h2", color: "black", kind: "wild4" }} />
         </div>
       </section>
       <div className="game-grid">

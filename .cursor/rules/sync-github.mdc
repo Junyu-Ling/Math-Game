@@ -1,0 +1,14 @@
+---
+description: After every change, commit and push to GitHub
+alwaysApply: true
+---
+
+# Sync to GitHub after every change
+
+When you finish implementing or fixing anything in this repo:
+
+1. Stage the relevant files (never `.env` or secrets).
+2. Create a git commit with a concise why-focused message.
+3. Push to `origin` on the current branch (`git push origin HEAD`).
+
+Do this without waiting to be asked. This overrides the default “do not commit unless asked” habit for this project.

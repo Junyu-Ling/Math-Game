@@ -331,12 +331,9 @@ h1 {
   margin-left: -18px;
 }
 
-.hero-stage > :first-child { margin-left: 0; transform: rotate(-10deg) translateY(8px); }
-.hero-stage > :nth-child(2) { transform: rotate(-4deg); z-index: 2; }
-.hero-stage > :nth-child(3) { transform: rotate(2deg) translateY(-6px); z-index: 3; }
-.hero-stage > :nth-child(4) { transform: rotate(8deg) translateY(4px); z-index: 2; }
-.hero-stage > :nth-child(5) { transform: rotate(14deg) translateY(10px); z-index: 3; }
-.hero-stage > :nth-child(6) { transform: rotate(18deg) translateY(6px); }
+.hero-stage > :first-child { margin-left: 0; transform: rotate(-8deg) translateY(6px); }
+.hero-stage > :nth-child(2) { transform: rotate(2deg); z-index: 2; }
+.hero-stage > :nth-child(3) { transform: rotate(10deg) translateY(8px); z-index: 3; }
 
 .hero-stage .card-svg {
   width: var(--cw);
