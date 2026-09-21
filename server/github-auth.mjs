@@ -5,7 +5,7 @@ const STATE_COOKIE = "axiom_gh_state";
 
 export function githubConfig() {
   return {
-    clientId: process.env.GITHUB_CLIENT_ID || "Ov231ijfLsR5fwRzdTxg",
+    clientId: process.env.GITHUB_CLIENT_ID || "Ov23lijfLsR5fwRzdTxg",
     clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
     callbackUrl: process.env.GITHUB_CALLBACK_URL || "",
     frontend: (process.env.FRONTEND_ORIGIN || "").replace(/\/$/, ""),

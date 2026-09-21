@@ -88,7 +88,7 @@ SMTP 留空：注册成功后，验证码会写在注册页上，并打印在本
 
 流程与 TOEFL6666 相同：`/api/auth/github/start` → GitHub 授权 → `/api/auth/github/callback` → 写入用户并跳回前端。
 
-数学站用**自己的** OAuth App（Client ID `Ov231ijfLsR5fwRzdTxg`），不必和托福共用。Redirect URIs：
+数学站用**自己的** OAuth App（Client ID `Ov23lijfLsR5fwRzdTxg`），不必和托福共用。Redirect URIs：
 
 ```
 http://localhost:8787/api/auth/github/callback
@@ -100,7 +100,7 @@ Homepage URL：`https://math31415926.vercel.app`
 `server/.env`：
 
 ```
-GITHUB_CLIENT_ID=Ov231ijfLsR5fwRzdTxg
+GITHUB_CLIENT_ID=Ov23lijfLsR5fwRzdTxg
 GITHUB_CLIENT_SECRET=（只放 server/.env 或本项目 Vercel，不要提交仓库）
 GITHUB_CALLBACK_URL=http://localhost:8787/api/auth/github/callback
 FRONTEND_ORIGIN=http://localhost:5173
@@ -114,14 +114,14 @@ FRONTEND_ORIGIN=http://localhost:5173
 
 GitHub Pages 不能跑登录回调。要用 Vercel 连 `Junyu-Ling/Math-Game`。
 
-1. GitHub OAuth App（数学站自己的，Client ID `Ov231ijfLsR5fwRzdTxg`）  
+1. GitHub OAuth App（数学站自己的，Client ID `Ov23lijfLsR5fwRzdTxg`）  
    - Homepage URL：`https://math31415926.vercel.app`  
    - Redirect URI：`https://math31415926.vercel.app/api/auth/github/callback`
 
 2. Vercel（Math Game 项目）→ Settings → Environment Variables：
 
 ```
-GITHUB_CLIENT_ID=Ov231ijfLsR5fwRzdTxg
+GITHUB_CLIENT_ID=Ov23lijfLsR5fwRzdTxg
 GITHUB_CLIENT_SECRET=（这个 App 自己的 Secret）
 JWT_SECRET=请换成足够长的随机串
 FRONTEND_ORIGIN=https://math31415926.vercel.app
