@@ -10,7 +10,7 @@ export type ServerMsg =
 const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
 export function wsUrl(token: string): string {
-  const http = apiBase || "http://localhost:8787";
+  const http = apiBase || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8787");
   const ws = http.replace(/^http/, "ws");
   return `${ws}/ws?token=${encodeURIComponent(token)}`;
 }

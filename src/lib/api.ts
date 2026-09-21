@@ -1,3 +1,5 @@
+import { VIRTUAL_USERS } from "./virtual";
+
 const TOKEN_KEY = "axiom.token";
 const USER_KEY = "axiom.user";
 const MOCK_USERS_KEY = "axiom.mockUsers";
@@ -7,6 +9,11 @@ export type User = {
   email: string;
   chips: number;
   createdAt: string;
+  provider?: string;
+  login?: string;
+  name?: string;
+  avatar?: string;
+  githubId?: string;
 };
 
 export type AuthPayload = {
@@ -14,6 +21,7 @@ export type AuthPayload = {
   user: User;
 };
 
+const isProd = import.meta.env.PROD;
 const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
 function headers(token?: string): HeadersInit {
@@ -41,12 +49,29 @@ function writeMockUsers(users: Array<User & { password: string }>) {
   localStorage.setItem(MOCK_USERS_KEY, JSON.stringify(users));
 }
 
+function ensureVirtualMockUsers() {
+  const users = readMockUsers();
+  let changed = false;
+  for (const v of VIRTUAL_USERS) {
+    if (users.some((u) => u.email === v.email)) continue;
+    users.push({
+      id: v.accountId,
+      email: v.email,
+      password: v.password,
+      chips: 1000,
+      createdAt: new Date().toISOString(),
+    });
+    changed = true;
+  }
+  if (changed) writeMockUsers(users);
+}
+
 function mockToken(email: string) {
   return `mock.${btoa(unescape(encodeURIComponent(email)))}.${Date.now()}`;
 }
 
 export const authApi = {
-  live: Boolean(apiBase),
+  live: Boolean(apiBase) || isProd,
 
   getStored(): AuthPayload | null {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -120,6 +145,7 @@ export const authApi = {
         body: JSON.stringify({ email, password }),
       });
     }
+    ensureVirtualMockUsers();
     const users = readMockUsers();
     const found = users.find((u) => u.email === email && u.password === password);
     if (!found) throw new Error("邮箱或密码错误");
@@ -167,5 +193,9 @@ export const authApi = {
     const { password: _pw, ...user } = current;
     void _pw;
     return user;
+  },
+
+  githubStartUrl() {
+    return `${apiBase}/api/auth/github/start`;
   },
 };

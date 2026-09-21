@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { GithubButton } from "../components/GithubButton";
 
 export function Register() {
   const { register, verify, live } = useAuth();
@@ -41,7 +42,10 @@ export function Register() {
     <div className="auth-wrap">
       <p className="kicker">{live ? "LIVE API" : "LOCAL MOCK"}</p>
       <h1>注册</h1>
-      <p className="lede">邮箱 + 密码。第二步填写 6 位验证码。本地模式验证码为 000000。</p>
+      <p className="lede">也可以直接用 GitHub 注册并登录。</p>
+      <div className="row-actions" style={{ marginBottom: 18 }}>
+        <GithubButton />
+      </div>
       {!needCode ? (
         <form onSubmit={onRegister}>
           <div className="field">

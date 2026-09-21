@@ -20,7 +20,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <>
               <span className="chip-pill">{user.chips} CHIPS</span>
               <NavLink to="/account" title={user.email}>
-                {user.email.split("@")[0]}
+                {user.login || user.name || user.email.split("@")[0]}
               </NavLink>
               <button className="linkish" type="button" onClick={logout}>
                 OUT
@@ -33,7 +33,7 @@ export function Shell({ children }: { children: ReactNode }) {
       </header>
       <main>{children}</main>
       <footer className="foot">
-        <span>AXIOM / LOCAL TABLE / EMAIL AUTH READY</span>
+        <span>AXIOM / GITHUB AUTH</span>
         <span>NO SUPABASE · REDIS OPTIONAL</span>
       </footer>
     </div>

@@ -3,6 +3,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { Shell } from "./components/Shell";
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
+import { AuthCallback } from "./pages/AuthCallback";
 import { Register } from "./pages/Register";
 import { Account } from "./pages/Account";
 import { DaVinciPage } from "./games/davinci/DaVinciPage";
@@ -18,6 +19,7 @@ export function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/register" element={<Register />} />
             <Route path="/account" element={<Account />} />
             <Route path="/play/davinci" element={<DaVinciPage />} />

@@ -20,8 +20,12 @@ export function Account() {
   return (
     <div className="page">
       <p className="kicker">{live ? "LIVE" : "MOCK STORE"}</p>
-      <h1>{user.email}</h1>
-      <p className="lede">账号已建立。达芬奇可登录后匹配联机；筹码仍记在这套邮箱账号上。</p>
+      <h1>{user.name || user.login || user.email}</h1>
+      <p className="lede">
+        {user.provider === "github" || user.githubId
+          ? `GitHub 账号 @${user.login || user.email}。筹码跟这个正式账号走。`
+          : "账号已建立。达芬奇可登录后匹配联机；筹码跟这套账号走。"}
+      </p>
       <div className="account-grid">
         <div className="stat">
           <span>CHIPS</span>

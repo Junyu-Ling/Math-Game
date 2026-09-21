@@ -84,6 +84,61 @@ SMTP 留空：注册成功后，验证码会写在注册页上，并打印在本
 
 ---
 
+## GitHub 正式登录（沿用你 TOEFL 站那套 OAuth）
+
+流程与 TOEFL6666 相同：`/api/auth/github/start` → GitHub 授权 → `/api/auth/github/callback` → 写入用户并跳回前端。
+
+可继续用 Math Game 这个 GitHub OAuth App（Client ID `Ov231ijfLsR5fwRzdTxg`）。Callback URL：
+
+```
+http://localhost:8787/api/auth/github/callback
+https://math31415926.vercel.app/api/auth/github/callback
+```
+
+GitHub → Settings → Developer settings → OAuth Apps → Authorization callback URL。线上 Homepage URL 填 `https://math31415926.vercel.app`。
+
+`server/.env`：
+
+```
+GITHUB_CLIENT_ID=Ov231ijfLsR5fwRzdTxg
+GITHUB_CLIENT_SECRET=（只放 server/.env 或 Vercel，不要提交仓库）
+GITHUB_CALLBACK_URL=http://localhost:8787/api/auth/github/callback
+FRONTEND_ORIGIN=http://localhost:5173
+```
+
+改完重启 `npm run server`。健康检查 `github: true` 才算开通。
+
+登录页点「使用 GitHub 登录」。首次授权会创建正式账号（`gh_<id>`），筹码 1000。若 GitHub 邮箱已在本站注册过，会绑定到同一条用户。
+
+### 部署到 Vercel（math31415926.vercel.app）
+
+GitHub Pages 不能跑登录回调。要用 Vercel 连 `Junyu-Ling/Math-Game`。
+
+1. GitHub OAuth App  
+   - Homepage URL：`https://math31415926.vercel.app`  
+   - Callback URL 必须包含：`https://math31415926.vercel.app/api/auth/github/callback`
+
+2. Vercel → Project → Settings → Environment Variables（Production）：
+
+```
+GITHUB_CLIENT_ID=Ov231ijfLsR5fwRzdTxg
+GITHUB_CLIENT_SECRET=（和本地同一份，不要填 localhost 的 CALLBACK）
+JWT_SECRET=请换成足够长的随机串
+FRONTEND_ORIGIN=https://math31415926.vercel.app
+```
+
+**不要**在 Vercel 里填 `GITHUB_CALLBACK_URL=http://localhost:8787/...`，否则线上会跳回本机。不填 CALLBACK 时会自动用当前域名。
+
+3. 重新 Deploy。打开  
+   `https://math31415926.vercel.app/api/health`  
+   应看到 `"github": true`。
+
+4. 网站 `/login` → 使用 GitHub 登录。
+
+线上匹配联机仍需要独立 WebSocket 服务；GitHub 登录本身走 HTTPS `/api` 即可。
+
+---
+
 ## 三、账号接口
 
 成功 HTTP 200；失败 `{ "error": "中文原因" }`。

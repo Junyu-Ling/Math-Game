@@ -10,6 +10,13 @@ import Redis from "ioredis";
 import nodemailer from "nodemailer";
 import { WebSocketServer } from "ws";
 import { applyAction, ARRANGE_MS, finishArrange, startCodaMatch, viewFor } from "./coda-engine.mjs";
+import {
+  fetchGithubIdentity,
+  exchangeGithubCode,
+  githubAuthorizeUrl,
+  githubReady,
+  oauthUrls,
+} from "./github-auth.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(path.join(__dirname, ".env"));
@@ -124,11 +131,59 @@ function readUsers() {
 }
 
 function writeUsers(users) {
-  fs.writeFileSync(DATA, JSON.stringify(users, null, 2));
+  try {
+    fs.writeFileSync(DATA, JSON.stringify(users, null, 2));
+  } catch (err) {
+    console.error("无法写入用户文件（Vercel 上属正常）：", err.message);
+  }
+}
+
+function signUser(user) {
+  return jwt.sign(publicUser(user), JWT_SECRET, { expiresIn: "7d" });
 }
 
 function publicUser(u) {
-  return { id: u.id, email: u.email, chips: u.chips, createdAt: u.createdAt };
+  return {
+    id: u.id,
+    email: u.email,
+    chips: u.chips,
+    createdAt: u.createdAt,
+    provider: u.provider || (u.githubId ? "github" : "email"),
+    login: u.login || "",
+    name: u.name || "",
+    avatar: u.avatar || "",
+    githubId: u.githubId || "",
+  };
+}
+
+function upsertGithubUser(identity) {
+  const users = readUsers();
+  let user =
+    users.find((u) => u.githubId === identity.githubId) ||
+    users.find((u) => u.email && u.email === identity.email);
+  if (!user) {
+    user = {
+      id: identity.githubId,
+      email: identity.email,
+      githubId: identity.githubId,
+      login: identity.login,
+      name: identity.name,
+      avatar: identity.avatar,
+      provider: "github",
+      chips: 1000,
+      createdAt: new Date().toISOString(),
+    };
+    users.push(user);
+  } else {
+    user.githubId = identity.githubId;
+    user.login = identity.login || user.login;
+    user.name = identity.name || user.name;
+    user.avatar = identity.avatar || user.avatar;
+    user.provider = user.provider || "github";
+    if (!user.email) user.email = identity.email;
+  }
+  writeUsers(users);
+  return user;
 }
 
 function auth(req, res, next) {
@@ -147,8 +202,43 @@ app.get("/api/health", async (_req, res) => {
     ok: true,
     redis: redisReady ? "PONG" : "memory",
     smtp: Boolean(mailer),
+    github: githubReady(),
     match: true,
   });
+});
+
+app.get("/api/auth/github/start", (req, res) => {
+  if (!githubReady()) {
+    return res.status(503).send("未配置 GitHub 登录。请在 server/.env 填写 GITHUB_CLIENT_ID 和 GITHUB_CLIENT_SECRET。");
+  }
+  const { callbackUrl } = oauthUrls(req);
+  const state = jwt.sign({ gh: 1, n: Date.now() }, JWT_SECRET, { expiresIn: "10m" });
+  res.redirect(githubAuthorizeUrl(state, callbackUrl));
+});
+
+app.get("/api/auth/github/callback", async (req, res) => {
+  const { frontend, callbackUrl } = oauthUrls(req);
+  const fail = (code) => res.redirect(`${frontend}/login?gh_error=${encodeURIComponent(code)}`);
+  if (!githubReady()) return fail("config");
+  if (req.query.error) return fail(req.query.error === "access_denied" ? "denied" : "server");
+  const code = String(req.query.code || "");
+  const state = String(req.query.state || "");
+  if (!code) return fail("missing_code");
+  try {
+    jwt.verify(state, JWT_SECRET);
+  } catch {
+    return fail("bad_state");
+  }
+  try {
+    const access = await exchangeGithubCode(code, callbackUrl);
+    const identity = await fetchGithubIdentity(access);
+    const user = upsertGithubUser(identity);
+    const token = signUser(user);
+    res.redirect(`${frontend}/auth/callback#token=${encodeURIComponent(token)}`);
+  } catch (err) {
+    console.error("[auth/github]", err.message);
+    return fail("server");
+  }
 });
 
 app.post("/api/auth/register", async (req, res) => {
@@ -204,7 +294,11 @@ app.post("/api/auth/login", (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   const password = String(req.body?.password || "");
   const user = readUsers().find((u) => u.email === email);
-  if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+  if (!user) return res.status(400).json({ error: "邮箱或密码错误" });
+  if (!user.passwordHash) {
+    return res.status(400).json({ error: "该账号请用 GitHub 登录" });
+  }
+  if (!bcrypt.compareSync(password, user.passwordHash)) {
     return res.status(400).json({ error: "邮箱或密码错误" });
   }
   const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: "7d" });
@@ -213,8 +307,9 @@ app.post("/api/auth/login", (req, res) => {
 
 app.get("/api/me", auth, (req, res) => {
   const user = readUsers().find((u) => u.id === req.user.id);
-  if (!user) return res.status(404).json({ error: "用户不存在" });
-  res.json({ user: publicUser(user) });
+  if (user) return res.json({ user: publicUser(user) });
+  if (req.user?.githubId || req.user?.id) return res.json({ user: publicUser(req.user) });
+  res.status(404).json({ error: "用户不存在" });
 });
 
 function seedDemo() {
@@ -379,7 +474,7 @@ wss.on("connection", (ws, req) => {
     ws.close();
     return;
   }
-  const account = readUsers().find((u) => u.id === user.id);
+  const account = readUsers().find((u) => u.id === user.id) || (user.githubId || user.id ? user : null);
   if (!account) {
     send(ws, { type: "error", error: "用户不存在" });
     ws.close();
@@ -466,5 +561,5 @@ httpServer.listen(PORT, () => {
   console.log("演示账号  player1@axiom.local / axiom123");
   console.log("演示账号  player2@axiom.local / axiom123");
   console.log(mailer ? "SMTP 已配置" : "未配置 SMTP：验证码会显示在注册页，并打印在本终端");
-  console.log(redisReady ? "匹配队列：Redis" : "匹配队列：内存（可稍后启动 Redis，会自动切过去）");
+  console.log(githubReady() ? "GitHub 登录已配置" : "未配置 GitHub：在 server/.env 填写 GITHUB_CLIENT_ID / SECRET");
 });

@@ -10,7 +10,9 @@ type AuthState = {
   register: (email: string, password: string) => Promise<{ needCode: boolean; hint?: string }>;
   verify: (email: string, code: string) => Promise<void>;
   logout: () => void;
+  acceptToken: (token: string) => Promise<void>;
   setChips: (chips: number) => Promise<void>;
+  githubStartUrl: string;
 };
 
 const Ctx = createContext<AuthState | null>(null);
@@ -61,6 +63,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setToken(null);
       },
+      async acceptToken(nextToken: string) {
+        const u = await authApi.me(nextToken);
+        authApi.persist({ token: nextToken, user: u });
+        setUser(u);
+        setToken(nextToken);
+      },
+      githubStartUrl: authApi.githubStartUrl(),
       async setChips(chips) {
         if (!token) return;
         const next = await authApi.updateChips(token, chips);
