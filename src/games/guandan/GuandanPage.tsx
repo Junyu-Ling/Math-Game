@@ -17,38 +17,55 @@ import { useLobby } from "../../context/LobbyContext";
 import { wait } from "../../lib/shuffle";
 import type { PokerCard } from "../../lib/poker";
 
-function BackRow({ n }: { n: number }) {
-  const show = Math.min(8, Math.max(0, n));
+function BackFan({ n, side }: { n: number; side?: "left" | "right" | "top" }) {
+  const show = Math.min(side === "top" ? 9 : 3, Math.max(0, n));
   return (
-    <div className="pcards tight">
+    <div className={`ddz-fan ${side ?? "top"}`}>
       {Array.from({ length: show }, (_, i) => (
-        <PokerFace key={i} card={{ id: `bk${i}`, suit: "S", rank: "A", hidden: true }} />
+        <PokerFace key={i} card={{ id: `bk${side ?? "t"}${i}`, suit: "S", rank: "A", hidden: true }} />
       ))}
-      <span className="muted">{n}</span>
+      <b className="ddz-count">{n}</b>
+    </div>
+  );
+}
+
+function SeatTag({
+  name,
+  extra,
+  turn,
+  out,
+}: {
+  name: string;
+  extra?: string;
+  turn: boolean;
+  out: boolean;
+}) {
+  return (
+    <div className={`ddz-tag ${turn ? "turn" : ""} ${out ? "out" : ""}`}>
+      <span className="ddz-avatar">{name.slice(0, 1)}</span>
+      <div>
+        <strong>{name}</strong>
+        <small>
+          {out ? "已出完" : extra}
+          {turn ? " · 出牌" : ""}
+        </small>
+      </div>
     </div>
   );
 }
 
 function SeatBlock({
-  label,
-  turn,
-  out,
-  children,
   className,
+  tag,
+  children,
 }: {
-  label: string;
-  turn: boolean;
-  out: boolean;
-  children: ReactNode;
   className: string;
+  tag: ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className={`seat ${className}`}>
-      <div className="seat-label">
-        {label}
-        {out ? " · out" : ""}
-        {turn ? " · TURN" : ""}
-      </div>
+    <div className={`ddz-seat ${className}`}>
+      {tag}
       {children}
     </div>
   );
@@ -145,7 +162,7 @@ export function GuandanPage() {
         </div>
       </div>
       <div className="game-layout">
-        <div className="table table-gd">
+        <div className="table table-gd table-ddz">
           {!state || waiting || !playing ? (
             <div className="coda-deal">
               {waiting && state ? (
@@ -164,65 +181,86 @@ export function GuandanPage() {
           ) : me && left && partner && right ? (
             <>
               <SeatBlock
-                className="seat-partner"
-                label={`${partner.name} · partner · ${partner.hand.length}`}
-                turn={state.players[state.turn]?.id === partner.id}
-                out={state.finishers.includes(partner.id)}
+                className="ddz-partner"
+                tag={
+                  <SeatTag
+                    name={partner.name}
+                    extra={`对家 · ${partner.hand.length}张`}
+                    turn={state.players[state.turn]?.id === partner.id}
+                    out={state.finishers.includes(partner.id)}
+                  />
+                }
               >
-                <BackRow n={partner.hand.length} />
+                <BackFan n={partner.hand.length} side="top" />
               </SeatBlock>
               <SeatBlock
-                className="seat-left"
-                label={`${left.name} · ${left.hand.length}`}
-                turn={state.players[state.turn]?.id === left.id}
-                out={state.finishers.includes(left.id)}
+                className="ddz-left"
+                tag={
+                  <SeatTag
+                    name={left.name}
+                    extra={`上家 · ${left.hand.length}张`}
+                    turn={state.players[state.turn]?.id === left.id}
+                    out={state.finishers.includes(left.id)}
+                  />
+                }
               >
-                <BackRow n={left.hand.length} />
+                <BackFan n={left.hand.length} side="left" />
               </SeatBlock>
-              <div className="seat-trick center-well">
-                <div className="pcards" style={{ justifyContent: "center" }}>
+              <div className="ddz-trick">
+                <div className="ddz-trick-cards">
                   {(state.last?.cards || []).map((c) => (
                     <PokerFace key={c.id} card={c} />
                   ))}
                 </div>
-                <p className="status-line">{state.message}</p>
+                <p className="ddz-msg">{state.message}</p>
                 {myI >= 0 ? (
-                  <p className="muted" style={{ textAlign: "center" }}>
-                    Teams · {state.players.filter((_, i) => teamOf(i) === teamOf(myI)).map((p) => p.name).join(" & ")} vs{" "}
-                    {state.players.filter((_, i) => teamOf(i) !== teamOf(myI)).map((p) => p.name).join(" & ")}
+                  <p className="ddz-teams">
+                    {state.players.filter((_, i) => teamOf(i) === teamOf(myI)).map((p) => p.name).join(" / ")}
+                    {"  vs  "}
+                    {state.players.filter((_, i) => teamOf(i) !== teamOf(myI)).map((p) => p.name).join(" / ")}
                   </p>
                 ) : null}
               </div>
               <SeatBlock
-                className="seat-right"
-                label={`${right.name} · ${right.hand.length}`}
-                turn={state.players[state.turn]?.id === right.id}
-                out={state.finishers.includes(right.id)}
+                className="ddz-right"
+                tag={
+                  <SeatTag
+                    name={right.name}
+                    extra={`下家 · ${right.hand.length}张`}
+                    turn={state.players[state.turn]?.id === right.id}
+                    out={state.finishers.includes(right.id)}
+                  />
+                }
               >
-                <BackRow n={right.hand.length} />
+                <BackFan n={right.hand.length} side="right" />
               </SeatBlock>
               <SeatBlock
-                className="seat-me"
-                label={`${me.name} · ${me.hand.length}`}
-                turn={myTurn}
-                out={state.finishers.includes(me.id)}
+                className="ddz-me"
+                tag={
+                  <SeatTag
+                    name={me.name}
+                    extra={`${me.hand.length}张`}
+                    turn={myTurn}
+                    out={state.finishers.includes(me.id)}
+                  />
+                }
               >
-                <div className="pcards wrap">
+                <div className="ddz-hand">
                   {me.hand.map((c) => (
                     <PokerFace key={c.id} card={c} selected={picked.includes(c.id)} onClick={() => toggle(c)} />
                   ))}
                 </div>
                 {myTurn ? (
-                  <div className="row-actions">
+                  <div className="ddz-actions">
+                    <button className="ddz-btn pass" type="button" onClick={() => act({ type: "pass" })}>
+                      不出
+                    </button>
                     <button
-                      className="btn"
+                      className="ddz-btn play"
                       type="button"
                       onClick={() => act({ type: "play", cards: me.hand.filter((c) => picked.includes(c.id)) })}
                     >
-                      Play
-                    </button>
-                    <button className="btn btn-ghost" type="button" onClick={() => act({ type: "pass" })}>
-                      Pass
+                      出牌
                     </button>
                   </div>
                 ) : null}

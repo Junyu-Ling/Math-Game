@@ -409,70 +409,93 @@ function PokerArt({ card }: { card: PokerCard }) {
   const box = cardBox();
   if (card.hidden) {
     return (
-      <svg className="card-svg poker-svg" viewBox="0 0 63 88" style={box}>
-        <rect x="0.6" y="0.6" width="61.8" height="86.8" rx="4.2" fill="#f7f4ef" stroke="#d8d2c8" />
-        <rect x="4.2" y="4.2" width="54.6" height="79.6" rx="2.4" fill="#1c1c1c" />
-        <text x="31.5" y="48" textAnchor="middle" fill="#f4f2ee" fontSize="11" fontFamily="Georgia, serif" letterSpacing="1.4">
-          AX
-        </text>
+      <svg className="card-svg poker-svg ddz-back" viewBox="0 0 63 88" style={box}>
+        <rect x="0.5" y="0.5" width="62" height="87" rx="5" fill="#f4f7fb" stroke="#c5d0e0" />
+        <rect x="3.6" y="3.6" width="55.8" height="80.8" rx="3.4" fill="#1e4f9a" />
+        <rect x="7" y="7.2" width="49" height="73.6" rx="2.4" fill="none" stroke="#7eb3ff" strokeWidth="1.1" />
+        <path
+          d="M31.5 18 l8 13 15 2-12 10 3 15-14-8-14 8 3-15-12-10 15-2z"
+          fill="none"
+          stroke="#cfe3ff"
+          strokeWidth="1.3"
+        />
+        <circle cx="31.5" cy="44" r="7" fill="none" stroke="#9cc4ff" strokeWidth="1.1" />
       </svg>
     );
   }
   const red = isRed(card.suit, card.rank);
-  const ink = red ? "#C0392B" : "#1A1A1A";
+  const ink = red ? "#E23C2B" : "#1A1A1A";
   const g = suitGlyph(card.suit);
-  const label = card.rank === "BJ" || card.rank === "RJ" ? "J" : card.rank;
   if (card.suit === "J") {
+    const big = card.rank === "RJ";
+    const fill = big ? "#E23C2B" : "#2A5DB0";
     return (
       <svg className="card-svg poker-svg" viewBox="0 0 63 88" style={box}>
-        <rect x="0.6" y="0.6" width="61.8" height="86.8" rx="4.2" fill="#fffdf8" stroke="#d8d2c8" />
-        <text x="8" y="14" fill={ink} fontSize="11" fontFamily="Georgia, serif" fontWeight="700">
-          {label}
+        <rect x="0.5" y="0.5" width="62" height="87" rx="5" fill="#fffef9" stroke="#d8d2c8" />
+        <text x="7" y="16" fill={fill} fontSize="11" fontFamily="Georgia, serif" fontWeight="800">
+          J
         </text>
-        <text x="31.5" y="42" textAnchor="middle" fill={ink} fontSize="18" fontFamily="Georgia, serif">
-          ★
+        <text
+          x="31.5"
+          y="44"
+          textAnchor="middle"
+          fill={fill}
+          fontSize="22"
+          fontFamily='"Noto Sans SC", "Microsoft YaHei", sans-serif'
+          fontWeight="800"
+        >
+          {big ? "大" : "小"}
         </text>
-        <text x="31.5" y="58" textAnchor="middle" fill={ink} fontSize="7" fontFamily="Inter, sans-serif" letterSpacing="1.6">
-          JOKER
+        <text
+          x="31.5"
+          y="64"
+          textAnchor="middle"
+          fill={fill}
+          fontSize="22"
+          fontFamily='"Noto Sans SC", "Microsoft YaHei", sans-serif'
+          fontWeight="800"
+        >
+          王
         </text>
       </svg>
     );
   }
   const pips = PIP_MAP[card.rank];
+  const label = card.rank;
   return (
     <svg className="card-svg poker-svg" viewBox="0 0 63 88" style={box}>
       <defs>
         <clipPath id={`${uid}c`}>
-          <rect x="0.6" y="0.6" width="61.8" height="86.8" rx="4.2" />
+          <rect x="0.5" y="0.5" width="62" height="87" rx="5" />
         </clipPath>
       </defs>
-      <rect x="0.6" y="0.6" width="61.8" height="86.8" rx="4.2" fill="#fffdf8" stroke="#d8d2c8" />
-      <g clipPath={`url(#${uid}c)`} fill={ink} fontFamily="Georgia, 'Times New Roman', serif">
-        <text x="6" y="13" fontSize={card.rank === "10" ? "8.5" : "11"} fontWeight="700">
+      <rect x="0.5" y="0.5" width="62" height="87" rx="5" fill="#fffef9" stroke="#d8d2c8" />
+      <g clipPath={`url(#${uid}c)`} fill={ink} fontFamily='Georgia, "Times New Roman", serif'>
+        <text x="5.5" y="14" fontSize={label === "10" ? "10" : "13"} fontWeight="800">
           {label}
         </text>
-        <text x="6.2" y="23" fontSize="8">
+        <text x="6.2" y="25" fontSize="9">
           {g}
         </text>
         <g transform="rotate(180 31.5 44)">
-          <text x="6" y="13" fontSize={card.rank === "10" ? "8.5" : "11"} fontWeight="700">
+          <text x="5.5" y="14" fontSize={label === "10" ? "10" : "13"} fontWeight="800">
             {label}
           </text>
-          <text x="6.2" y="23" fontSize="8">
+          <text x="6.2" y="25" fontSize="9">
             {g}
           </text>
         </g>
-        {pips
-          ? pips.map(([x, y], i) => (
-              <text key={i} x={x} y={y} textAnchor="middle" fontSize="12">
-                {g}
-              </text>
-            ))
-          : (
-            <text x="31.5" y="50" textAnchor="middle" fontSize="22" fontWeight="700">
-              {label}
+        {pips ? (
+          pips.map(([x, y], i) => (
+            <text key={i} x={x} y={y} textAnchor="middle" fontSize="13">
+              {g}
             </text>
-          )}
+          ))
+        ) : (
+          <text x="31.5" y="52" textAnchor="middle" fontSize="26" fontWeight="800">
+            {label}
+          </text>
+        )}
       </g>
     </svg>
   );

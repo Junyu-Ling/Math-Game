@@ -85,7 +85,7 @@ export function Flip7Page() {
             <GameSetup
               kicker="FLIP 7"
               title="First to 200"
-              blurb="Seven distinct numbers add +15. A duplicate number busts."
+              blurb="On your turn flip one card, or stay to bank. Play then passes. Seven distinct numbers add +15. A duplicate number busts."
               game="flip7"
               onPractice={() => setLocal(startFlip7())}
             />
@@ -110,7 +110,7 @@ export function Flip7Page() {
                     : myTurn
                       ? state.phase === "target"
                         ? "Pick a rival: Freeze or Flip Three"
-                        : "Hit or Stay. Duplicates bust."
+                        : "Flip one card, then the next player. Stay to bank this round."
                       : `${cur?.name} is acting`}
                 </div>
                 {myTurn && state.phase === "target"

@@ -73,7 +73,6 @@ function Row({
   gaps,
   ghostAt,
   reserveSlot,
-  triedById,
 }: {
   tiles: CodaTile[];
   hide: boolean;
@@ -86,7 +85,6 @@ function Row({
   gaps?: number[];
   ghostAt?: number | null;
   reserveSlot?: boolean;
-  triedById?: Record<string, CodaValue[]>;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -126,7 +124,6 @@ function Row({
             aimed={aimed && !tile.revealed}
             flash={fx}
             down={Boolean(downRevealed && tile.revealed)}
-            tried={tile.revealed ? undefined : triedById?.[tile.id]}
             onClick={onTile ? () => onTile(i) : undefined}
           />
         ),
@@ -493,7 +490,6 @@ export function DaVinciPage() {
                 selectedIndex={aimedRival}
                 flash={flash}
                 reserveSlot
-                triedById={state.tried}
                 onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: rival.id, index: i })}
               />
             </div>
@@ -569,7 +565,6 @@ export function DaVinciPage() {
                 selectedIndex={aimedYou}
                 flash={flash}
                 reserveSlot
-                triedById={state.tried}
                 gaps={arrangeGaps}
                 ghostAt={myInsert ? autoSlot : null}
                 onGap={(i) => {

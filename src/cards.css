@@ -1031,40 +1031,6 @@
   cursor: default;
 }
 
-.mj-tried {
-  position: absolute;
-  right: 5px;
-  bottom: 7px;
-  z-index: 3;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 2px;
-  max-width: 78%;
-  pointer-events: none;
-}
-
-.mj-tried i {
-  font-style: normal;
-  font-size: 9px;
-  line-height: 1;
-  min-width: 11px;
-  padding: 1px 2px;
-  border-radius: 3px;
-  background: rgba(17, 17, 17, 0.78);
-  color: #f8f4ea;
-  font-family: "IBM Plex Mono", monospace;
-  font-weight: 600;
-}
-
-.mj.white .mj-tried i {
-  background: rgba(17, 17, 17, 0.72);
-}
-
-.mj.black .mj-tried i {
-  background: rgba(246, 237, 216, 0.9);
-  color: #161616;
-}
 
 .table-flip,
 .table-bj,

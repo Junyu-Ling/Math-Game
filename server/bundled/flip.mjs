@@ -73,7 +73,7 @@ function startFlip7Duel(a, b) {
     lastCard: null,
     winnerId: null,
     goal: 200,
-    log: [{ id: uid("l"), text: `${a.name} vs ${b.name}\u3002Hit / Stay\uFF0C\u5148\u5230 200\u3002` }]
+    log: [{ id: uid("l"), text: `${a.name} vs ${b.name}. Hit / Stay. First to 200.` }]
   };
 }
 function startFlip7() {
@@ -83,7 +83,7 @@ function startFlip7() {
   return {
     ...state,
     players: state.players.map((p) => p.id === cpu.id ? { ...p, human: false } : p),
-    log: [{ id: uid("l"), text: "\u7EC3\u4E60\u4EBA\u673A\u3002Hit / Stay\uFF0C\u5148\u5230 200\u3002" }]
+    log: [{ id: uid("l"), text: "Practice vs CPU. Hit / Stay. First to 200." }]
   };
 }
 function viewFlip7(state, _viewerId) {
@@ -123,12 +123,12 @@ function hit(state) {
       const area = me.area.filter((c) => c.id !== chance.id);
       next = withPlayer(next, me.id, (p) => ({ ...p, area, pendingFlip3: Math.max(0, p.pendingFlip3 - 1) }));
       next.discard = [...next.discard, chance, card];
-      next.log = [...next.log, { id: uid("l"), text: `${me.name} \u89E6\u53D1\u91CD\u590D ${card.value}\uFF0C\u6D88\u8017 Second Chance\u3002`, tone: whoTone }];
+      next.log = [...next.log, { id: uid("l"), text: `${me.name} hit a duplicate ${card.value} and spent Second Chance.`, tone: whoTone }];
       return afterHit(next, me.id);
     }
     next = withPlayer(next, me.id, (p) => ({ ...p, area: [], status: "bust", pendingFlip3: 0 }));
     next.discard = [...next.discard, ...me.area, card];
-    next.log = [...next.log, { id: uid("l"), text: `${me.name} \u7206\u724C\uFF08\u91CD\u590D ${card.value}\uFF09\uFF0C\u672C\u8F6E 0 \u5206\u3002`, tone: "bad" }];
+    next.log = [...next.log, { id: uid("l"), text: `${me.name} busts (duplicate ${card.value}). Round scores 0.`, tone: "bad" }];
     return advance(next);
   }
   next = withPlayer(next, me.id, (p) => ({
@@ -136,7 +136,7 @@ function hit(state) {
     area: [...p.area, card],
     pendingFlip3: Math.max(0, p.pendingFlip3 - 1)
   }));
-  next.log = [...next.log, { id: uid("l"), text: `${me.name} \u7FFB\u5F00 ${cardLabel(card)}\u3002`, tone: whoTone }];
+  next.log = [...next.log, { id: uid("l"), text: `${me.name} flips ${cardLabel(card)}.`, tone: whoTone }];
   if (card.kind === "freeze" || card.kind === "flip3") {
     return { ...next, phase: "target", pendingAction: card.kind };
   }
@@ -146,6 +146,7 @@ function afterHit(state, playerId) {
   const me = state.players.find((p) => p.id === playerId);
   if (!me) return state;
   const scored = areaScore(me.area);
+  const idx = state.players.findIndex((p) => p.id === playerId);
   if (scored.flip7) {
     let next = withPlayer(state, me.id, (p) => ({
       ...p,
@@ -154,12 +155,14 @@ function afterHit(state, playerId) {
       area: []
     }));
     next.discard = [...next.discard, ...me.area];
-    next.log = [...next.log, { id: uid("l"), text: `${me.name} Flip 7\uFF01+${scored.score}\uFF08\u542B 15 \u66B4\u51FB\uFF09\u3002`, tone: "you" }];
+    next.log = [...next.log, { id: uid("l"), text: `${me.name} Flip 7! +${scored.score} (includes +15).`, tone: "you" }];
     next = checkWin(next, me.id);
     if (next.phase === "over") return next;
-    return advance(next);
+    return advance({ ...next, turn: idx });
   }
-  return { ...state, phase: "action" };
+  const parked = { ...state, turn: Math.max(0, idx), phase: "action" };
+  if (me.pendingFlip3 > 0) return parked;
+  return advance(parked);
 }
 function stay(state) {
   if (state.phase !== "action") return state;
@@ -168,7 +171,7 @@ function stay(state) {
   const scored = areaScore(me.area).score;
   let next = withPlayer(state, me.id, (p) => ({ ...p, area: [], status: "stayed", total: p.total + scored }));
   next.discard = [...next.discard, ...me.area];
-  next.log = [...next.log, { id: uid("l"), text: `${me.name} \u505C\u724C\uFF0C\u672C\u8F6E +${scored}\u3002`, tone: me.human ? "you" : "ai" }];
+  next.log = [...next.log, { id: uid("l"), text: `${me.name} stays. Round +${scored}.`, tone: me.human ? "you" : "ai" }];
   next = checkWin(next, me.id);
   if (next.phase === "over") return next;
   return advance(next);
@@ -179,11 +182,20 @@ function applyTarget(state, targetId) {
   const action = state.pendingAction;
   let next = state;
   if (action === "freeze") {
-    next = withPlayer(next, targetId, (p) => ({ ...p, pendingFreeze: true }));
-    next.log = [...next.log, { id: uid("l"), text: `${me.name} \u5BF9 ${nameOf(state, targetId)} \u4F7F\u7528 Freeze\u3002` }];
+    const target = state.players.find((p) => p.id === targetId);
+    const scored = target ? areaScore(target.area).score : 0;
+    next = withPlayer(next, targetId, (p) => ({
+      ...p,
+      pendingFreeze: false,
+      status: "stayed",
+      total: p.total + scored,
+      area: []
+    }));
+    if (target) next.discard = [...next.discard, ...target.area];
+    next.log = [...next.log, { id: uid("l"), text: `${me.name} freezes ${nameOf(state, targetId)} \xB7 +${scored}.` }];
   } else {
     next = withPlayer(next, targetId, (p) => ({ ...p, pendingFlip3: p.pendingFlip3 + 3 }));
-    next.log = [...next.log, { id: uid("l"), text: `${me.name} \u5BF9 ${nameOf(state, targetId)} \u4F7F\u7528 Flip Three\u3002` }];
+    next.log = [...next.log, { id: uid("l"), text: `${me.name} uses Flip Three on ${nameOf(state, targetId)}.` }];
   }
   next.pendingAction = null;
   next.phase = "action";
@@ -199,7 +211,7 @@ function checkWin(state, playerId) {
       ...state,
       phase: "over",
       winnerId: p.id,
-      log: [...state.log, { id: uid("l"), text: `${p.name} \u8FBE\u5230 ${p.total}\uFF0C\u80DC\u51FA\u3002`, tone: "you" }]
+      log: [...state.log, { id: uid("l"), text: `${p.name} reaches ${p.total} and wins.`, tone: "you" }]
     };
   }
   return state;
@@ -212,7 +224,9 @@ function newRound(state) {
   const players = state.players.map((p) => ({
     ...p,
     area: [],
-    status: "active"
+    status: "active",
+    pendingFreeze: false,
+    pendingFlip3: 0
   }));
   return {
     ...state,
@@ -222,7 +236,7 @@ function newRound(state) {
     turn: state.round % state.players.length,
     phase: "action",
     lastCard: null,
-    log: [...state.log, { id: uid("l"), text: `\u7B2C ${state.round + 1} \u8F6E\u5F00\u59CB\u3002` }]
+    log: [...state.log, { id: uid("l"), text: `Round ${state.round + 1} starts.` }]
   };
 }
 function advance(state) {
@@ -241,7 +255,7 @@ function advance(state) {
         status: "stayed",
         total: x.total + scored
       }));
-      next.log = [...next.log, { id: uid("l"), text: `${p.name} \u88AB\u51BB\u7ED3\uFF0C\u5F3A\u5236\u505C\u724C +${scored}\u3002` }];
+      next.log = [...next.log, { id: uid("l"), text: `${p.name} is frozen and must stay +${scored}.` }];
       next = checkWin(next, p.id);
       if (next.phase === "over") return next;
       next.turn = i;

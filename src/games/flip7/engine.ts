@@ -180,6 +180,7 @@ function afterHit(state: FlipState, playerId: string): FlipState {
   const me = state.players.find((p) => p.id === playerId);
   if (!me) return state;
   const scored = areaScore(me.area);
+  const idx = state.players.findIndex((p) => p.id === playerId);
   if (scored.flip7) {
     let next = withPlayer(state, me.id, (p) => ({
       ...p,
@@ -191,9 +192,11 @@ function afterHit(state: FlipState, playerId: string): FlipState {
     next.log = [...next.log, { id: uid("l"), text: `${me.name} Flip 7! +${scored.score} (includes +15).`, tone: "you" }];
     next = checkWin(next, me.id);
     if (next.phase === "over") return next;
-    return advance(next);
+    return advance({ ...next, turn: idx });
   }
-  return { ...state, phase: "action" };
+  const parked = { ...state, turn: Math.max(0, idx), phase: "action" as const };
+  if (me.pendingFlip3 > 0) return parked;
+  return advance(parked);
 }
 
 export function stay(state: FlipState): FlipState {
@@ -215,8 +218,17 @@ export function applyTarget(state: FlipState, targetId: string): FlipState {
   const action = state.pendingAction;
   let next = state;
   if (action === "freeze") {
-    next = withPlayer(next, targetId, (p) => ({ ...p, pendingFreeze: true }));
-    next.log = [...next.log, { id: uid("l"), text: `${me.name} uses Freeze on ${nameOf(state, targetId)}.` }];
+    const target = state.players.find((p) => p.id === targetId);
+    const scored = target ? areaScore(target.area).score : 0;
+    next = withPlayer(next, targetId, (p) => ({
+      ...p,
+      pendingFreeze: false,
+      status: "stayed",
+      total: p.total + scored,
+      area: [],
+    }));
+    if (target) next.discard = [...next.discard, ...target.area];
+    next.log = [...next.log, { id: uid("l"), text: `${me.name} freezes ${nameOf(state, targetId)} · +${scored}.` }];
   } else {
     next = withPlayer(next, targetId, (p) => ({ ...p, pendingFlip3: p.pendingFlip3 + 3 }));
     next.log = [...next.log, { id: uid("l"), text: `${me.name} uses Flip Three on ${nameOf(state, targetId)}.` }];
@@ -253,6 +265,8 @@ function newRound(state: FlipState): FlipState {
     ...p,
     area: [],
     status: "active" as const,
+    pendingFreeze: false,
+    pendingFlip3: 0,
   }));
   return {
     ...state,
