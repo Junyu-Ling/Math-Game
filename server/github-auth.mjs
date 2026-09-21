@@ -14,7 +14,12 @@ export function githubConfig() {
 
 export function githubReady() {
   const { clientId, clientSecret } = githubConfig();
-  return Boolean(clientId && clientSecret);
+  return Boolean(clientId && clientSecret) && !githubSecretLooksLikeUrl();
+}
+
+export function githubSecretLooksLikeUrl() {
+  const secret = githubConfig().clientSecret.trim();
+  return /^https?:\/\//i.test(secret);
 }
 
 export function requestOrigin(req) {

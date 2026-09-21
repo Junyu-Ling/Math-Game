@@ -5,6 +5,7 @@ import {
   fetchGithubIdentity,
   githubAuthorizeUrl,
   githubReady,
+  githubSecretLooksLikeUrl,
   oauthUrls,
   setOauthStateCookie,
   verifyOauthState,
@@ -83,6 +84,7 @@ export async function handle(req, res, path) {
     send(res, 200, {
       ok: true,
       github: githubReady(),
+      githubSecretIsUrl: githubSecretLooksLikeUrl(),
       match: Boolean(matchWs),
       vercel: true,
       ws: matchWs,
@@ -94,7 +96,11 @@ export async function handle(req, res, path) {
     if (!githubReady()) {
       res.statusCode = 503;
       res.setHeader("Content-Type", "text/plain; charset=utf-8");
-      res.end("未配置 GitHub 登录。请在 Vercel 环境变量填写 GITHUB_CLIENT_ID 和 GITHUB_CLIENT_SECRET。");
+      res.end(
+        githubSecretLooksLikeUrl()
+          ? "GITHUB_CLIENT_SECRET 填成了网址。请到 GitHub OAuth App 点 Generate a new client secret，把那一串字符填进 Vercel，不要填 authorize 链接。"
+          : "未配置 GitHub 登录。请在 Vercel 环境变量填写 GITHUB_CLIENT_ID 和 GITHUB_CLIENT_SECRET。",
+      );
       return;
     }
     const { callbackUrl } = oauthUrls(req);
