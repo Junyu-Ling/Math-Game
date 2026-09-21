@@ -3,9 +3,9 @@
   "outputDirectory": "dist",
   "installCommand": "npm install && npm install --prefix server",
   "functions": {
-    "api/[...path].mjs": {
+    "api/**/*.mjs": {
       "maxDuration": 15,
-      "includeFiles": "server/github-auth.mjs"
+      "includeFiles": "server/**"
     }
   },
   "rewrites": [

@@ -5,7 +5,7 @@ import {
   githubAuthorizeUrl,
   githubReady,
   oauthUrls,
-} from "../server/github-auth.mjs";
+} from "./github-auth.mjs";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
 const users = new Map();
@@ -63,17 +63,6 @@ function send(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-function apiPath(req) {
-  const raw = req.query?.path;
-  if (Array.isArray(raw)) return raw.join("/");
-  if (raw) return String(raw);
-  try {
-    return new URL(req.url || "/", "http://n").pathname.replace(/^\/api\/?/, "").replace(/\/$/, "");
-  } catch {
-    return "";
-  }
-}
-
 function query(req, key) {
   const v = req.query?.[key];
   if (Array.isArray(v)) return String(v[0] || "");
@@ -85,9 +74,7 @@ function query(req, key) {
   }
 }
 
-export default async function handler(req, res) {
-  const path = apiPath(req);
-
+export async function handle(req, res, path) {
   if (path === "health" || path === "") {
     send(res, 200, { ok: true, github: githubReady(), match: false, vercel: true });
     return;
