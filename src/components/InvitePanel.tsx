@@ -69,7 +69,7 @@ export function InvitePanel({ game, meta }: { game: string; meta?: Record<string
   return (
     <aside className="side" id="invite-panel">
       <div>
-        <h3>Invite</h3>
+        <h3>Players</h3>
         <InviteList game={game} meta={meta} />
       </div>
       {incoming.length > 0 ? (

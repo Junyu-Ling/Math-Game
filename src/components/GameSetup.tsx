@@ -1,18 +1,14 @@
-import { InviteList } from "./InvitePanel";
-
 export function GameSetup({
   kicker,
   title,
   blurb,
   onPractice,
-  game,
-  meta,
 }: {
   kicker: string;
   title: string;
   blurb: string;
   onPractice: () => void;
-  game: string;
+  game?: string;
   meta?: Record<string, unknown>;
 }) {
   return (
@@ -25,7 +21,6 @@ export function GameSetup({
           Practice vs CPU
         </button>
       </div>
-      <InviteList game={game} meta={meta} />
     </div>
   );
 }

@@ -211,9 +211,12 @@ export async function rememberPlayer(user) {
 
 export async function saveAccount(user) {
   const id = String(user.id);
-  await kvSet(`axiom:acct:${id}`, user, USER_SEC);
-  if (user.email) await kvSet(`axiom:acctemail:${String(user.email).toLowerCase()}`, id, USER_SEC);
-  await rememberPlayer(user);
+  const prev = (await findAccountById(id)) || {};
+  const merged = { ...prev, ...user, id };
+  if (prev.passwordHash && !user.passwordHash) merged.passwordHash = prev.passwordHash;
+  await kvSet(`axiom:acct:${id}`, merged, USER_SEC);
+  if (merged.email) await kvSet(`axiom:acctemail:${String(merged.email).toLowerCase()}`, id, USER_SEC);
+  await rememberPlayer(merged);
 }
 
 export async function findAccountById(id) {
@@ -239,46 +242,78 @@ export async function clearVerify(email) {
 }
 
 
-async function listRoster(viewerId) {
-  const live = await listPresence();
-  const liveMap = new Map(live.map((p) => [String(p.id), p]));
-  let ids = await smembers("axiom:users");
-  for (const p of live) {
-    const id = String(p.id);
-    if (!ids.includes(id)) ids.push(id);
-  }
-  ids = [...new Set(ids.map(String))].filter((id) => id !== String(viewerId)).slice(0, 200);
+async function scanKeys(matchPrefix) {
+  const keys = [];
   const r = client();
-  const profiles = new Map();
-  if (r && ids.length) {
+  if (r) {
     try {
-      const rows = await r.mget(...ids.map((id) => `axiom:u:${id}`));
-      for (let i = 0; i < ids.length; i++) {
+      let cursor = "0";
+      do {
+        const res = await r.scan(cursor, "MATCH", `${matchPrefix}*`, "COUNT", 100);
+        cursor = String(res[0]);
+        keys.push(...res[1]);
+      } while (cursor !== "0");
+    } catch {
+      /* memory */
+    }
+  }
+  for (const key of mem.keys()) {
+    if (String(key).startsWith(matchPrefix) && memGet(key) != null) keys.push(key);
+  }
+  return [...new Set(keys)];
+}
+
+function idsFromKeys(keys, prefix) {
+  return keys.map((key) => String(key).startsWith(prefix) ? String(key).slice(prefix.length) : "").filter(Boolean);
+}
+
+async function mgetJson(keys) {
+  const map = new Map();
+  if (!keys.length) return map;
+  const r = client();
+  if (r) {
+    try {
+      const rows = await r.mget(...keys);
+      for (let i = 0; i < keys.length; i++) {
         const raw = rows[i];
         if (!raw) continue;
         try {
-          profiles.set(ids[i], JSON.parse(raw));
+          map.set(keys[i], JSON.parse(raw));
         } catch {
           /* skip */
         }
       }
+      return map;
     } catch {
       /* fallback */
     }
   }
-  if (!profiles.size) {
-    for (const id of ids) {
-      const p = (await readJson(`axiom:u:${id}`)) || liveMap.get(id);
-      if (p) profiles.set(id, p);
-    }
+  for (const key of keys) {
+    const row = await readJson(key);
+    if (row) map.set(key, row);
   }
+  return map;
+}
+
+async function listRoster(viewerId) {
+  const live = await listPresence();
+  const liveMap = new Map(live.map((p) => [String(p.id), p]));
+  const ids = [
+    ...(await smembers("axiom:users")),
+    ...idsFromKeys(await scanKeys("axiom:u:"), "axiom:u:"),
+    ...idsFromKeys(await scanKeys("axiom:acct:"), "axiom:acct:"),
+    ...live.map((p) => String(p.id)),
+  ];
+  const unique = [...new Set(ids.map(String))].filter((id) => id && id !== String(viewerId)).slice(0, 200);
+  const profiles = await mgetJson(unique.map((id) => `axiom:u:${id}`));
+  const accounts = await mgetJson(unique.filter((id) => !profiles.has(`axiom:u:${id}`)).map((id) => `axiom:acct:${id}`));
   const out = [];
-  for (const id of ids) {
-    const saved = profiles.get(id);
+  for (const id of unique) {
+    const saved = profiles.get(`axiom:u:${id}`) || accounts.get(`axiom:acct:${id}`);
     const liveP = liveMap.get(id);
-    const name = liveP?.name || saved?.name || "PLAYER";
-    const avatar = liveP?.avatar || saved?.avatar || "";
     if (!saved && !liveP) continue;
+    const name = liveP?.name || saved?.name || saved?.login || saved?.email || "PLAYER";
+    const avatar = liveP?.avatar || saved?.avatar || "";
     out.push({
       id,
       name,
@@ -331,7 +366,7 @@ export async function heartbeat(user, href = "", light = false) {
   };
   await kvSet(`axiom:p:${id}`, rec, ONLINE_SEC);
   await sadd("axiom:online", id, ONLINE_SEC + 5);
-  await rememberPlayer(user);
+  await saveAccount(user);
   return snapshot(id, light);
 }
 

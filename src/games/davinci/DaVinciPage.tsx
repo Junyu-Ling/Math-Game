@@ -27,7 +27,7 @@ import { DeckStack } from "../../components/PlayingCard";
 import { wait } from "../../lib/shuffle";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
-import { InviteList, InvitePanel } from "../../components/InvitePanel";
+import { InvitePanel } from "../../components/InvitePanel";
 
 type Flash = {
   kind: "hit" | "miss" | "win" | "lose";
@@ -447,7 +447,6 @@ export function DaVinciPage() {
                       Practice vs CPU
                     </button>
                   </div>
-                  <InviteList game="coda" meta={{ useJokers: jokers, black: blackN, white: whiteN }} />
                 </>
               ) : (
                 <button className="btn btn-ghost" type="button" onClick={resetTable}>
