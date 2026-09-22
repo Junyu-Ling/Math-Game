@@ -87,7 +87,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         abort?.abort();
         abort = new AbortController();
         const inRoom = Boolean(snapRef.current.room);
-        const needRoster = !inRoom && Date.now() - lastFull > 2500;
+        const needRoster = !inRoom && Date.now() - lastFull > 800;
         const next = needRoster
           ? await lobbyApi.sync(token, window.location.pathname, false)
           : await lobbyApi.watch(
@@ -100,12 +100,12 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         if (stop) return;
         if (!next.light) lastFull = Date.now();
         applySnap(next, inRoom || Boolean(next.light));
+        if (!stop) timer = window.setTimeout(tick, 0);
       } catch (ex) {
         if (stop) return;
         if (ex instanceof Error && ex.name === "AbortError") return;
         setError(ex instanceof Error ? ex.message : "Lobby sync failed");
-      } finally {
-        if (!stop) timer = window.setTimeout(tick, 30);
+        if (!stop) timer = window.setTimeout(tick, 200);
       }
     };
     void tick();

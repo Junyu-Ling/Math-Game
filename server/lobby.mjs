@@ -27,9 +27,10 @@ function client() {
     redisTried = true;
     const tls = url.startsWith("rediss://") ? { rejectUnauthorized: true } : undefined;
     redis = new Redis(url, {
-      maxRetriesPerRequest: 2,
+      maxRetriesPerRequest: 1,
       enableOfflineQueue: true,
-      connectTimeout: 8000,
+      connectTimeout: 4000,
+      lazyConnect: false,
       tls,
     });
     redis.on("error", () => {});
@@ -80,6 +81,8 @@ async function kvSet(key, value, ttlSec) {
 }
 
 const waiters = new Map();
+const WAKE_CH = "axiom:wakepub";
+let redisSub = null;
 
 function wakeLocal(ids) {
   for (const id of ids) {
@@ -88,6 +91,50 @@ function wakeLocal(ids) {
     waiters.delete(id);
     for (const fn of list) fn();
   }
+}
+
+function ensureSub() {
+  const r = client();
+  if (!r || redisSub) return redisSub;
+  try {
+    redisSub = r.duplicate();
+    redisSub.on("error", () => {});
+    redisSub.on("message", (_ch, payload) => {
+      try {
+        const ids = JSON.parse(String(payload || "[]"));
+        if (Array.isArray(ids)) wakeLocal(ids.map(String));
+      } catch {
+        wakeLocal(String(payload || "").split(",").filter(Boolean));
+      }
+    });
+    void redisSub.subscribe(WAKE_CH);
+  } catch {
+    redisSub = null;
+  }
+  return redisSub;
+}
+
+function waitLocal(userId, timeoutMs) {
+  const id = String(userId);
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      clearTimeout(t);
+      const list = waiters.get(id) || [];
+      waiters.set(
+        id,
+        list.filter((fn) => fn !== onWake),
+      );
+      resolve(ok);
+    };
+    const onWake = () => finish(true);
+    const t = setTimeout(() => finish(false), Math.max(0, timeoutMs));
+    const list = waiters.get(id) || [];
+    list.push(onWake);
+    waiters.set(id, list);
+  });
 }
 
 export async function wakeUsers(ids) {
@@ -103,6 +150,7 @@ export async function wakeUsers(ids) {
       pipe.ltrim(`axiom:wakeq:${id}`, 0, 7);
       pipe.expire(`axiom:wakeq:${id}`, 30);
     }
+    pipe.publish(WAKE_CH, JSON.stringify(uniq));
     await pipe.exec();
   } catch {
     /* memory */
@@ -112,34 +160,25 @@ export async function wakeUsers(ids) {
 export async function waitWake(userId, timeoutMs) {
   const id = String(userId);
   const r = client();
+  ensureSub();
   if (r) {
     try {
-      const hit = await r.blpop(`axiom:wakeq:${id}`, Math.max(1, Math.ceil(timeoutMs / 1000)));
-      return Boolean(hit);
+      const queued = await r.lpop(`axiom:wakeq:${id}`);
+      if (queued) return true;
     } catch {
-      await new Promise((resolve) => setTimeout(resolve, Math.min(80, timeoutMs)));
+      /* fall through */
+    }
+  }
+  const hit = await waitLocal(id, timeoutMs);
+  if (hit) return true;
+  if (r) {
+    try {
+      return Boolean(await r.lpop(`axiom:wakeq:${id}`));
+    } catch {
       return false;
     }
   }
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = (ok) => {
-      if (done) return;
-      done = true;
-      const list = waiters.get(id) || [];
-      waiters.set(
-        id,
-        list.filter((fn) => fn !== onWake),
-      );
-      resolve(ok);
-    };
-    const onWake = () => finish(true);
-    const t = setTimeout(() => finish(false), timeoutMs);
-    const list = waiters.get(id) || [];
-    list.push(onWake);
-    waiters.set(id, list);
-    void t;
-  });
+  return false;
 }
 
 async function kvDel(key) {
@@ -361,12 +400,7 @@ async function mgetJson(keys) {
 async function listRoster(viewerId) {
   const live = await listPresence();
   const liveMap = new Map(live.map((p) => [String(p.id), p]));
-  const ids = [
-    ...(await smembers("axiom:users")),
-    ...idsFromKeys(await scanKeys("axiom:u:"), "axiom:u:"),
-    ...idsFromKeys(await scanKeys("axiom:acct:"), "axiom:acct:"),
-    ...live.map((p) => String(p.id)),
-  ];
+  const ids = [...(await smembers("axiom:users")), ...live.map((p) => String(p.id))];
   const unique = [...new Set(ids.map(String))].filter((id) => id && id !== String(viewerId)).slice(0, 200);
   const profiles = await mgetJson(unique.map((id) => `axiom:u:${id}`));
   const accounts = await mgetJson(unique.filter((id) => !profiles.has(`axiom:u:${id}`)).map((id) => `axiom:acct:${id}`));
@@ -406,8 +440,21 @@ async function saveRoom(room, opts = {}) {
     endsAt: room.endsAt,
     seq: room.seq || 0,
   };
-  await kvSet(`axiom:room:${room.id}`, rec, ROOM_SEC);
-  for (const id of room.seats) await kvSet(`axiom:seat:${id}`, room.id, ROOM_SEC);
+  const r = client();
+  if (r) {
+    try {
+      const pipe = r.pipeline();
+      pipe.set(`axiom:room:${room.id}`, JSON.stringify(rec), "EX", ROOM_SEC);
+      for (const id of room.seats) pipe.set(`axiom:seat:${id}`, room.id, "EX", ROOM_SEC);
+      await pipe.exec();
+    } catch {
+      await kvSet(`axiom:room:${room.id}`, rec, ROOM_SEC);
+      for (const id of room.seats) await kvSet(`axiom:seat:${id}`, room.id, ROOM_SEC);
+    }
+  } else {
+    await kvSet(`axiom:room:${room.id}`, rec, ROOM_SEC);
+    for (const id of room.seats) await kvSet(`axiom:seat:${id}`, room.id, ROOM_SEC);
+  }
   if (!opts.skipRemember) await rememberSeats(room);
   await wakeUsers(room.seats);
 }
@@ -457,11 +504,12 @@ export async function touchPresence(user, href = "") {
   await sadd("axiom:online", id, ONLINE_SEC + 5);
 }
 
-export async function watchLobby(user, seq = 0, inviteCount = -1, href = "", timeoutMs = 12000) {
+export async function watchLobby(user, seq = 0, inviteCount = -1, href = "", timeoutMs = 8000) {
   const id = String(user.id);
   const wantSeq = Number(seq) || 0;
   const wantInv = Number(inviteCount);
-  await touchPresence(user, href);
+  void touchPresence(user, href);
+  ensureSub();
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     const snap = await snapshot(id, true);
@@ -469,8 +517,8 @@ export async function watchLobby(user, seq = 0, inviteCount = -1, href = "", tim
     if (roomSeq !== wantSeq) return snap;
     if (wantInv >= 0 && snap.invites.length !== wantInv) return snap;
     const left = timeoutMs - (Date.now() - started);
-    if (left < 250) break;
-    await waitWake(id, Math.min(left, 4000));
+    if (left < 20) break;
+    await waitWake(id, left);
   }
   return snapshot(id, true);
 }
@@ -478,14 +526,11 @@ export async function watchLobby(user, seq = 0, inviteCount = -1, href = "", tim
 export async function snapshot(userId, light = false) {
   const online = light ? [] : await listRoster(userId);
   const inviteIds = await smembers(`axiom:uinv:${userId}`);
+  const invMap = await mgetJson(inviteIds.map((id) => `axiom:inv:${id}`));
   const invites = [];
   for (const id of inviteIds) {
-    const inv = await readJson(`axiom:inv:${id}`);
-    if (!inv) {
-      await srem(`axiom:uinv:${userId}`, id);
-      continue;
-    }
-    invites.push(inv);
+    const inv = invMap.get(`axiom:inv:${id}`);
+    if (inv) invites.push(inv);
   }
   const rid = await getSeat(userId);
   let room = null;
