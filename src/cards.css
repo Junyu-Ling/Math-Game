@@ -200,42 +200,20 @@
 .mj-fresh {
   position: absolute;
   left: 50%;
-  top: -14px;
+  top: -10px;
   z-index: 12;
-  width: 22px;
-  height: 28px;
-  margin-left: -11px;
-  pointer-events: none;
-  filter: drop-shadow(0 2px 3px rgba(17, 17, 17, 0.35));
-}
-
-.mj-fresh-head {
-  position: absolute;
-  left: 3px;
-  right: 3px;
-  top: 0;
+  width: 16px;
   height: 12px;
-  border-radius: 6px 6px 2px 2px;
-  background:
-    radial-gradient(circle at 30% 30%, #fff6d6, transparent 55%),
-    linear-gradient(180deg, #f3d78a, #c4922e);
-  border: 1px solid #8a6418;
+  margin-left: -8px;
+  pointer-events: none;
+  background: linear-gradient(180deg, #f3d78a, #c4922e);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  filter: drop-shadow(0 1px 2px rgba(80, 48, 8, 0.45));
 }
 
-.mj-fresh-arm {
-  position: absolute;
-  left: 7px;
-  width: 3px;
-  top: 10px;
-  height: 16px;
-  border-radius: 1px;
-  background: linear-gradient(90deg, #efe0a8, #b8892a);
-  border: 1px solid #8a6418;
-}
-
-.mj-fresh-arm:last-child {
-  left: auto;
-  right: 7px;
+.seat-left .side-tile .mj-fresh,
+.seat-right .side-tile .mj-fresh {
+  top: 4px;
 }
 
 .mj.fresh .coda-face {
@@ -629,6 +607,7 @@
   height: var(--tile-w, 56px);
   display: grid;
   place-items: center;
+  overflow: visible;
 }
 .seat-left .side-tile .mj {
   transform: rotate(-90deg);
