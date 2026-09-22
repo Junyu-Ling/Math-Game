@@ -144,13 +144,15 @@ export function Flip7Page() {
                           : "Flip one card, then the next player. Stay to bank this round."
                       : `${cur?.name} is acting`}
                 </div>
-                {myTurn && state.phase === "target" && !savePlaying
-                  ? activePlayers(state).map((p) => (
-                      <button key={p.id} className="btn" type="button" onClick={() => act({ type: "target", targetId: p.id })}>
-                        {p.id === me.id ? `Use on yourself` : `Use on ${p.name}`}
-                      </button>
-                    ))
-                  : null}
+                <div className="target-slot">
+                  {myTurn && state.phase === "target" && !savePlaying
+                    ? activePlayers(state).map((p) => (
+                        <button key={p.id} className="btn" type="button" onClick={() => act({ type: "target", targetId: p.id })}>
+                          {p.id === me.id ? `Use on yourself` : `Use on ${p.name}`}
+                        </button>
+                      ))
+                    : null}
+                </div>
               </div>
               <div className="seat">
                 {burst?.playerId === me.id && fx?.id === burst.id && fx.boom ? <FlipBoom key={`${burst.id}-boom`} /> : null}
@@ -168,16 +170,24 @@ export function Flip7Page() {
                     <FlipFace key={c.id} card={c} />
                   ))}
                 </div>
-                {myTurn && state.phase === "action" && !savePlaying && (
-                  <div className="row-actions">
-                    <button className="btn btn-go" type="button" onClick={() => act({ type: "hit" })}>
-                      HIT
-                    </button>
-                    <button className="btn btn-gold" type="button" disabled={me.pendingFlip3 > 0} onClick={() => act({ type: "stay" })}>
-                      STAY
-                    </button>
-                  </div>
-                )}
+                <div className="row-actions">
+                  <button
+                    className="btn btn-go"
+                    type="button"
+                    disabled={!myTurn || state.phase !== "action" || savePlaying}
+                    onClick={() => act({ type: "hit" })}
+                  >
+                    HIT
+                  </button>
+                  <button
+                    className="btn btn-gold"
+                    type="button"
+                    disabled={!myTurn || state.phase !== "action" || savePlaying || me.pendingFlip3 > 0}
+                    onClick={() => act({ type: "stay" })}
+                  >
+                    STAY
+                  </button>
+                </div>
               </div>
             </>
           )}

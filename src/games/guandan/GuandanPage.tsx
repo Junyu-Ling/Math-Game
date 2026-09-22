@@ -259,20 +259,19 @@ export function GuandanPage() {
                     <PokerFace key={c.id} card={c} selected={picked.includes(c.id)} onClick={() => toggle(c)} />
                   ))}
                 </div>
-                {myTurn ? (
-                  <div className="ddz-actions">
-                    <button className="ddz-btn pass" type="button" onClick={() => act({ type: "pass" })}>
-                      Pass
-                    </button>
-                    <button
-                      className="ddz-btn play"
-                      type="button"
-                      onClick={() => act({ type: "play", cards: me.hand.filter((c) => picked.includes(c.id)) })}
-                    >
-                      Play
-                    </button>
-                  </div>
-                ) : null}
+                <div className="ddz-actions">
+                  <button className="ddz-btn pass" type="button" disabled={!myTurn} onClick={() => act({ type: "pass" })}>
+                    Pass
+                  </button>
+                  <button
+                    className="ddz-btn play"
+                    type="button"
+                    disabled={!myTurn}
+                    onClick={() => act({ type: "play", cards: me.hand.filter((c) => picked.includes(c.id)) })}
+                  >
+                    Play
+                  </button>
+                </div>
                 {state.phase === "over" ? <p className="result-note">{state.message}</p> : null}
               </SeatBlock>
             </>

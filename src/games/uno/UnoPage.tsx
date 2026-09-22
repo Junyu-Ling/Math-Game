@@ -113,13 +113,15 @@ export function UnoPage() {
                 </div>
               </div>
               <div className="center-well">
-                <DeckStack
-                  count={state.deck.length}
-                  label="Draw"
-                  onClick={canDraw ? () => act({ type: "draw" }) : undefined}
-                  disabled={!canDraw}
-                />
-                {top ? <UnoFace card={top} /> : null}
+                <div className="center-cards">
+                  <DeckStack
+                    count={state.deck.length}
+                    label="Draw"
+                    onClick={canDraw ? () => act({ type: "draw" }) : undefined}
+                    disabled={!canDraw}
+                  />
+                  {top ? <UnoFace card={top} /> : <div className="card-ghost" aria-hidden />}
+                </div>
                 <div className="uno-center-actions">
                   <div className={`uno-color-chip ${state.color}`}>{state.color.toUpperCase()}</div>
                   {shoutUno ? (
@@ -132,6 +134,7 @@ export function UnoPage() {
                       KEEP
                     </button>
                   ) : null}
+                  {myTurn && state.phase === "color" ? <UnoColorPick onPick={(color) => act({ type: "color", color })} /> : null}
                 </div>
                 <div className="status-line">
                   {state.phase === "over"
@@ -152,7 +155,6 @@ export function UnoPage() {
                                 : "No match — draw one"
                             : `${cur?.name} is acting`}
                 </div>
-                {myTurn && state.phase === "color" ? <UnoColorPick onPick={(color) => act({ type: "color", color })} /> : null}
               </div>
               <div className="seat">
                 <div className="seat-label">

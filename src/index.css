@@ -278,7 +278,10 @@ button:disabled {
   grid-template-rows: minmax(88px, auto) minmax(160px, 1fr) minmax(176px, auto);
   gap: 8px 10px;
   align-items: stretch;
+  height: clamp(480px, 70dvh, 720px);
   min-height: clamp(480px, 70dvh, 720px);
+  max-height: clamp(480px, 70dvh, 720px);
+  overflow: hidden;
 }
 
 .table-gd:has(.coda-deal) {
@@ -397,7 +400,7 @@ button:disabled {
 .ddz-trick-cards {
   display: flex;
   justify-content: center;
-  min-height: 88px;
+  min-height: 96px;
   --cw: 52px;
   --ch: 78px;
 }
@@ -435,7 +438,7 @@ button:disabled {
   justify-content: center;
   align-items: flex-end;
   width: 100%;
-  min-height: 108px;
+  min-height: 118px;
   padding: 18px 8px 6px;
   --cw: 54px;
   --ch: 82px;
@@ -460,6 +463,7 @@ button:disabled {
   justify-content: center;
   gap: 16px;
   margin-top: 4px;
+  min-height: 36px;
 }
 
 .ddz-btn {
@@ -1068,7 +1072,8 @@ h1 {
   display: flex;
   justify-content: center;
   gap: 14px;
-  margin: 40px 0 28px;
+  margin: 24px 0 20px;
+  min-height: 140px;
 }
 
 .expr {

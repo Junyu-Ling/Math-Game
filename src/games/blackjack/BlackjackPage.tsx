@@ -104,16 +104,14 @@ export function BlackjackPage() {
                     <PokerFace key={c.id} card={c} />
                   ))}
                 </div>
-                {myTurn && (
-                  <div className="row-actions">
-                    <button className="btn btn-go" type="button" onClick={() => act({ type: "hit" })}>
-                      HIT
-                    </button>
-                    <button className="btn btn-gold" type="button" onClick={() => act({ type: "stand" })}>
-                      STAND
-                    </button>
-                  </div>
-                )}
+                <div className="row-actions">
+                  <button className="btn btn-go" type="button" disabled={!myTurn} onClick={() => act({ type: "hit" })}>
+                    HIT
+                  </button>
+                  <button className="btn btn-gold" type="button" disabled={!myTurn} onClick={() => act({ type: "stand" })}>
+                    STAND
+                  </button>
+                </div>
               </div>
             </>
           )}

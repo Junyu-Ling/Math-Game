@@ -120,10 +120,11 @@ export function HoldemPage() {
                 </div>
               </div>
               <div className="center-well">
-                <div className="pcards" style={{ justifyContent: "center" }}>
-                  {state.community.map((c) => (
-                    <PokerFace key={c.id} card={c} />
-                  ))}
+                <div className="pcards community-slots">
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const card = state.community[i];
+                    return card ? <PokerFace key={card.id} card={card} /> : <div key={`slot-${i}`} className="card-ghost" aria-hidden />;
+                  })}
                 </div>
                 <p className="status-line">
                   Pot {state.pot} · {state.message}
@@ -139,39 +140,41 @@ export function HoldemPage() {
                     <PokerFace key={c.id} card={c} />
                   ))}
                 </div>
-                {myTurn ? (
-                  <div className="row-actions">
-                    <button className="btn btn-ghost" type="button" onClick={() => act({ type: "fold" })}>
-                      Fold
-                    </button>
-                    {toCall > 0 ? (
-                      <button className="btn" type="button" onClick={() => act({ type: "call" })}>
-                        Call {toCall}
-                      </button>
-                    ) : (
-                      <button className="btn" type="button" onClick={() => act({ type: "check" })}>
-                        Check
-                      </button>
-                    )}
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={() => act({ type: "raise", amount: state.currentBet + Math.max(state.bb * 2, Math.floor(state.pot / 2) || state.bb) })}
-                    >
-                      Raise
-                    </button>
-                    <button className="btn btn-ghost" type="button" onClick={() => act({ type: "allin" })}>
-                      All in
-                    </button>
-                  </div>
-                ) : null}
-                {state.street === "showdown" ? (
-                  <div className="row-actions">
+                <div className="row-actions">
+                  {state.street === "showdown" ? (
                     <button className="btn" type="button" onClick={() => act({ type: "next" })}>
                       Next hand
                     </button>
-                  </div>
-                ) : null}
+                  ) : (
+                    <>
+                      <button className="btn btn-ghost" type="button" disabled={!myTurn} onClick={() => act({ type: "fold" })}>
+                        Fold
+                      </button>
+                      {toCall > 0 ? (
+                        <button className="btn" type="button" disabled={!myTurn} onClick={() => act({ type: "call" })}>
+                          Call {toCall}
+                        </button>
+                      ) : (
+                        <button className="btn" type="button" disabled={!myTurn} onClick={() => act({ type: "check" })}>
+                          Check
+                        </button>
+                      )}
+                      <button
+                        className="btn"
+                        type="button"
+                        disabled={!myTurn}
+                        onClick={() =>
+                          act({ type: "raise", amount: state.currentBet + Math.max(state.bb * 2, Math.floor(state.pot / 2) || state.bb) })
+                        }
+                      >
+                        Raise
+                      </button>
+                      <button className="btn btn-ghost" type="button" disabled={!myTurn} onClick={() => act({ type: "allin" })}>
+                        All in
+                      </button>
+                    </>
+                  )}
+                </div>
                 {state.street === "over" ? <p className="result-note">{state.message}</p> : null}
               </div>
             </>

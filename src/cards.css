@@ -296,7 +296,7 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  min-height: 118px;
+  min-height: 140px;
   align-items: flex-end;
 }
 
@@ -1206,10 +1206,65 @@
   border: 1px solid #e5e7eb;
 }
 
+.table-flip,
+.table-bj,
+.table-uno {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) 204px minmax(0, 1.2fr);
+  justify-content: stretch;
+  justify-items: stretch;
+  align-content: stretch;
+  height: clamp(560px, 78dvh, 760px);
+  min-height: clamp(560px, 78dvh, 760px);
+  max-height: clamp(560px, 78dvh, 760px);
+  overflow: hidden;
+  padding: clamp(14px, 2vw, 22px);
+}
+
+.table-bj {
+  grid-template-rows: minmax(0, 1fr) 188px minmax(0, 1.2fr);
+}
+
+.table-uno {
+  grid-template-rows: minmax(0, 1fr) 224px minmax(0, 1.2fr);
+}
+
+.table-m24 {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: clamp(560px, 78dvh, 760px);
+  min-height: clamp(560px, 78dvh, 760px);
+  max-height: clamp(560px, 78dvh, 760px);
+  overflow: hidden;
+}
+
+.table-flip:has(> .coda-deal),
+.table-bj:has(> .coda-deal),
+.table-uno:has(> .coda-deal),
+.table-m24:has(> .coda-deal) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-flip > .seat,
+.table-bj > .seat,
+.table-uno > .seat,
+.table-flip > .center-well,
+.table-bj > .center-well,
+.table-uno > .center-well {
+  min-width: 0;
+  min-height: 0;
+}
+
 .table-flip .seat,
 .table-bj .seat,
 .table-uno .seat {
   align-items: center;
+  width: 100%;
+  justify-content: center;
 }
 
 .table-flip .seat-label,
@@ -1356,9 +1411,85 @@
   width: 100%;
 }
 
-.table-uno .pcards {
+.table-flip .seat .pcards,
+.table-bj .seat .pcards,
+.table-uno .seat .pcards {
+  flex-wrap: nowrap;
+  gap: 0;
+  min-height: 140px;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 4px 12px 0;
+  scrollbar-width: thin;
+}
+
+.table-flip .seat .pcards > * + *,
+.table-bj .seat .pcards > * + *,
+.table-uno .seat .pcards > * + * {
+  margin-left: -34px;
+}
+
+.table-bj .center-well {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+
+.table-bj .center-well .pcards,
+.table-bj .community-slots {
+  flex-wrap: nowrap;
+  justify-content: center;
+  min-height: 140px;
+  width: 100%;
+}
+
+.card-ghost {
+  width: var(--cw, 86px);
+  height: var(--ch, 130px);
+  flex: 0 0 auto;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.table-flip .center-well {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+
+.table-flip .target-slot {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  min-height: 44px;
+  width: 100%;
+}
+
+.table-uno .center-well {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.table-uno .center-cards {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 130px;
+  width: 100%;
+}
+
+.table-uno .seat:first-child .pcards {
+  padding-top: 4px;
+  min-height: 140px;
+}
+
+.table-uno .seat:last-child .pcards {
   padding-top: 22px;
   overflow: visible;
+  min-height: 160px;
 }
 
 .table-uno .card-svg-btn.playable {
@@ -1372,6 +1503,7 @@
 .table-uno .card-svg-btn.playable:hover {
   animation-play-state: paused;
   transform: translateY(-18px);
+  z-index: 4;
 }
 
 @keyframes uno-playable-bob {
@@ -1388,6 +1520,9 @@
 .table-bj .seat .row-actions,
 .table-uno .seat .row-actions {
   justify-content: center;
+  margin-top: 4px;
+  min-height: 44px;
+  flex-shrink: 0;
 }
 
 .m24-num {
@@ -1704,7 +1839,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   border: 3px solid #e6c27a;
 }
 
-.uno-colors { display: flex; gap: 8px; margin-top: 10px; }
+.uno-colors { display: flex; gap: 8px; margin-top: 0; }
 .uno-dot {
   width: 28px;
   height: 28px;
@@ -1718,9 +1853,12 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 
 .uno-center-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   gap: 10px;
+  min-height: 52px;
+  width: 100%;
 }
 
 .uno-shout {
