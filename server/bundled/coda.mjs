@@ -120,7 +120,7 @@ function instantInsert(state, pending, resume) {
   next = checkEliminations(next);
   if (next.phase === "over") return next;
   if (resume === "next") return nextTurn(next);
-  return { ...next, phase: "draw" };
+  return afterOpening(next);
 }
 function openingSplit(black, white) {
   const b = Math.max(0, Math.min(OPENING, Math.floor(black)));
@@ -138,93 +138,167 @@ function pullOpeningJoker(player) {
   }
   return { ...player, tiles: nums, stash: stash ?? null };
 }
-function startCodaMatch(useJokers, a, b) {
-  const base = startCoda(useJokers, a.black, a.white);
-  const deck = makeDeck(useJokers);
-  const aSplit = openingSplit(a.black, a.white);
-  const bSplit = openingSplit(b.black, b.white);
-  const deal = (seat, n) => ({
-    id: seat.id,
-    name: seat.name,
-    human: true,
-    tiles: sortOpening([...takeByColor(deck, "black", n.black), ...takeByColor(deck, "white", n.white)]),
-    stash: null,
-    out: false
-  });
-  let you = deal(a, aSplit);
-  let rival = deal(b, bSplit);
-  you = pullOpeningJoker(you);
-  rival = pullOpeningJoker(rival);
-  const wait = Boolean(you.stash || rival.stash);
-  const stashSlots = {};
-  if (you.stash) stashSlots[you.id] = insertIndices(you.tiles, you.stash)[0] ?? 0;
-  if (rival.stash) stashSlots[rival.id] = insertIndices(rival.tiles, rival.stash)[0] ?? 0;
+function emptyCodaPlayer(p) {
   return {
-    ...base,
-    players: [you, rival],
-    deck: shuffle(deck),
-    phase: wait ? "arrange" : "rps",
-    drawn: wait ? you.stash : null,
-    arrangeId: wait ? 1 : 0,
-    pending: wait ? you.stash : null,
-    pendingSlot: wait && you.stash ? insertIndices(you.tiles, you.stash)[0] ?? 0 : null,
-    humanDraft: wait ? you.tiles.map((t) => ({ ...t })) : null,
-    frozenRival: wait ? rival.tiles.map((t) => ({ ...t })) : null,
-    resume: wait ? "draw" : null,
-    rpsThrows: {},
-    rpsReveal: null,
-    stashSlots,
-    log: [
-      {
-        id: uid("l"),
-        text: wait ? "Online opening: if anyone drew a dash, arrange for 5 seconds." : "Online opening of 4 tiles in hand. RPS \u2014 loser guesses first."
-      }
-    ]
+    id: p.id,
+    name: p.name,
+    human: p.human !== false,
+    tiles: [],
+    stash: null,
+    out: false,
+    black: 2,
+    white: 2,
+    ready: false
   };
 }
-function startCoda(useJokers = true, youBlack = 2, youWhite = 2) {
-  const deck = makeDeck(useJokers);
-  const youSplit = openingSplit(youBlack, youWhite);
-  const rivalSplit = openingSplit(2, 2);
-  const deal = (name, human, b, w) => {
-    const tiles = sortOpening([...takeByColor(deck, "black", b), ...takeByColor(deck, "white", w)]);
-    return { id: uid("p"), name, human, tiles, stash: null, out: false };
-  };
-  let you = deal("YOU", true, youSplit.black, youSplit.white);
-  let rival = deal("RIVAL", false, rivalSplit.black, rivalSplit.white);
-  you = pullOpeningJoker(you);
-  rival = pullOpeningJoker(rival);
-  const wait = Boolean(you.stash || rival.stash);
-  const stashSlots = {};
-  if (you.stash) stashSlots[you.id] = insertIndices(you.tiles, you.stash)[0] ?? 0;
-  if (rival.stash) stashSlots[rival.id] = insertIndices(rival.tiles, rival.stash)[0] ?? 0;
+function afterOpening(state) {
+  if (state.players.length !== 2) {
+    const living = state.players.filter((p) => !p.out);
+    const pick = living[Math.floor(Math.random() * Math.max(1, living.length))] ?? state.players[0];
+    const turn = Math.max(0, state.players.findIndex((p) => p.id === pick?.id));
+    return {
+      ...state,
+      turn,
+      phase: "draw",
+      drawn: null,
+      selected: null,
+      log: [...state.log, { id: uid("l"), text: `${state.players[turn]?.name} draws first.` }]
+    };
+  }
   return {
-    players: [you, rival],
-    deck: shuffle(deck),
+    ...state,
+    phase: "rps",
+    log: [...state.log, { id: uid("l"), text: "Tiles locked. RPS \u2014 loser guesses first." }]
+  };
+}
+function startCodaLobby(people, useJokers) {
+  const players = people.slice(0, 4).map(emptyCodaPlayer);
+  return {
+    players,
+    deck: [],
     turn: 0,
-    phase: wait ? "arrange" : "rps",
-    drawn: wait ? you.stash : null,
+    phase: "lobby",
+    drawn: null,
     selected: null,
     useJokers,
     winnerId: null,
-    arrangeId: wait ? 1 : 0,
-    pending: wait ? you.stash : null,
-    pendingSlot: wait && you.stash ? insertIndices(you.tiles, you.stash)[0] ?? 0 : null,
-    humanDraft: wait ? you.tiles.map((t) => ({ ...t })) : null,
-    frozenRival: wait ? rival.tiles.map((t) => ({ ...t })) : null,
-    resume: wait ? "draw" : null,
+    arrangeId: 0,
+    pending: null,
+    pendingSlot: null,
+    humanDraft: null,
+    frozenRival: null,
+    resume: null,
     rpsThrows: {},
     rpsReveal: null,
-    stashSlots,
+    stashSlots: {},
     tried: {},
     fresh: {},
     log: [
       {
         id: uid("l"),
-        text: you.stash ? "Opening dash drawn. Insert, still 4 tiles, then lock." : wait ? "Opening 4 in hand. Rival drew a dash. Arrange, then RPS." : "Opening 4 in hand, no dash. RPS \u2014 loser guesses first."
+        text: `Table ${players.length}/4. Each player picks black and white (4 total), then ready.`
       }
     ]
   };
+}
+function pickCodaMix(state, actorId, black, white) {
+  if (state.phase !== "lobby") return state;
+  if (!state.players.some((p) => p.id === actorId)) return state;
+  const split = openingSplit(black, white);
+  return {
+    ...state,
+    players: state.players.map(
+      (p) => p.id === actorId ? { ...p, black: split.black, white: split.white, ready: false } : p
+    )
+  };
+}
+function readyCoda(state, actorId) {
+  if (state.phase !== "lobby") return state;
+  const actor = state.players.find((p) => p.id === actorId);
+  if (!actor) return state;
+  const next = {
+    ...state,
+    players: state.players.map((p) => p.id === actorId ? { ...p, ready: true } : p),
+    log: [...state.log, { id: uid("l"), text: `${actor.name} is ready.` }]
+  };
+  if (next.players.length >= 2 && next.players.every((p) => p.ready)) return dealCodaTable(next);
+  return next;
+}
+function dealCodaTable(state) {
+  const seated = state.players.slice(0, 4);
+  if (seated.length < 2) return state;
+  const deck = makeDeck(state.useJokers);
+  const players = seated.map((p) => {
+    const split = openingSplit(p.black ?? 2, p.white ?? 2);
+    return pullOpeningJoker({
+      ...p,
+      tiles: sortOpening([...takeByColor(deck, "black", split.black), ...takeByColor(deck, "white", split.white)]),
+      stash: null,
+      out: false
+    });
+  });
+  const wait = players.some((p) => p.stash);
+  const stashSlots = {};
+  for (const p of players) {
+    if (p.stash) stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
+  }
+  const firstStash = players.find((p) => p.stash);
+  const other = players.find((p) => p.id !== firstStash?.id) ?? players[1];
+  const dealt = {
+    ...state,
+    players,
+    deck: shuffle(deck),
+    turn: 0,
+    selected: null,
+    winnerId: null,
+    tried: {},
+    fresh: {},
+    rpsThrows: {},
+    rpsReveal: null,
+    stashSlots,
+    arrangeId: wait ? state.arrangeId + 1 : 0,
+    pending: wait ? firstStash?.stash ?? null : null,
+    pendingSlot: wait && firstStash?.stash ? stashSlots[firstStash.id] ?? 0 : null,
+    humanDraft: wait && firstStash ? firstStash.tiles.map((t) => ({ ...t })) : null,
+    frozenRival: wait && other ? other.tiles.map((t) => ({ ...t })) : null,
+    resume: wait ? "draw" : null,
+    drawn: wait ? firstStash?.stash ?? null : null,
+    log: [
+      ...state.log,
+      {
+        id: uid("l"),
+        text: wait ? "Opening: if anyone drew a dash, arrange for 5 seconds." : players.length === 2 ? "Opening 4 in hand. RPS \u2014 loser guesses first." : "Opening 4 in hand. First draw is random."
+      }
+    ]
+  };
+  if (wait) return { ...dealt, phase: "arrange" };
+  return afterOpening({ ...dealt, phase: "draw" });
+}
+function startCodaMatch(useJokers, a, b) {
+  let lobby = startCodaLobby([a, b], useJokers);
+  lobby = pickCodaMix(lobby, a.id, a.black, a.white);
+  lobby = pickCodaMix(lobby, b.id, b.black, b.white);
+  lobby = {
+    ...lobby,
+    players: lobby.players.map((p) => ({ ...p, ready: true, human: p.id === a.id ? a.human !== false : b.human !== false }))
+  };
+  return dealCodaTable(lobby);
+}
+var CPU_NAMES = ["CPU", "CPU 2", "CPU 3"];
+function startCoda(useJokers = true, youBlack = 2, youWhite = 2, seats = 2) {
+  const n = Math.max(2, Math.min(4, Math.floor(seats) || 2));
+  const people = Array.from({ length: n }, (_, i) => ({
+    id: i === 0 ? "you" : `cpu-${i}`,
+    name: i === 0 ? "YOU" : CPU_NAMES[i - 1],
+    human: i === 0
+  }));
+  let lobby = startCodaLobby(people, useJokers);
+  lobby = pickCodaMix(lobby, "you", youBlack, youWhite);
+  for (const p of lobby.players) {
+    if (p.id !== "you") lobby = pickCodaMix(lobby, p.id, 2, 2);
+  }
+  lobby = { ...lobby, players: lobby.players.map((p) => ({ ...p, ready: true })) };
+  return dealCodaTable(lobby);
 }
 function enterArrange(state, pending, resume) {
   const inserter = currentPlayer(state);
@@ -501,11 +575,7 @@ function finishArrange(state) {
   next = checkEliminations(next);
   if (next.phase === "over") return next;
   if (state.resume === "next") return nextTurn(next);
-  return {
-    ...next,
-    phase: "rps",
-    log: [...next.log, { id: uid("l"), text: "Arrange done. Tiles locked. RPS \u2014 loser guesses first." }]
-  };
+  return afterOpening(next);
 }
 var RPS_LABEL = { rock: "rock", paper: "paper", scissors: "scissors" };
 function rpsWins(a, b) {
@@ -683,6 +753,10 @@ function isActorTurn(state, actorId) {
 function applyAction(state, actorId, action) {
   if (!state.players.some((p) => p.id === actorId)) return state;
   switch (action.type) {
+    case "pick":
+      return pickCodaMix(state, actorId, action.black, action.white);
+    case "ready":
+      return readyCoda(state, actorId);
     case "draw":
       return isActorTurn(state, actorId) ? drawCard(state, action.color) : state;
     case "select":
@@ -746,6 +820,7 @@ export {
   applyAction,
   continueGuess,
   currentPlayer,
+  dealCodaTable,
   deckCounts,
   drawCard,
   finishArrange,
@@ -754,13 +829,16 @@ export {
   guessTile,
   insertIndices,
   isSorted,
+  pickCodaMix,
   placeDrawn,
   playRps,
   possibleValues,
   rank,
+  readyCoda,
   selectTile,
   setPendingSlot,
   startCoda,
+  startCodaLobby,
   startCodaMatch,
   stay,
   triedOnTile,

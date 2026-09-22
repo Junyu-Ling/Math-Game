@@ -32,7 +32,13 @@ export function MahjongTile({ tile, hide, selected, aimed, flash, down, dim, min
   const body = (
     <>
       {aimed ? <span className="mj-arrow" aria-hidden /> : null}
-      {fresh ? <span className="mj-fresh" aria-hidden /> : null}
+      {fresh ? (
+        <span className="mj-fresh" aria-hidden>
+          <span className="mj-fresh-head" />
+          <span className="mj-fresh-arm" />
+          <span className="mj-fresh-arm" />
+        </span>
+      ) : null}
       <span className="mj-shade" />
       <span className="coda-flip">
         <span className="coda-face">

@@ -28,10 +28,11 @@ export type UnoState = {
   dir: 1 | -1;
   pendingDraw: number;
   justDrawnId: string | null;
-  phase: "play" | "color" | "over";
+  phase: "lobby" | "play" | "color" | "over";
   wildCardId: string | null;
   winnerId: string | null;
   log: Array<{ id: string; text: string }>;
+  drawBurst: { n: number; playerId: string; key: string } | null;
 };
 
 const COLORS: UnoColor[] = ["red", "yellow", "green", "blue"];
@@ -120,19 +121,57 @@ export function needsUnoCall(player: UnoPlayer): boolean {
   return player.hand.length <= 2 && !player.calledUno;
 }
 
-export function startUnoPractice(): UnoState {
-  return startUnoDuel({ id: "you", name: "YOU", human: true }, { id: "cpu", name: "CPU", human: false });
+const CPU_NAMES = ["CPU", "CPU 2", "CPU 3"];
+
+export function startUnoLobby(people: Array<{ id: string; name: string; human?: boolean }>): UnoState {
+  const players = people.slice(0, 4).map((p) => ({
+    id: p.id,
+    name: p.name,
+    human: p.human !== false,
+    hand: [] as UnoCard[],
+    calledUno: false,
+  }));
+  return {
+    players,
+    deck: [],
+    discard: [],
+    color: "red",
+    turn: 0,
+    dir: 1,
+    pendingDraw: 0,
+    justDrawnId: null,
+    phase: "lobby",
+    wildCardId: null,
+    winnerId: null,
+    drawBurst: null,
+    log: [{ id: uid("l"), text: `Table ${players.length}/4. Host starts once at least two are seated.` }],
+  };
+}
+
+export function startUnoPractice(seats = 2): UnoState {
+  const n = Math.max(2, Math.min(4, Math.floor(seats) || 2));
+  return startUnoTable(
+    Array.from({ length: n }, (_, i) => ({
+      id: i === 0 ? "you" : `cpu-${i}`,
+      name: i === 0 ? "YOU" : CPU_NAMES[i - 1]!,
+      human: i === 0,
+    })),
+  );
 }
 
 export function startUnoDuel(a: { id: string; name: string; human?: boolean }, b: { id: string; name: string; human?: boolean }): UnoState {
+  return startUnoTable([a, b]);
+}
+
+export function startUnoTable(people: Array<{ id: string; name: string; human?: boolean }>): UnoState {
+  const seated = people.slice(0, 4);
+  if (seated.length < 2) return startUnoLobby(seated);
   let deck = buildDeck();
-  const deal = (p: { id: string; name: string; human?: boolean }): UnoPlayer => {
-    const hand = deck.slice(0, 7);
+  const players: UnoPlayer[] = seated.map((p) => {
+    const hand = sortUnoHand(deck.slice(0, 7));
     deck = deck.slice(7);
-    return { id: p.id, name: p.name, human: p.human !== false, hand: sortUnoHand(hand), calledUno: false };
-  };
-  const pa = deal(a);
-  const pb = deal(b);
+    return { id: p.id, name: p.name, human: p.human !== false, hand, calledUno: false };
+  });
   let start = deck[0];
   deck = deck.slice(1);
   while (start && (start.kind === "wild" || start.kind === "wild4")) {
@@ -142,7 +181,7 @@ export function startUnoDuel(a: { id: string; name: string; human?: boolean }, b
   }
   const color = (start?.color === "black" ? "red" : start?.color) as UnoColor;
   return {
-    players: [pa, pb],
+    players,
     deck,
     discard: start ? [start] : [],
     color,
@@ -153,7 +192,8 @@ export function startUnoDuel(a: { id: string; name: string; human?: boolean }, b
     phase: "play",
     wildCardId: null,
     winnerId: null,
-    log: [{ id: uid("l"), text: `${a.name} vs ${b.name}. Empty your hand to win.` }],
+    drawBurst: start?.kind === "draw2" ? { n: 2, playerId: players[0]!.id, key: uid("fx") } : null,
+    log: [{ id: uid("l"), text: `${players.map((p) => p.name).join(" vs ")}. Empty your hand to win.` }],
   };
 }
 
@@ -180,7 +220,8 @@ export type UnoAction =
   | { type: "draw" }
   | { type: "keep" }
   | { type: "uno" }
-  | { type: "color"; color: UnoColor };
+  | { type: "color"; color: UnoColor }
+  | { type: "start" };
 
 function giveCards(state: UnoState, id: string, cards: UnoCard[]): UnoState {
   return withPlayer(state, id, (p) => {
@@ -189,19 +230,33 @@ function giveCards(state: UnoState, id: string, cards: UnoCard[]): UnoState {
   });
 }
 
+function burst(state: UnoState, n: number, playerId: string): UnoState {
+  return { ...state, drawBurst: { n, playerId, key: uid("fx") } };
+}
+
 export function applyUnoAction(state: UnoState, actorId: string, action: UnoAction): UnoState {
   if (state.phase === "over") return state;
+  if (!state.players.some((p) => p.id === actorId)) return state;
+
+  if (state.phase === "lobby") {
+    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 2) {
+      return startUnoTable(state.players);
+    }
+    return state;
+  }
+
+  if (action.type === "uno") {
+    const actor = state.players.find((p) => p.id === actorId);
+    if (!actor || actor.hand.length > 2 || actor.calledUno) return state;
+    return withPlayer(state, actorId, (p) => ({ ...p, calledUno: true }));
+  }
+
   const me = currentUno(state);
   if (me.id !== actorId) return state;
 
   if (state.phase === "color") {
     if (action.type !== "color" || state.wildCardId == null) return state;
     return { ...state, color: action.color, phase: "play", wildCardId: null, turn: nextIndex(state, false) };
-  }
-
-  if (action.type === "uno") {
-    if (me.hand.length > 2 || me.calledUno) return state;
-    return withPlayer(state, me.id, (p) => ({ ...p, calledUno: true }));
   }
 
   if (action.type === "keep") {
@@ -212,18 +267,20 @@ export function applyUnoAction(state: UnoState, actorId: string, action: UnoActi
   if (action.type === "draw") {
     if (state.justDrawnId) return state;
     if (state.pendingDraw > 0) {
-      const pulled = take(state, state.pendingDraw);
+      const n = state.pendingDraw;
+      const pulled = take(state, n);
       let next = giveCards(pulled.state, me.id, pulled.cards);
       next.pendingDraw = 0;
       next.justDrawnId = null;
       next.log = [...next.log, { id: uid("l"), text: `${me.name} draws ${pulled.cards.length}.` }];
       next.turn = nextIndex(next);
-      return next;
+      return burst(next, pulled.cards.length, me.id);
     }
     const pulled = take(state, 1);
     const card = pulled.cards[0];
     let next = card ? giveCards(pulled.state, me.id, [card]) : pulled.state;
     next.log = [...next.log, { id: uid("l"), text: `${me.name} draws.` }];
+    next = burst(next, 1, me.id);
     if (card && canPlay({ ...next, justDrawnId: null }, card)) {
       next.justDrawnId = card.id;
       return next;
@@ -234,7 +291,6 @@ export function applyUnoAction(state: UnoState, actorId: string, action: UnoActi
   }
 
   if (action.type !== "play") return state;
-  if (needsUnoCall(me)) return state;
   const card = me.hand.find((c) => c.id === action.cardId);
   if (!card || !canPlay(state, card)) return state;
 
@@ -242,11 +298,21 @@ export function applyUnoAction(state: UnoState, actorId: string, action: UnoActi
   next.justDrawnId = null;
   next.discard = [...next.discard, card];
   next.log = [...next.log, { id: uid("l"), text: `${me.name} plays ${labelUno(card)}.` }];
+
+  const after = next.players.find((p) => p.id === me.id);
+  if (after && after.hand.length <= 1 && !me.calledUno) {
+    const pulled = take(next, 2);
+    next = giveCards(pulled.state, me.id, pulled.cards);
+    next.log = [...next.log, { id: uid("l"), text: `${me.name} missed UNO and draws 2.` }];
+    next = burst(next, 2, me.id);
+  }
+
   next = winCheck(next, me.id);
   if (next.phase === "over") return next;
 
   if (card.kind === "wild" || card.kind === "wild4") {
     next.pendingDraw += card.kind === "wild4" ? 4 : 0;
+    if (card.kind === "wild4") next = burst(next, next.pendingDraw, next.players[nextIndex(next)]?.id ?? me.id);
     if (action.color) {
       next.color = action.color;
       next.turn = nextIndex(next, false);
@@ -258,10 +324,16 @@ export function applyUnoAction(state: UnoState, actorId: string, action: UnoActi
   }
 
   if (card.color !== "black") next.color = card.color;
-  if (card.kind === "draw2") next.pendingDraw += 2;
-  const skip = card.kind === "skip" || card.kind === "reverse";
-  if (card.kind === "reverse") next.dir = next.dir === 1 ? -1 : 1;
-  next.turn = nextIndex(next, skip);
+  if (card.kind === "draw2") {
+    next.pendingDraw += 2;
+    next = burst(next, next.pendingDraw, next.players[nextIndex(next)]?.id ?? me.id);
+  }
+  if (card.kind === "reverse") {
+    next.dir = (next.dir === 1 ? -1 : 1) as 1 | -1;
+    next.turn = nextIndex(next, next.players.length === 2);
+    return next;
+  }
+  next.turn = nextIndex(next, card.kind === "skip");
   return next;
 }
 

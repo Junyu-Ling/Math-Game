@@ -605,12 +605,12 @@ export async function createInvite(from, toId, game, meta = {}) {
   if (toSeat) throw new Error("Someone is already in a game");
   if (fromSeat) {
     const rec = await getRoomRecord(fromSeat);
-    const lobby = rec && rec.game === "guandan" && rec.state?.phase === "lobby";
+    const lobby = rec && OPEN_TABLES.has(rec.game) && rec.state?.phase === "lobby";
     if (!lobby) throw new Error("Someone is already in a game");
     if (rec.seats[0] !== fromId) throw new Error("Only the host can invite");
     if (rec.seats.length >= 4) throw new Error("The table is full");
     if (rec.seats.includes(toId)) throw new Error("They are already seated");
-    if (game !== "guandan") throw new Error("This table is Guandan");
+    if (game !== rec.game) throw new Error(`This table is ${rec.game}`);
   }
   const id = uid("inv");
   const invite = {
@@ -642,8 +642,8 @@ export async function respondInvite(user, inviteId, accept, mods) {
   await srem(`axiom:uinv:${invite.toId}`, inviteId);
   await wakeUsers([invite.fromId, invite.toId]);
   if (!accept) return { ok: true, declined: true };
-  if (invite.game === "guandan") {
-    return joinGuandanTable(user, invite, mods);
+  if (OPEN_TABLES.has(invite.game)) {
+    return joinOpenTable(user, invite, mods);
   }
   if ((await getSeat(invite.fromId)) || (await getSeat(invite.toId))) throw new Error("Someone is already in a game");
   const from = await readJson(`axiom:p:${invite.fromId}`);
@@ -662,8 +662,7 @@ function startRoom(invite, from, to, mods) {
   if (invite.game === "coda") {
     const black = Math.max(0, Math.min(4, Number(meta.black) || 2));
     const white = 4 - black;
-    state = mods.coda.startCodaMatch(Boolean(meta.useJokers), { ...a, black, white }, { ...b, black: 4 - black, white: 4 - white });
-    if (state.phase === "arrange") endsAt = Date.now() + mods.coda.ARRANGE_MS;
+    state = mods.coda.startCodaLobby([a, b], Boolean(meta.useJokers));
   } else if (invite.game === "flip7") {
     state = mods.flip.startFlip7Duel(a, b);
   } else if (invite.game === "bj") {
@@ -671,7 +670,7 @@ function startRoom(invite, from, to, mods) {
   } else if (invite.game === "m24") {
     state = mods.m24.startM24Duel(a, b);
   } else if (invite.game === "uno") {
-    state = mods.uno.startUnoDuel(a, b);
+    state = mods.uno.startUnoLobby([a, b]);
   } else if (invite.game === "holdem") {
     state = mods.holdem.startHoldemDuel(a, b);
   } else {
@@ -687,7 +686,8 @@ function startRoom(invite, from, to, mods) {
   };
 }
 
-async function joinGuandanTable(user, invite, mods) {
+async function joinOpenTable(user, invite, mods) {
+  const game = invite.game;
   const hostId = String(invite.fromId);
   const joiner = { id: String(user.id), name: playerName(user) };
   if (await getSeat(joiner.id)) throw new Error("You are already in a game");
@@ -695,18 +695,12 @@ async function joinGuandanTable(user, invite, mods) {
   let rec = hostSeat ? await getRoomRecord(hostSeat) : null;
   const host = await readJson(`axiom:p:${hostId}`);
   if (!host) throw new Error("They went offline");
-  if (rec && rec.game === "guandan" && rec.state?.phase === "lobby") {
+  if (rec && rec.game === game && rec.state?.phase === "lobby") {
     if (rec.seats.includes(joiner.id)) throw new Error("Already seated");
     if (rec.seats.length >= 4) throw new Error("The table is full");
     rec.seats = [...rec.seats, joiner.id];
-    rec.state = mods.guandan.startGuandanLobby(
-      rec.seats.map((id) => {
-        const existing = rec.state.players.find((p) => p.id === id);
-        if (existing) return { id, name: existing.name };
-        return joiner;
-      }),
-    );
-    if (rec.seats.length === 4) {
+    rec.state = rebuildLobby(rec, joiner, mods);
+    if (game === "guandan" && rec.seats.length === 4) {
       rec.state = mods.guandan.startGuandanTable(rec.state.players.map((p) => ({ id: p.id, name: p.name })));
     }
     rec.seq = (rec.seq || 0) + 1;
@@ -715,13 +709,11 @@ async function joinGuandanTable(user, invite, mods) {
     return { ok: true, room: publicRoom(rec, user.id) };
   }
   if (hostSeat) throw new Error("Host is already in a game");
-  const state = mods.guandan.startGuandanLobby([
-    { id: hostId, name: host.name },
-    joiner,
-  ]);
+  const people = [{ id: hostId, name: host.name }, joiner];
+  const state = newLobbyState(game, people, mods, invite.meta || {});
   const room = {
     id: uid("room"),
-    game: "guandan",
+    game,
     seats: [hostId, joiner.id],
     state,
     endsAt: null,
@@ -731,6 +723,35 @@ async function joinGuandanTable(user, invite, mods) {
   await saveRoom(room);
   return { ok: true, room: publicRoom(room, user.id) };
 }
+
+function newLobbyState(game, people, mods, meta) {
+  if (game === "guandan") return mods.guandan.startGuandanLobby(people);
+  if (game === "uno") return mods.uno.startUnoLobby(people);
+  if (game === "coda") return mods.coda.startCodaLobby(people, Boolean(meta?.useJokers));
+  throw new Error("Unknown table game");
+}
+
+function rebuildLobby(rec, joiner, mods) {
+  const people = rec.seats.map((id) => {
+    const existing = rec.state.players.find((p) => p.id === id);
+    if (existing) return { id, name: existing.name };
+    return joiner;
+  });
+  if (rec.game === "guandan") return mods.guandan.startGuandanLobby(people);
+  if (rec.game === "uno") return mods.uno.startUnoLobby(people);
+  if (rec.game === "coda") {
+    let state = mods.coda.startCodaLobby(people, Boolean(rec.state?.useJokers));
+    for (const p of rec.state.players || []) {
+      if (!people.some((x) => x.id === p.id)) continue;
+      state = mods.coda.applyAction(state, p.id, { type: "pick", black: p.black ?? 2, white: p.white ?? 2 });
+      if (p.ready) state = mods.coda.applyAction(state, p.id, { type: "ready" });
+    }
+    return state;
+  }
+  return rec.state;
+}
+
+const OPEN_TABLES = new Set(["guandan", "coda", "uno"]);
 
 export async function applyRoomAction(user, roomId, action, mods) {
   mods = mods || (await getMods());
@@ -770,7 +791,7 @@ export async function leaveRoom(userId) {
   const rid = await getSeat(userId);
   if (!rid) return snapshot(userId);
   const rec = await attachMods(await getRoomRecord(rid));
-  if (rec?.game === "guandan" && rec.state?.phase === "lobby") {
+  if (rec?.game && OPEN_TABLES.has(rec.game) && rec.state?.phase === "lobby") {
     const hostLeft = rec.seats[0] === userId;
     await kvDel(`axiom:seat:${userId}`);
     if (hostLeft || rec.seats.length <= 2) {
@@ -780,9 +801,7 @@ export async function leaveRoom(userId) {
       return snapshot(userId);
     }
     rec.seats = rec.seats.filter((id) => id !== userId);
-    rec.state = rec.mods.guandan.startGuandanLobby(
-      rec.state.players.filter((p) => p.id !== userId).map((p) => ({ id: p.id, name: p.name })),
-    );
+    rec.state = rebuildLobby(rec, null, rec.mods);
     await saveRoom(rec);
     return snapshot(userId);
   }

@@ -19,6 +19,7 @@ import {
   finishRps,
   startCoda,
   stay,
+  applyAction,
   OPENING,
   RPS_REVEAL_MS,
   type CodaAction,
@@ -43,6 +44,10 @@ type Flash = {
 
 function statusText(state: CodaState, myTurn: boolean, remain: number, matching: boolean): string {
   if (matching) return "Waiting for the invite to be accepted.";
+  if (state.phase === "lobby") {
+    const ready = state.players.filter((p) => p.ready).length;
+    return `Opening mix. Ready ${ready}/${state.players.length} — game starts when everyone is ready (2–4).`;
+  }
   if (state.phase === "over") {
     const w = state.players.find((p) => p.id === state.winnerId);
     return w ? `${w.name} wins` : "Game over";
@@ -59,9 +64,9 @@ function statusText(state: CodaState, myTurn: boolean, remain: number, matching:
   if (state.phase === "guess" && state.selected) {
     return myTurn ? "Tile locked. Guess the number. Both of you see the arrow." : "Your rival is aiming at a tile.";
   }
-  if (!myTurn) return "Rival is thinking…";
-  if (state.phase === "draw") return myTurn ? "Pick black or white and draw that color." : "Rival is choosing a draw color.";
-  if (state.phase === "guess") return "Tap a hidden rival tile, then guess its number.";
+  if (!myTurn) return `${currentPlayer(state).name} is thinking…`;
+  if (state.phase === "draw") return myTurn ? "Pick black or white and draw that color." : "A rival is choosing a draw color.";
+  if (state.phase === "guess") return "Tap a hidden tile, then guess its number.";
   if (state.phase === "continue") return "Hit. Keep guessing, or stay and insert in secret.";
   return "";
 }
@@ -175,6 +180,56 @@ function Row({
   );
 }
 
+function OppSeat({
+  player,
+  className,
+  tiles,
+  opening,
+  turn,
+  flash,
+  fresh,
+  selectedIndex,
+  onTile,
+}: {
+  player: { id: string; name: string; out: boolean };
+  className: string;
+  tiles: CodaTile[];
+  opening: boolean;
+  turn: boolean;
+  flash?: Flash | null;
+  fresh?: Record<string, string>;
+  selectedIndex?: number;
+  onTile: (i: number) => void;
+}) {
+  return (
+    <div className={`seat ${className} ${opening ? "veiled" : ""}`}>
+      <div className="seat-plaque">
+        <b>{player.name}</b>
+        <span>{player.out ? "OUT" : opening ? "Arrange" : turn ? "Turn" : "Wait"}</span>
+      </div>
+      <div className="tiles-wrap">
+        {opening ? (
+          <div className="arrange-veil" aria-hidden>
+            <strong>Arranging</strong>
+            <span>Order revealed in 5 seconds</span>
+          </div>
+        ) : null}
+        <Row
+          tiles={tiles}
+          hide
+          downRevealed
+          playerId={player.id}
+          selectedIndex={selectedIndex}
+          flash={flash}
+          reserveSlot
+          fresh={fresh}
+          onTile={onTile}
+        />
+      </div>
+    </div>
+  );
+}
+
 function outcomeFlash(next: CodaState, youId: string): Flash | null {
   if (next.phase !== "over" || !next.winnerId) return null;
   return { kind: next.winnerId === youId ? "win" : "lose" };
@@ -205,6 +260,15 @@ const RPS_CHOICES: { id: RpsThrow; label: string }[] = [
   { id: "scissors", label: "Scissors" },
   { id: "paper", label: "Paper" },
 ];
+
+function aroundYou<T extends { id: string }>(players: T[], youId: string) {
+  const i = Math.max(0, players.findIndex((p) => p.id === youId));
+  const n = players.length;
+  const at = (d: number) => players[(i + d) % n] ?? null;
+  if (n <= 2) return { rival: at(1), left: null as T | null, right: null as T | null, partner: null as T | null };
+  if (n === 3) return { rival: null as T | null, left: at(1), partner: null as T | null, right: at(2) };
+  return { rival: null as T | null, left: at(1), partner: at(2), right: at(3) };
+}
 
 const RPS_CHANT = ["", "Rock", "Scissors", "Paper"] as const;
 
@@ -292,6 +356,7 @@ export function DaVinciPage() {
   const [jokers, setJokers] = useState(true);
   const [blackN, setBlackN] = useState(2);
   const [whiteN, setWhiteN] = useState(2);
+  const [seats, setSeats] = useState(2);
   const [state, setState] = useState<CodaState | null>(null);
   const [remain, setRemain] = useState(ARRANGE_MS / 1000);
   const [flash, setFlash] = useState<Flash | null>(null);
@@ -302,9 +367,14 @@ export function DaVinciPage() {
   const online = Boolean(codaRoom);
   const matching = Boolean(user && lobby.invites.some((i) => i.game === "coda" && i.fromId === user.id));
 
-  const playing = state !== null;
-  const you = playing ? (youId ? state.players.find((p) => p.id === youId) : state.players[0]) ?? state.players[0] : null;
-  const rival = playing && you ? (state.players.find((p) => p.id !== you.id) ?? state.players[1]) : null;
+  const waiting = Boolean(state?.phase === "lobby");
+  const playing = state !== null && !waiting;
+  const you = state && (playing || waiting)
+    ? (youId ? state.players.find((p) => p.id === youId) : state.players[0]) ?? state.players[0]
+    : null;
+  const others = playing && you ? state.players.filter((p) => p.id !== you.id) : [];
+  const seated = you && state ? aroundYou(state.players, you.id) : { rival: null, left: null, right: null, partner: null };
+  const rival = seated.rival ?? others[0] ?? null;
   const me = playing ? currentPlayer(state) : null;
   const arranging = Boolean(playing && state?.phase === "arrange");
   const opening = arranging && state?.resume === "draw";
@@ -341,6 +411,9 @@ export function DaVinciPage() {
     else if (action.type === "stay") setState((s) => (s ? stay(s) : s));
     else if (action.type === "slot") setState((s) => (s ? setPendingSlot(s, action.index, you?.id) : s));
     else if (action.type === "rps") setState((s) => (s ? playRps(s, action.throw, you?.id) : s));
+    else if (action.type === "pick" || action.type === "ready") {
+      setState((s) => (s && you ? applyAction(s, you.id, action) : s));
+    }
   }
 
   useEffect(() => {
@@ -399,7 +472,7 @@ export function DaVinciPage() {
 
   useEffect(() => {
     if (!state || online) return;
-    if (!me || me.human || state.phase === "over" || arranging || state.phase === "rps") return;
+    if (!me || me.human || state.phase === "over" || arranging || state.phase === "rps" || state.phase === "lobby") return;
     let stop = false;
     (async () => {
       await wait(180);
@@ -466,12 +539,14 @@ export function DaVinciPage() {
     const black = Math.max(0, Math.min(OPENING, n));
     setBlackN(black);
     setWhiteN(OPENING - black);
+    if (waiting && you) dispatch({ type: "pick", black, white: OPENING - black });
   }
 
   function setWhite(n: number) {
     const white = Math.max(0, Math.min(OPENING, n));
     setWhiteN(white);
     setBlackN(OPENING - white);
+    if (waiting && you) dispatch({ type: "pick", black: OPENING - white, white });
   }
 
   function resetTable() {
@@ -486,8 +561,8 @@ export function DaVinciPage() {
   function beginPractice() {
     if (codaRoom) void lobby.leave();
     setFlash(null);
-    setYouId(null);
-    setState(startCoda(jokers, blackN, whiteN));
+    setYouId("you");
+    setState(startCoda(jokers, blackN, whiteN, seats));
   }
 
   useEffect(() => {
@@ -537,19 +612,34 @@ export function DaVinciPage() {
         </div>
       </div>
       <div className="game-layout">
-        <div className={`table table-coda ${flash ? `table-${flash.kind}` : ""}`}>
+        <div className={`table table-coda ${flash ? `table-${flash.kind}` : ""} ${playing && state && state.players.length > 2 ? "coda-multi" : ""}`}>
           <div className="coda-lamp" />
           <div className="coda-ring" />
-          {!playing || !you || !rival || !state ? (
+          {!playing || !you || !state || others.length < 1 ? (
             <div className="coda-deal">
-              <p className="kicker">{matching ? "INVITE" : "OPENING DRAW"}</p>
-              <h2>{matching ? "Invite pending" : "Opening draw"}</h2>
+              <p className="kicker">{waiting ? "TABLE" : matching ? "INVITE" : "OPENING DRAW"}</p>
+              <h2>{waiting ? `Table ${state?.players.length ?? 0}/4` : matching ? "Invite pending" : "Opening draw"}</h2>
               <p>
-                {matching
-                  ? "Waiting for them to accept."
-                  : `Start with ${OPENING} tiles. Sign in to invite an online player. Use the list on the right.`}
+                {waiting
+                  ? "Each player picks how many black and white tiles to start with (4 total), then ready. Game starts when everyone is ready."
+                  : matching
+                    ? "Waiting for them to accept."
+                    : `2–4 players. Start with ${OPENING} tiles. Sign in to invite; everyone picks their own mix before the deal.`}
               </p>
-              {!matching ? (
+              {waiting && state ? (
+                <ul className="lobby-roster">
+                  {state.players.map((p) => (
+                    <li key={p.id}>
+                      <b>{p.name}</b>
+                      <span>
+                        black {p.black ?? 2} · white {p.white ?? 2}
+                        {p.ready ? " · ready" : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {!matching || waiting ? (
                 <>
                   <div className="deal-colors">
                     <div className="deal-color black">
@@ -585,10 +675,30 @@ export function DaVinciPage() {
                       <MahjongTile key={`w-${i}`} tile={{ color: "white", value: 0, revealed: false }} hide mini />
                     ))}
                   </div>
+                  {!waiting ? (
+                    <div className="deal-seats" role="group" aria-label="Players">
+                      {[2, 3, 4].map((n) => (
+                        <button
+                          key={n}
+                          className={`btn ${seats === n ? "" : "btn-ghost"}`}
+                          type="button"
+                          onClick={() => setSeats(n)}
+                        >
+                          {n}P
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="row-actions" style={{ justifyContent: "center" }}>
-                    <button className="btn" type="button" onClick={beginPractice}>
-                      Practice vs CPU
-                    </button>
+                    {waiting ? (
+                      <button className="btn" type="button" disabled={Boolean(you?.ready)} onClick={() => dispatch({ type: "ready" })}>
+                        {you?.ready ? "Waiting for others" : "Ready"}
+                      </button>
+                    ) : (
+                      <button className="btn" type="button" onClick={beginPractice}>
+                        Practice vs CPU
+                      </button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -599,33 +709,45 @@ export function DaVinciPage() {
             </div>
           ) : (
             <>
-          <div className={`seat seat-rival ${opening ? "veiled" : ""}`}>
-            <div className="seat-plaque">
-              <b>{rival.name}</b>
-              <span>
-                {rival.out ? "OUT" : opening ? "Arrange" : me?.id === rival.id ? "Turn" : "Wait"}
-              </span>
-            </div>
-            <div className="tiles-wrap">
-              {opening ? (
-                <div className="arrange-veil" aria-hidden>
-                  <strong>Arranging</strong>
-                  <span>Order revealed in 5 seconds</span>
-                </div>
-              ) : null}
-              <Row
-                tiles={rivalRow}
-                hide
-                downRevealed
-                playerId={rival.id}
-                selectedIndex={aimedRival}
-                flash={flash}
-                reserveSlot
-                fresh={state.fresh}
-                onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: rival.id, index: i })}
-              />
-            </div>
-          </div>
+          {seated.partner ? (
+            <OppSeat
+              player={seated.partner}
+              className="seat-partner"
+              tiles={seated.partner.tiles}
+              opening={opening}
+              turn={me?.id === seated.partner.id}
+              flash={flash}
+              fresh={state.fresh}
+              selectedIndex={state.selected?.playerId === seated.partner.id ? state.selected.index : undefined}
+              onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: seated.partner!.id, index: i })}
+            />
+          ) : null}
+          {seated.rival ? (
+            <OppSeat
+              player={seated.rival}
+              className="seat-rival"
+              tiles={rivalRow}
+              opening={opening}
+              turn={me?.id === seated.rival.id}
+              flash={flash}
+              fresh={state.fresh}
+              selectedIndex={aimedRival}
+              onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: seated.rival!.id, index: i })}
+            />
+          ) : null}
+          {seated.left ? (
+            <OppSeat
+              player={seated.left}
+              className="seat-left"
+              tiles={seated.left.tiles}
+              opening={opening}
+              turn={me?.id === seated.left.id}
+              flash={flash}
+              fresh={state.fresh}
+              selectedIndex={state.selected?.playerId === seated.left.id ? state.selected.index : undefined}
+              onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: seated.left!.id, index: i })}
+            />
+          ) : null}
 
           <div className="center-well">
             <div className="coda-center-tools">
@@ -680,6 +802,20 @@ export function DaVinciPage() {
               )}
             </div>
           </div>
+
+          {seated.right ? (
+            <OppSeat
+              player={seated.right}
+              className="seat-right"
+              tiles={seated.right.tiles}
+              opening={opening}
+              turn={me?.id === seated.right.id}
+              flash={flash}
+              fresh={state.fresh}
+              selectedIndex={state.selected?.playerId === seated.right.id ? state.selected.index : undefined}
+              onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: seated.right!.id, index: i })}
+            />
+          ) : null}
 
           <div className="seat seat-you">
             <div className="seat-plaque you">
@@ -772,22 +908,24 @@ export function DaVinciPage() {
         </div>
 
         <div className="side-stack">
-        <InvitePanel game="coda" meta={{ useJokers: jokers, black: blackN, white: whiteN }} />
+        <InvitePanel game="coda" meta={{ useJokers: jokers }} />
         <aside className="side coda-panel">
           <div>
             <h3>STATUS</h3>
             <p className="status-line">
               {matching
                 ? statusText(state ?? ({} as CodaState), false, remain, true)
-                : playing && state
-                  ? statusText(state, myTurn, remain, false)
-                  : `Opening mix: black ${blackN} · white ${whiteN}${online ? " · duel" : ""}`}
+                : waiting && state
+                  ? statusText(state, false, remain, false)
+                  : playing && state
+                    ? statusText(state, myTurn, remain, false)
+                    : `Opening mix: black ${blackN} · white ${whiteN}${seats > 2 ? ` · ${seats}P` : ""}`}
             </p>
           </div>
           {playing && state && (state.phase === "draw" || state.phase === "guess" || state.phase === "continue") ? (
             <div className="coda-play-actions">
               <div>
-                <h3>Guess {state.selected ? "· locked" : "· tap a rival tile first"}</h3>
+                <h3>Guess {state.selected ? "· locked" : "· tap a hidden tile first"}</h3>
                 <div className="pad">
                   {numbers.map((n) => {
                     const used = selectedTried.has(n);
@@ -841,6 +979,7 @@ export function DaVinciPage() {
           <div>
             <h3>RULE</h3>
             <ul>
+              <li>2–4 players. Each player picks their own black/white opening mix, then ready. The deal waits until everyone is ready.</li>
               <li>On your draw, pick black or white. You cannot draw a color that is gone.</li>
               <li>Each color has 0–11 plus one dash. The dash is shuffled in with the numbers, so it is not guaranteed in the opening 4.</li>
               <li>The veil is opening-only. Inserts wait the full 5 seconds even after you pick a slot.</li>
