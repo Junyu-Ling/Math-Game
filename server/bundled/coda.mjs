@@ -580,25 +580,91 @@ function possibleValues(player, index) {
   all.push("joker");
   return all;
 }
-function aiGuess(state) {
+function knownNumberRank(tile, known) {
+  if (!known || tile.value === "joker") return null;
+  return rank(tile);
+}
+function boundLeft(tiles, index, ownerKnown) {
+  for (let i = index - 1; i >= 0; i--) {
+    const tile = tiles[i];
+    if (!tile) continue;
+    const r = knownNumberRank(tile, ownerKnown || tile.revealed);
+    if (r !== null) return r + 1;
+  }
+  return 0;
+}
+function boundRight(tiles, index, ownerKnown) {
+  for (let i = index + 1; i < tiles.length; i++) {
+    const tile = tiles[i];
+    if (!tile) continue;
+    const r = knownNumberRank(tile, ownerKnown || tile.revealed);
+    if (r !== null) return r - 1;
+  }
+  return 23;
+}
+function tilesAiCanSee(state, viewerId) {
+  const out = [];
+  for (const p of state.players) {
+    for (const tile of p.tiles) {
+      if (p.id === viewerId || tile.revealed) out.push(tile);
+    }
+    if (p.stash && (p.id === viewerId || p.stash.revealed)) out.push(p.stash);
+  }
+  const actor = currentPlayer(state);
+  if (state.drawn && (actor.id === viewerId || state.drawn.revealed)) out.push(state.drawn);
+  if (state.pending && (actor.id === viewerId || state.pending.revealed)) out.push(state.pending);
+  return out;
+}
+function aiScan(state) {
   const me = currentPlayer(state);
-  const targets = state.players.filter((p) => p.id !== me.id && !p.out);
+  const taken = new Set(tilesAiCanSee(state, me.id).map((t) => `${t.color}:${String(t.value)}`));
   let best = null;
-  for (const p of targets) {
+  for (const p of state.players) {
+    if (p.id === me.id || p.out) continue;
+    const owns = p.id === me.id;
     for (let index = 0; index < p.tiles.length; index++) {
       const tile = p.tiles[index];
       if (!tile || tile.revealed) continue;
-      const used = new Set((state.tried?.[tile.id] ?? []).map((v) => String(v)));
-      const opts = possibleValues(p, index).filter((v) => !used.has(String(v)));
-      if (!opts.length) continue;
-      const nums = opts.filter((v) => v !== "joker");
-      const pick = nums.length ? nums[Math.floor(nums.length / 2)] : opts[0];
-      const score = 100 - opts.length;
-      if (!best || score > best.score) best = { playerId: p.id, index, value: pick, score };
+      const tried = new Set((state.tried?.[tile.id] ?? []).map((v) => String(v)));
+      const min = boundLeft(p.tiles, index, owns);
+      const max = boundRight(p.tiles, index, owns);
+      const nums = [];
+      for (let n = 0; n <= 11; n++) {
+        const r = n * 2 + (tile.color === "white" ? 1 : 0);
+        if (r < min || r > max) continue;
+        if (taken.has(`${tile.color}:${n}`)) continue;
+        if (tried.has(String(n))) continue;
+        nums.push(n);
+      }
+      const jokerOk = state.useJokers && !taken.has(`${tile.color}:joker`) && !tried.has("joker");
+      const remaining = nums.length + (jokerOk ? 1 : 0);
+      if (!remaining) continue;
+      const value = nums.length ? nums[Math.floor((nums.length - 1) / 2)] : "joker";
+      const anchored = Boolean(
+        index > 0 && p.tiles[index - 1]?.revealed || p.tiles[index + 1]?.revealed
+      );
+      const better = !best || remaining < best.remaining || remaining === best.remaining && anchored && !best.anchored || remaining === best.remaining && anchored === best.anchored && index < best.index;
+      if (better) best = { playerId: p.id, index, value, remaining, anchored };
     }
   }
-  if (!best) return null;
-  return { playerId: best.playerId, index: best.index, value: best.value };
+  return best;
+}
+function aiGuess(state) {
+  const pick = aiScan(state);
+  if (!pick) return null;
+  return { playerId: pick.playerId, index: pick.index, value: pick.value };
+}
+function aiShouldContinue(state) {
+  const me = currentPlayer(state);
+  const hidden = state.players.filter((p) => p.id !== me.id && !p.out).reduce((n, p) => n + p.tiles.filter((t) => !t.revealed).length, 0);
+  if (hidden <= 0) return false;
+  if (hidden === 1) return true;
+  const pick = aiScan(state);
+  if (!pick) return false;
+  if (pick.remaining <= 2) return true;
+  if (pick.remaining <= 3 && hidden <= 4) return true;
+  if (hidden <= 2 && pick.remaining <= 5) return true;
+  return pick.anchored && pick.remaining <= 4;
 }
 function formatTile(tile, hidden) {
   if (hidden && !tile.revealed) return tile.color === "black" ? "black" : "white";
@@ -669,6 +735,7 @@ export {
   RPS_REVEAL_MS,
   aiDrawColor,
   aiGuess,
+  aiShouldContinue,
   applyAction,
   continueGuess,
   currentPlayer,

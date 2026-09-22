@@ -977,6 +977,7 @@
 
 .coda-play-actions {
   min-height: 248px;
+  flex: 0 0 auto;
 }
 
 .coda-play-actions .pad-slot-reserve {

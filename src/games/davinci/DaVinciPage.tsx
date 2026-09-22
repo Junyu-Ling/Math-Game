@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   aiDrawColor,
   aiGuess,
+  aiShouldContinue,
   ARRANGE_MS,
   continueGuess,
   currentPlayer,
@@ -47,7 +48,7 @@ function statusText(state: CodaState, myTurn: boolean, remain: number, matching:
     return w ? `${w.name} wins` : "Game over";
   }
   if (state.phase === "rps") {
-    return "石头剪刀布. The loser guesses first.";
+    return "Rock-paper-scissors. The loser guesses first.";
   }
   if (state.phase === "arrange") {
     if (state.resume === "draw") {
@@ -196,13 +197,13 @@ const BURST: Record<Flash["kind"], { title: string; sub: string }> = {
   lose: { title: "You lose", sub: "All of your tiles are open." },
 };
 
-const RPS_CHOICES: { id: RpsThrow; label: string; hint: string }[] = [
-  { id: "rock", label: "石头", hint: "Rock" },
-  { id: "scissors", label: "剪刀", hint: "Scissors" },
-  { id: "paper", label: "布", hint: "Paper" },
+const RPS_CHOICES: { id: RpsThrow; label: string }[] = [
+  { id: "rock", label: "Rock" },
+  { id: "scissors", label: "Scissors" },
+  { id: "paper", label: "Paper" },
 ];
 
-const RPS_CHANT = ["", "石头", "剪刀", "布"] as const;
+const RPS_CHANT = ["", "Rock", "Scissors", "Paper"] as const;
 
 function rpsWinsThrow(a: RpsThrow, b: RpsThrow): boolean {
   return (a === "rock" && b === "scissors") || (a === "paper" && b === "rock") || (a === "scissors" && b === "paper");
@@ -271,14 +272,14 @@ function rpsCaption(
   youId: string,
 ): string {
   if (reveal && shown) {
-    if (reveal.a === reveal.b) return "平局，再出一次";
+    if (reveal.a === reveal.b) return "Tie. Throw again.";
     const youThrow = reveal.aId === youId ? reveal.a : reveal.b;
     const foeThrow = reveal.aId === youId ? reveal.b : reveal.a;
-    return rpsWinsThrow(youThrow, foeThrow) ? "你赢了，对方先猜" : "你输了，你先猜";
+    return rpsWinsThrow(youThrow, foeThrow) ? "You win. They guess first." : "You lose. You guess first.";
   }
-  if (reveal) return "出拳";
-  if (waiting && myThrow) return "已出拳，等对方";
-  return "出拳。输的人先猜。";
+  if (reveal) return "Throw.";
+  if (waiting && myThrow) return "Ready. Waiting for the other hand.";
+  return "Throw. Loser guesses first.";
 }
 
 export function DaVinciPage() {
@@ -398,7 +399,7 @@ export function DaVinciPage() {
     if (!me || me.human || state.phase === "over" || arranging || state.phase === "rps") return;
     let stop = false;
     (async () => {
-      await wait(140);
+      await wait(180);
       if (stop) return;
       if (state.phase === "draw") {
         setState((s) => (s ? drawCard(s, aiDrawColor(s)) : s));
@@ -413,7 +414,7 @@ export function DaVinciPage() {
           setState((s) => (s ? selectTile(s, g.playerId, g.index) : s));
           return;
         }
-        await wait(160);
+        await wait(220);
         if (stop) return;
         const { next, flash: fx } = applyGuess(state, g.value, you?.id ?? "");
         setState(next);
@@ -421,9 +422,9 @@ export function DaVinciPage() {
         return;
       }
       if (state.phase === "continue") {
-        await wait(120);
+        await wait(240);
         if (stop) return;
-        setState((s) => (s ? (Math.random() < 0.4 ? continueGuess(s) : stay(s)) : s));
+        setState((s) => (s ? (aiShouldContinue(s) ? continueGuess(s) : stay(s)) : s));
       }
     })();
     return () => {
@@ -704,7 +705,7 @@ export function DaVinciPage() {
 
           {rpsing && you && rival && state ? (
             <div className="coda-deal coda-rps">
-              <p className="kicker">石头剪刀布</p>
+              <p className="kicker">Rock paper scissors</p>
               <div className="rps-arena">
                 <div className="rps-side rival">
                   <span className="rps-name">{rival.name}</span>
@@ -742,7 +743,6 @@ export function DaVinciPage() {
                   >
                     <HandShape kind={c.id} />
                     <b>{c.label}</b>
-                    <span>{c.hint}</span>
                   </button>
                 ))}
               </div>
@@ -779,9 +779,9 @@ export function DaVinciPage() {
                   : `Opening mix: black ${blackN} · white ${whiteN}${online ? " · duel" : ""}`}
             </p>
           </div>
-          {playing && state ? (
+          {playing && state && (state.phase === "draw" || state.phase === "guess" || state.phase === "continue") ? (
             <div className="coda-play-actions">
-              <div className={state.phase === "guess" && myTurn ? "" : "is-idle"}>
+              <div>
                 <h3>Guess {state.selected ? "· locked" : "· tap a rival tile first"}</h3>
                 <div className="pad">
                   {numbers.map((n) => {
@@ -813,7 +813,7 @@ export function DaVinciPage() {
                   )}
                 </div>
               </div>
-              <div className={`row-actions coda-continue ${state.phase === "continue" && myTurn ? "" : "is-idle"}`}>
+              <div className="row-actions coda-continue">
                 <button
                   className="btn btn-go"
                   type="button"
@@ -839,7 +839,7 @@ export function DaVinciPage() {
               <li>On your draw, pick black or white. You cannot draw a color that is gone.</li>
               <li>Opening hand is 4 tiles. Only a drawn dash needs an insert lock.</li>
               <li>The veil is opening-only. Inserts wait the full 5 seconds even after you pick a slot.</li>
-              <li>After the opening 4, throw 石头剪刀布. The loser guesses first.</li>
+              <li>After the opening 4, play rock-paper-scissors. The loser guesses first.</li>
             </ul>
           </div>
           <div>
