@@ -534,15 +534,15 @@
   isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(168px, 1fr) 188px minmax(168px, 1fr);
+  grid-template-rows: minmax(180px, 1fr) 200px minmax(180px, 1fr);
   justify-content: stretch;
   justify-items: stretch;
   align-content: stretch;
-  height: clamp(480px, 74dvh, 680px);
-  min-height: clamp(480px, 74dvh, 680px);
-  max-height: clamp(480px, 74dvh, 680px);
+  height: clamp(540px, 80dvh, 740px);
+  min-height: clamp(540px, 80dvh, 740px);
+  max-height: clamp(540px, 80dvh, 740px);
   overflow: hidden;
-  padding: clamp(14px, 2vw, 22px);
+  padding: clamp(18px, 2.4vw, 28px);
   background: rgba(255, 255, 255, 0.45);
   box-shadow: none;
   border: 1px solid #e5e7eb;
@@ -883,7 +883,7 @@
   --tile-w: 56px;
   --tile-h: 84px;
   position: relative;
-  min-height: 132px;
+  min-height: 148px;
   overflow: visible;
   width: 100%;
   min-width: 0;
@@ -954,9 +954,9 @@
 }
 
 .table-coda .center-well {
-  height: 188px;
-  min-height: 188px;
-  max-height: 188px;
+  height: 200px;
+  min-height: 200px;
+  max-height: 200px;
   padding: 0;
   flex-wrap: nowrap;
   overflow: hidden;
@@ -1211,33 +1211,35 @@
 .table-uno {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) 204px minmax(0, 1.2fr);
+  grid-template-rows: minmax(0, 1fr) 216px minmax(0, 1.28fr);
   justify-content: stretch;
   justify-items: stretch;
   align-content: stretch;
-  height: clamp(560px, 78dvh, 760px);
-  min-height: clamp(560px, 78dvh, 760px);
-  max-height: clamp(560px, 78dvh, 760px);
+  height: clamp(680px, 84dvh, 840px);
+  min-height: clamp(680px, 84dvh, 840px);
+  max-height: clamp(680px, 84dvh, 840px);
   overflow: hidden;
-  padding: clamp(14px, 2vw, 22px);
+  padding: clamp(20px, 2.4vw, 30px);
+  row-gap: 14px;
 }
 
 .table-bj {
-  grid-template-rows: minmax(0, 1fr) 188px minmax(0, 1.2fr);
+  grid-template-rows: minmax(0, 1fr) 210px minmax(0, 1.28fr);
 }
 
 .table-uno {
-  grid-template-rows: minmax(0, 1fr) 224px minmax(0, 1.2fr);
+  grid-template-rows: minmax(0, 1fr) 236px minmax(0, 1.28fr);
 }
 
 .table-m24 {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  height: clamp(560px, 78dvh, 760px);
-  min-height: clamp(560px, 78dvh, 760px);
-  max-height: clamp(560px, 78dvh, 760px);
+  height: clamp(680px, 84dvh, 840px);
+  min-height: clamp(680px, 84dvh, 840px);
+  max-height: clamp(680px, 84dvh, 840px);
   overflow: hidden;
+  padding: clamp(20px, 2.4vw, 30px);
 }
 
 .table-flip:has(> .coda-deal),
@@ -1265,6 +1267,7 @@
   align-items: center;
   width: 100%;
   justify-content: center;
+  gap: 12px;
 }
 
 .table-flip .seat-label,
@@ -1415,30 +1418,39 @@
 .table-bj .seat .pcards,
 .table-uno .seat .pcards {
   flex-wrap: nowrap;
-  gap: 0;
+  gap: 10px;
   min-height: 140px;
   overflow-x: auto;
   overflow-y: visible;
-  padding: 4px 12px 0;
+  padding: 6px 16px 0;
   scrollbar-width: thin;
 }
 
 .table-flip .seat .pcards > * + *,
-.table-bj .seat .pcards > * + *,
+.table-bj .seat .pcards > * + * {
+  margin-left: 0;
+}
+
+.table-uno .seat .pcards {
+  gap: 0;
+}
+
 .table-uno .seat .pcards > * + * {
-  margin-left: -34px;
+  margin-left: -16px;
 }
 
 .table-bj .center-well {
   flex-direction: column;
   flex-wrap: nowrap;
-  gap: 10px;
+  gap: 14px;
+  padding: 4px 0;
 }
 
 .table-bj .center-well .pcards,
 .table-bj .community-slots {
   flex-wrap: nowrap;
   justify-content: center;
+  gap: 12px;
   min-height: 140px;
   width: 100%;
 }
@@ -1454,42 +1466,44 @@
 .table-flip .center-well {
   flex-direction: column;
   flex-wrap: nowrap;
-  gap: 10px;
+  gap: 14px;
+  padding: 4px 0;
 }
 
 .table-flip .target-slot {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
-  min-height: 44px;
+  min-height: 48px;
   width: 100%;
 }
 
 .table-uno .center-well {
   flex-direction: column;
   flex-wrap: nowrap;
-  gap: 8px;
+  gap: 12px;
+  padding: 4px 0;
 }
 
 .table-uno .center-cards {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  min-height: 130px;
+  gap: 22px;
+  min-height: 140px;
   width: 100%;
 }
 
 .table-uno .seat:first-child .pcards {
-  padding-top: 4px;
+  padding-top: 6px;
   min-height: 140px;
 }
 
 .table-uno .seat:last-child .pcards {
-  padding-top: 22px;
+  padding-top: 26px;
   overflow: visible;
-  min-height: 160px;
+  min-height: 166px;
 }
 
 .table-uno .card-svg-btn.playable {
@@ -1520,8 +1534,8 @@
 .table-bj .seat .row-actions,
 .table-uno .seat .row-actions {
   justify-content: center;
-  margin-top: 4px;
-  min-height: 44px;
+  margin-top: 10px;
+  min-height: 48px;
   flex-shrink: 0;
 }
 
@@ -1856,8 +1870,8 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  min-height: 52px;
+  gap: 14px;
+  min-height: 56px;
   width: 100%;
 }
 
