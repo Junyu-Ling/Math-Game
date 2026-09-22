@@ -46,8 +46,8 @@ function SeatTag({
       <div>
         <strong>{name}</strong>
         <small>
-          {out ? "已出完" : extra}
-          {turn ? " · 出牌" : ""}
+          {out ? "Out" : extra}
+          {turn ? " · turn" : ""}
         </small>
       </div>
     </div>
@@ -101,7 +101,7 @@ export function GuandanPage() {
     if (!actor || !actor.id.startsWith("cpu")) return;
     let stop = false;
     void (async () => {
-      await wait(550);
+      await wait(local.last || !local.jumpCard ? 550 : 1400);
       if (stop) return;
       setLocal((s) => {
         const id = s?.players[s.turn]?.id;
@@ -162,7 +162,7 @@ export function GuandanPage() {
         </div>
       </div>
       <div className="game-layout">
-        <div className="table table-gd table-ddz">
+        <div className="table table-gd">
           {!state || waiting || !playing ? (
             <div className="coda-deal">
               {waiting && state ? (
@@ -185,7 +185,7 @@ export function GuandanPage() {
                 tag={
                   <SeatTag
                     name={partner.name}
-                    extra={`对家 · ${partner.hand.length}张`}
+                    extra={`Partner · ${partner.hand.length}`}
                     turn={state.players[state.turn]?.id === partner.id}
                     out={state.finishers.includes(partner.id)}
                   />
@@ -198,7 +198,7 @@ export function GuandanPage() {
                 tag={
                   <SeatTag
                     name={left.name}
-                    extra={`上家 · ${left.hand.length}张`}
+                    extra={`Left · ${left.hand.length}`}
                     turn={state.players[state.turn]?.id === left.id}
                     out={state.finishers.includes(left.id)}
                   />
@@ -207,11 +207,20 @@ export function GuandanPage() {
                 <BackFan n={left.hand.length} side="left" />
               </SeatBlock>
               <div className="ddz-trick">
-                <div className="ddz-trick-cards">
-                  {(state.last?.cards || []).map((c) => (
-                    <PokerFace key={c.id} card={c} />
-                  ))}
-                </div>
+                {!state.last && state.jumpCard ? (
+                  <>
+                    <p className="kicker">Jump card</p>
+                    <div className="ddz-trick-cards ddz-jump">
+                      <PokerFace card={state.jumpCard} />
+                    </div>
+                  </>
+                ) : (
+                  <div className="ddz-trick-cards">
+                    {(state.last?.cards || []).map((c) => (
+                      <PokerFace key={c.id} card={c} />
+                    ))}
+                  </div>
+                )}
                 <p className="ddz-msg">{state.message}</p>
                 {myI >= 0 ? (
                   <p className="ddz-teams">
@@ -226,7 +235,7 @@ export function GuandanPage() {
                 tag={
                   <SeatTag
                     name={right.name}
-                    extra={`下家 · ${right.hand.length}张`}
+                    extra={`Right · ${right.hand.length}`}
                     turn={state.players[state.turn]?.id === right.id}
                     out={state.finishers.includes(right.id)}
                   />
@@ -239,7 +248,7 @@ export function GuandanPage() {
                 tag={
                   <SeatTag
                     name={me.name}
-                    extra={`${me.hand.length}张`}
+                    extra={`${me.hand.length} cards`}
                     turn={myTurn}
                     out={state.finishers.includes(me.id)}
                   />
@@ -253,14 +262,14 @@ export function GuandanPage() {
                 {myTurn ? (
                   <div className="ddz-actions">
                     <button className="ddz-btn pass" type="button" onClick={() => act({ type: "pass" })}>
-                      不出
+                      Pass
                     </button>
                     <button
                       className="ddz-btn play"
                       type="button"
                       onClick={() => act({ type: "play", cards: me.hand.filter((c) => picked.includes(c.id)) })}
                     >
-                      出牌
+                      Play
                     </button>
                   </div>
                 ) : null}

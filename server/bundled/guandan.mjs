@@ -1,41 +1,48 @@
-import { makeGuandanDeck, type PokerCard, type Rank } from "../../lib/poker";
-import { uid } from "../../lib/shuffle";
+// src/lib/shuffle.ts
+function shuffle(items) {
+  const next = [...items];
+  for (let i = next.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const a = next[i];
+    const b = next[j];
+    if (a === void 0 || b === void 0) continue;
+    next[i] = b;
+    next[j] = a;
+  }
+  return next;
+}
+function uid(prefix = "id") {
+  return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+}
 
-export type GdKind = "single" | "pair" | "triple" | "bomb" | "rocket";
-export type GdPlay = { kind: GdKind; rank: number; cards: PokerCard[] };
-export type GdSeat = { id: string; name: string; hand: PokerCard[] };
+// src/lib/poker.ts
+var RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+var SUITS = ["S", "H", "D", "C"];
+function makeDeck() {
+  const cards = [];
+  for (const suit of SUITS) for (const rank of RANKS) cards.push({ id: uid("pk"), suit, rank });
+  return shuffle(cards);
+}
+function makeGuandanDeck() {
+  const cards = [...makeDeck(), ...makeDeck()];
+  cards.push({ id: uid("pk"), suit: "J", rank: "BJ" }, { id: uid("pk"), suit: "J", rank: "RJ" });
+  cards.push({ id: uid("pk"), suit: "J", rank: "BJ" }, { id: uid("pk"), suit: "J", rank: "RJ" });
+  return shuffle(cards);
+}
 
-export type GuandanState = {
-  id: string;
-  phase: "lobby" | "play" | "over";
-  players: GdSeat[];
-  turn: number;
-  last: GdPlay | null;
-  lastSeat: number | null;
-  passed: string[];
-  finishers: string[];
-  winnerTeam: 0 | 1 | null;
-  jumpCard: PokerCard | null;
-  message: string;
-};
-
-export type GuandanAction = { type: "play"; cards: PokerCard[] } | { type: "pass" };
-
-export function teamOf(index: number): 0 | 1 {
+// src/games/guandan/engine.ts
+function teamOf(index) {
   return index % 2 === 0 ? 0 : 1;
 }
-
-export function partnerIndex(index: number): number {
+function partnerIndex(index) {
   return (index + 2) % 4;
 }
-
-function idxOf(s: GuandanState, id: string): number {
+function idxOf(s, id) {
   const i = s.players.findIndex((p) => p.id === id);
   if (i < 0) throw new Error("Not seated");
   return i;
 }
-
-export function gdPower(card: PokerCard): number {
+function gdPower(card) {
   if (card.rank === "RJ") return 17;
   if (card.rank === "BJ") return 16;
   if (card.rank === "2") return 15;
@@ -43,10 +50,9 @@ export function gdPower(card: PokerCard): number {
   if (card.rank === "K") return 13;
   if (card.rank === "Q") return 12;
   if (card.rank === "J") return 11;
-  return Number(card.rank as Rank);
+  return Number(card.rank);
 }
-
-function parsePlay(cards: PokerCard[]): GdPlay {
+function parsePlay(cards) {
   if (!cards.length) throw new Error("Select cards");
   const sorted = [...cards].sort((a, b) => gdPower(a) - gdPower(b) || a.suit.localeCompare(b.suit));
   const jokers = sorted.filter((c) => c.suit === "J");
@@ -60,8 +66,7 @@ function parsePlay(cards: PokerCard[]): GdPlay {
   if (sorted.length === 4 && allSame) return { kind: "bomb", rank, cards: sorted };
   throw new Error("Not a legal combo (single, pair, triple, bomb, or rocket)");
 }
-
-function beats(prev: GdPlay | null, next: GdPlay): boolean {
+function beats(prev, next) {
   if (!prev) return true;
   if (next.kind === "rocket") return true;
   if (prev.kind === "rocket") return false;
@@ -69,16 +74,13 @@ function beats(prev: GdPlay | null, next: GdPlay): boolean {
   if (next.kind !== prev.kind) return false;
   return next.rank > prev.rank;
 }
-
-function sortHand(hand: PokerCard[]) {
+function sortHand(hand) {
   return [...hand].sort((a, b) => gdPower(a) - gdPower(b) || a.suit.localeCompare(b.suit));
 }
-
-function finished(s: GuandanState, id: string) {
+function finished(s, id) {
   return s.finishers.includes(id);
 }
-
-function nextAlive(s: GuandanState, from: number): number {
+function nextAlive(s, from) {
   for (let k = 1; k <= 4; k++) {
     const j = (from + k) % s.players.length;
     const p = s.players[j];
@@ -86,13 +88,11 @@ function nextAlive(s: GuandanState, from: number): number {
   }
   return from;
 }
-
-function teamWon(s: GuandanState, team: 0 | 1): boolean {
+function teamWon(s, team) {
   const ids = s.players.filter((_, i) => teamOf(i) === team).map((p) => p.id);
   return ids.length === 2 && ids.every((id) => finished(s, id));
 }
-
-function checkOver(s: GuandanState) {
+function checkOver(s) {
   if (teamWon(s, 0)) {
     s.phase = "over";
     s.winnerTeam = 0;
@@ -105,8 +105,7 @@ function checkOver(s: GuandanState) {
     s.message = `${s.players[1]?.name} & ${s.players[3]?.name} win.`;
   }
 }
-
-export function startGuandanLobby(people: Array<{ id: string; name: string }>): GuandanState {
+function startGuandanLobby(people) {
   return {
     id: uid("gd"),
     phase: "lobby",
@@ -118,21 +117,20 @@ export function startGuandanLobby(people: Array<{ id: string; name: string }>): 
     finishers: [],
     winnerTeam: null,
     jumpCard: null,
-    message: `Waiting for ${Math.max(0, 4 - people.length)} more. Four players, partners sit across.`,
+    message: `Waiting for ${Math.max(0, 4 - people.length)} more. Four players, partners sit across.`
   };
 }
-
-export function startGuandanTable(people: Array<{ id: string; name: string }>): GuandanState {
+function startGuandanTable(people) {
   if (people.length !== 4) throw new Error("Guandan needs four players");
   const deck = makeGuandanDeck();
   const players = people.map((p, i) => ({
     id: p.id,
     name: p.name,
-    hand: sortHand(deck.slice(i * 27, i * 27 + 27)),
+    hand: sortHand(deck.slice(i * 27, i * 27 + 27))
   }));
   const seat = Math.floor(Math.random() * 4);
-  const hand = players[seat]!.hand;
-  const jumpCard = { ...hand[Math.floor(Math.random() * hand.length)]!, hidden: false };
+  const hand = players[seat].hand;
+  const jumpCard = { ...hand[Math.floor(Math.random() * hand.length)], hidden: false };
   return {
     id: uid("gd"),
     phase: "play",
@@ -144,36 +142,32 @@ export function startGuandanTable(people: Array<{ id: string; name: string }>): 
     finishers: [],
     winnerTeam: null,
     jumpCard,
-    message: `Jump card drawn. ${people[seat]?.name} holds it and leads.`,
+    message: `Jump card drawn. ${people[seat]?.name} holds it and leads.`
   };
 }
-
-export function startGuandanPractice(): GuandanState {
+function startGuandanPractice() {
   return startGuandanTable([
     { id: "you", name: "YOU" },
     { id: "cpu-e", name: "EAST" },
     { id: "cpu-n", name: "NORTH" },
-    { id: "cpu-w", name: "WEST" },
+    { id: "cpu-w", name: "WEST" }
   ]);
 }
-
-export function applyGuandanAction(s: GuandanState, playerId: string, action: GuandanAction): GuandanState {
-  const next: GuandanState = structuredClone(s);
+function applyGuandanAction(s, playerId, action) {
+  const next = structuredClone(s);
   if (next.phase !== "play") return next;
   const i = idxOf(next, playerId);
   if (next.turn !== i) throw new Error("Not your turn");
   const p = next.players[i];
   if (!p) throw new Error("Not seated");
   if (finished(next, p.id)) throw new Error("Already out");
-
   if (action.type === "pass") {
     if (!next.last || next.lastSeat === i) throw new Error("Lead cannot pass");
     next.passed = [...next.passed, p.id];
     const lastId = next.lastSeat != null ? next.players[next.lastSeat]?.id : null;
     const mustPass = next.players.filter((x) => !finished(next, x.id) && x.id !== lastId);
     if (mustPass.every((x) => next.passed.includes(x.id))) {
-      const leader =
-        lastId && finished(next, lastId) && next.lastSeat != null ? nextAlive(next, next.lastSeat) : (next.lastSeat ?? i);
+      const leader = lastId && finished(next, lastId) && next.lastSeat != null ? nextAlive(next, next.lastSeat) : next.lastSeat ?? i;
       next.last = null;
       next.lastSeat = null;
       next.passed = [];
@@ -185,7 +179,6 @@ export function applyGuandanAction(s: GuandanState, playerId: string, action: Gu
     }
     return next;
   }
-
   const ids = new Set(action.cards.map((c) => c.id));
   const taken = p.hand.filter((c) => ids.has(c.id));
   if (taken.length !== action.cards.length) throw new Error("Cards not in hand");
@@ -204,8 +197,7 @@ export function applyGuandanAction(s: GuandanState, playerId: string, action: Gu
   if (next.phase === "play") next.turn = nextAlive(next, i);
   return next;
 }
-
-export function viewGuandan(s: GuandanState, viewerId: string): GuandanState {
+function viewGuandan(s, viewerId) {
   const v = structuredClone(s);
   const show = v.phase === "over";
   for (const p of v.players) {
@@ -214,22 +206,20 @@ export function viewGuandan(s: GuandanState, viewerId: string): GuandanState {
   if (v.jumpCard) v.jumpCard = { ...v.jumpCard, hidden: false };
   return v;
 }
-
-function groups(hand: PokerCard[]) {
-  const map = new Map<number, PokerCard[]>();
+function groups(hand) {
+  const map = /* @__PURE__ */ new Map();
   for (const c of hand) {
     const k = gdPower(c);
-    map.set(k, [...(map.get(k) || []), c]);
+    map.set(k, [...map.get(k) || [], c]);
   }
   return [...map.entries()].sort((a, b) => a[0] - b[0]);
 }
-
-export function guandanBotAct(s: GuandanState, botId: string): GuandanAction {
+function guandanBotAct(s, botId) {
   const i = idxOf(s, botId);
   const hand = s.players[i]?.hand || [];
   const last = s.last;
   const gs = groups(hand);
-  const tryKind = (kind: GdKind, n: number): PokerCard[] | null => {
+  const tryKind = (kind, n) => {
     for (const [, cards] of gs) {
       if (cards.length < n) continue;
       const play = cards.slice(0, n);
@@ -237,7 +227,6 @@ export function guandanBotAct(s: GuandanState, botId: string): GuandanAction {
         const parsed = parsePlay(play);
         if (parsed.kind === kind && beats(last, parsed)) return play;
       } catch {
-        /* skip */
       }
     }
     return null;
@@ -266,3 +255,14 @@ export function guandanBotAct(s: GuandanState, botId: string): GuandanAction {
   if (fallback) return { type: "play", cards: [fallback] };
   return { type: "pass" };
 }
+export {
+  applyGuandanAction,
+  gdPower,
+  guandanBotAct,
+  partnerIndex,
+  startGuandanLobby,
+  startGuandanPractice,
+  startGuandanTable,
+  teamOf,
+  viewGuandan
+};

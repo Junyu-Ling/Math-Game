@@ -287,11 +287,11 @@ button:disabled {
   justify-content: center;
 }
 
-.table-ddz .ddz-partner { grid-column: 2; grid-row: 1; }
-.table-ddz .ddz-left { grid-column: 1; grid-row: 2; }
-.table-ddz .ddz-trick { grid-column: 2; grid-row: 2; }
-.table-ddz .ddz-right { grid-column: 3; grid-row: 2; }
-.table-ddz .ddz-me { grid-column: 1 / -1; grid-row: 3; }
+.table-gd .ddz-partner { grid-column: 2; grid-row: 1; }
+.table-gd .ddz-left { grid-column: 1; grid-row: 2; }
+.table-gd .ddz-trick { grid-column: 2; grid-row: 2; }
+.table-gd .ddz-right { grid-column: 3; grid-row: 2; }
+.table-gd .ddz-me { grid-column: 1 / -1; grid-row: 3; }
 
 .ddz-seat {
   display: flex;
@@ -307,8 +307,9 @@ button:disabled {
   gap: 8px;
   padding: 4px 10px 4px 4px;
   border-radius: 999px;
-  background: rgba(12, 40, 22, 0.72);
-  color: #f6f1df;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: var(--ink);
   max-width: 100%;
 }
 
@@ -406,22 +407,26 @@ button:disabled {
   margin-right: -22px;
 }
 
-.ddz-trick-cards > :last-child {
+.ddz-trick-cards.ddz-jump {
+  min-height: 96px;
+}
+
+.ddz-trick-cards.ddz-jump > .card-svg,
+.ddz-trick-cards.ddz-jump > .card-svg-btn {
   margin-right: 0;
 }
 
 .ddz-msg {
   margin: 0;
-  color: #f4edd8;
+  color: var(--ink);
   text-align: center;
   font-size: 13px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   min-height: 1.4em;
 }
 
 .ddz-teams {
   margin: 0;
-  color: rgba(244, 237, 216, 0.72);
+  color: var(--muted);
   font-size: 11px;
 }
 
@@ -445,7 +450,7 @@ button:disabled {
   margin-right: 0;
 }
 
-.table-ddz .ddz-hand .card-svg-btn.selected {
+.table-gd .ddz-hand .card-svg-btn.selected {
   transform: translateY(-18px);
   outline: none;
 }
@@ -796,17 +801,11 @@ h1 {
 .table.table-gd {
   display: grid;
   justify-content: stretch;
+  padding: 14px 12px 10px;
 }
 
 .table.table-ddz {
   padding: 14px 12px 10px;
-  border-radius: 18px;
-  background:
-    radial-gradient(120% 90% at 50% 40%, #3c9a58 0%, #1b6b38 55%, #0f4a26 100%);
-  border: 8px solid #c9a15b;
-  box-shadow:
-    inset 0 0 0 2px #8a6428,
-    0 16px 36px rgba(0, 0, 0, 0.28);
 }
 
 .table.table-gd:has(.coda-deal) {
