@@ -84,6 +84,7 @@ function Row({
   ghostAt,
   reserveSlot,
   fresh,
+  vertical,
 }: {
   tiles: CodaTile[];
   hide: boolean;
@@ -97,6 +98,7 @@ function Row({
   ghostAt?: number | null;
   reserveSlot?: boolean;
   fresh?: Record<string, string>;
+  vertical?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -126,20 +128,21 @@ function Row({
       const aimed = selectedIndex === i;
       const fxKind = flash && flash.playerId === playerId && flash.index === i ? flash.kind : null;
       const fx = fxKind === "hit" || fxKind === "miss" ? fxKind : null;
+      const face = (
+        <MahjongTile
+          tile={tile}
+          hide={hide}
+          selected={aimed}
+          aimed={aimed && !tile.revealed}
+          flash={fx}
+          down={Boolean(downRevealed && tile.revealed)}
+          fresh={Boolean(fresh?.[tile.id])}
+          onClick={onTile ? () => onTile(i) : undefined}
+        />
+      );
       cells.push({
         key: tile.id,
-        node: (
-          <MahjongTile
-            tile={tile}
-            hide={hide}
-            selected={aimed}
-            aimed={aimed && !tile.revealed}
-            flash={fx}
-            down={Boolean(downRevealed && tile.revealed)}
-            fresh={Boolean(fresh?.[tile.id])}
-            onClick={onTile ? () => onTile(i) : undefined}
-          />
-        ),
+        node: vertical ? <span className="side-tile">{face}</span> : face,
       });
     }
   }
@@ -154,23 +157,24 @@ function Row({
     const row = rowRef.current;
     if (!wrap || !row) return;
     const fit = () => {
-      const avail = wrap.clientWidth;
+      const avail = vertical ? wrap.clientHeight : wrap.clientWidth;
       if (avail < 8) return;
       const prev = row.style.zoom;
       row.style.zoom = "1";
-      const need = Math.max(row.scrollWidth, row.getBoundingClientRect().width);
+      const box = row.getBoundingClientRect();
+      const need = vertical ? Math.max(row.scrollHeight, box.height) : Math.max(row.scrollWidth, box.width);
       row.style.zoom = prev;
-      const next = need > avail ? Math.max(0.42, avail / need) : 1;
+      const next = need > avail ? Math.max(0.28, avail / need) : 1;
       setZoom((z) => (Math.abs(z - next) < 0.004 ? z : next));
     };
     fit();
     const ro = new ResizeObserver(() => requestAnimationFrame(fit));
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, [tiles, gaps, ghostAt, reserveSlot]);
+  }, [tiles, gaps, ghostAt, reserveSlot, vertical]);
 
   return (
-    <div className="tiles-fit" ref={wrapRef}>
+    <div className={`tiles-fit ${vertical ? "is-vertical" : ""}`} ref={wrapRef}>
       <div className="tiles" ref={rowRef} style={{ zoom }}>
         {cells.map((c) => (
           <span key={c.key}>{c.node}</span>
@@ -223,6 +227,7 @@ function OppSeat({
           flash={flash}
           reserveSlot
           fresh={fresh}
+          vertical={className === "seat-left" || className === "seat-right"}
           onTile={onTile}
         />
       </div>

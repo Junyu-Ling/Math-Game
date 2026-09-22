@@ -14,6 +14,7 @@ import {
   type UnoState,
 } from "./engine";
 import { DeckStack, UnoColorPick, UnoFace } from "../../components/PlayingCard";
+import { FitCards, SideCard } from "../../components/FitCards";
 import { InvitePanel } from "../../components/InvitePanel";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -71,6 +72,7 @@ function UnoSeat({
   hidden,
   turn,
   mine,
+  vertical,
   playable,
   onPlay,
   onRing,
@@ -80,30 +82,51 @@ function UnoSeat({
   hidden: boolean;
   turn: boolean;
   mine: boolean;
+  vertical?: boolean;
   playable?: (id: string) => boolean;
   onPlay?: (id: string) => void;
   onRing?: () => void;
 }) {
   const armed = needsUnoCall(player);
   return (
-    <div className={`seat ${className}`}>
+    <div className={`seat ${className}${vertical ? " seat-side" : ""}`}>
       <div className="seat-label">
         {player.name} · {player.hand.length} cards{turn ? " · TURN" : ""}
         {player.calledUno ? " · UNO" : ""}
       </div>
-      <div className="uno-seat-row">
+      <div className={`uno-seat-row ${vertical ? "is-vertical" : ""}`}>
         <ServiceBell rung={player.calledUno} armed={armed} mine={mine} onRing={onRing} />
-        <div className="pcards">
-          {player.hand.map((c) => (
-            <UnoFace
-              key={c.id}
-              card={hidden ? { ...c, hidden: true } : c}
-              playable={Boolean(mine && playable?.(c.id))}
-              onClick={mine && onPlay ? () => onPlay(c.id) : undefined}
-            />
-          ))}
-        </div>
+        <FitCards vertical={vertical}>
+          {player.hand.map((c) => {
+            const face = (
+              <UnoFace
+                key={c.id}
+                card={hidden ? { ...c, hidden: true } : c}
+                playable={Boolean(mine && playable?.(c.id))}
+                onClick={mine && onPlay ? () => onPlay(c.id) : undefined}
+              />
+            );
+            return vertical ? <SideCard key={c.id}>{face}</SideCard> : face;
+          })}
+        </FitCards>
       </div>
+    </div>
+  );
+}
+
+function DirMark({ dir }: { dir: 1 | -1 }) {
+  const cw = dir === -1;
+  return (
+    <div className={`uno-dir ${cw ? "cw" : "ccw"}`} aria-label={cw ? "Clockwise" : "Counter-clockwise"}>
+      <svg viewBox="0 0 72 72" aria-hidden>
+        <circle cx="36" cy="36" r="26" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray="6 8" />
+        {cw ? (
+          <path d="M54 20l8 10-12 1z" fill="currentColor" />
+        ) : (
+          <path d="M18 20l-8 10 12 1z" fill="currentColor" />
+        )}
+      </svg>
+      <span>{cw ? "CW" : "CCW"}</span>
     </div>
   );
 }
@@ -262,6 +285,7 @@ export function UnoPage() {
                   player={seated.left}
                   className="seat-left"
                   hidden
+                  vertical
                   turn={cur?.id === seated.left.id}
                   mine={false}
                 />
@@ -275,6 +299,7 @@ export function UnoPage() {
                     disabled={!canDraw}
                   />
                   {top ? <UnoFace card={top} /> : <div className="card-ghost" aria-hidden />}
+                  <DirMark dir={state.dir} />
                 </div>
                 {state.pendingDraw > 0 ? <div className="uno-plus-flag">+{state.pendingDraw}</div> : null}
                 {plusFx ? <div key={plusFx.key} className="uno-plus-burst">+{plusFx.n}</div> : null}
@@ -291,7 +316,9 @@ export function UnoPage() {
                   {state.phase === "over"
                     ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
                     : state.pendingDraw > 0
-                      ? `Draw +${state.pendingDraw}, or stack +2 / +4`
+                      ? state.stackKind === "wild4"
+                        ? `+${state.pendingDraw} · stack ${state.color} +2 or +4`
+                        : `+${state.pendingDraw} · stack any +2`
                       : shoutArmed && myTurn
                         ? drewPlayable
                           ? "Ring the bell to call UNO, then play or keep"
@@ -312,6 +339,7 @@ export function UnoPage() {
                   player={seated.right}
                   className="seat-right"
                   hidden
+                  vertical
                   turn={cur?.id === seated.right.id}
                   mine={false}
                 />

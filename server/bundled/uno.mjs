@@ -80,7 +80,12 @@ function topCard(state) {
 }
 function canPlay(state, card) {
   if (state.justDrawnId && card.id !== state.justDrawnId) return false;
-  if (state.pendingDraw > 0) return card.kind === "draw2" || card.kind === "wild4";
+  if (state.pendingDraw > 0) {
+    if (state.stackKind === "wild4") {
+      return card.kind === "wild4" || card.kind === "draw2" && card.color === state.color;
+    }
+    return card.kind === "draw2";
+  }
   if (card.kind === "wild" || card.kind === "wild4") return true;
   const top = topCard(state);
   if (!top) return true;
@@ -114,6 +119,7 @@ function startUnoLobby(people) {
     wildCardId: null,
     winnerId: null,
     drawBurst: null,
+    stackKind: null,
     log: [{ id: uid("l"), text: `Table ${players.length}/4. Host starts once at least two are seated.` }]
   };
 }
@@ -160,6 +166,7 @@ function startUnoTable(people) {
     wildCardId: null,
     winnerId: null,
     drawBurst: start?.kind === "draw2" ? { n: 2, playerId: players[0].id, key: uid("fx") } : null,
+    stackKind: start?.kind === "draw2" ? "draw2" : null,
     log: [{ id: uid("l"), text: `${players.map((p) => p.name).join(" vs ")}. Empty your hand to win.` }]
   };
 }
@@ -219,6 +226,7 @@ function applyUnoAction(state, actorId, action) {
       let next3 = giveCards(pulled2.state, me.id, pulled2.cards);
       next3.pendingDraw = 0;
       next3.justDrawnId = null;
+      next3.stackKind = null;
       next3.log = [...next3.log, { id: uid("l"), text: `${me.name} draws ${pulled2.cards.length}.` }];
       next3.turn = nextIndex(next3);
       return burst(next3, pulled2.cards.length, me.id);
@@ -241,6 +249,7 @@ function applyUnoAction(state, actorId, action) {
   if (!card || !canPlay(state, card)) return state;
   let next = withPlayer(state, me.id, (p) => ({ ...p, hand: p.hand.filter((c) => c.id !== card.id) }));
   next.justDrawnId = null;
+  next.stackKind = null;
   next.discard = [...next.discard, card];
   next.log = [...next.log, { id: uid("l"), text: `${me.name} plays ${labelUno(card)}.` }];
   const after = next.players.find((p) => p.id === me.id);
@@ -253,8 +262,13 @@ function applyUnoAction(state, actorId, action) {
   next = winCheck(next, me.id);
   if (next.phase === "over") return next;
   if (card.kind === "wild" || card.kind === "wild4") {
-    next.pendingDraw += card.kind === "wild4" ? 4 : 0;
-    if (card.kind === "wild4") next = burst(next, next.pendingDraw, next.players[nextIndex(next)]?.id ?? me.id);
+    if (card.kind === "wild4") {
+      next.pendingDraw += 4;
+      next.stackKind = "wild4";
+      next = burst(next, next.pendingDraw, next.players[nextIndex(next)]?.id ?? me.id);
+    } else {
+      next.stackKind = state.pendingDraw > 0 ? state.stackKind : null;
+    }
     if (action.color) {
       next.color = action.color;
       next.turn = nextIndex(next, false);
@@ -267,6 +281,7 @@ function applyUnoAction(state, actorId, action) {
   if (card.color !== "black") next.color = card.color;
   if (card.kind === "draw2") {
     next.pendingDraw += 2;
+    next.stackKind = state.stackKind === "wild4" ? "wild4" : "draw2";
     next = burst(next, next.pendingDraw, next.players[nextIndex(next)]?.id ?? me.id);
   }
   if (card.kind === "reverse") {

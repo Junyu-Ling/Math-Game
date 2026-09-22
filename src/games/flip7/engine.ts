@@ -19,7 +19,7 @@ export type FlipPlayer = {
   pendingFlip3: number;
 };
 
-export type FlipPhase = "action" | "target" | "roundEnd" | "over";
+export type FlipPhase = "lobby" | "action" | "target" | "roundEnd" | "over";
 
 export type FlipLog = { id: string; text: string; tone?: "you" | "ai" | "bad" };
 
@@ -76,19 +76,43 @@ export function areaScore(area: FlipCard[]): { score: number; numbers: number; f
   return { score, numbers: numbers.length, flip7 };
 }
 
-export function startFlip7Duel(a: { id: string; name: string }, b: { id: string; name: string }): FlipState {
-  const seat = (p: { id: string; name: string }): FlipPlayer => ({
+function emptySeat(p: { id: string; name: string; human?: boolean }): FlipPlayer {
+  return {
     id: p.id,
     name: p.name,
-    human: true,
+    human: p.human !== false,
     total: 0,
     area: [],
     status: "active",
     pendingFreeze: false,
     pendingFlip3: 0,
-  });
+  };
+}
+
+export function startFlip7Lobby(people: Array<{ id: string; name: string; human?: boolean }>): FlipState {
+  const players = people.slice(0, 4).map(emptySeat);
   return {
-    players: [seat(a), seat(b)],
+    players,
+    deck: [],
+    discard: [],
+    turn: 0,
+    round: 1,
+    phase: "lobby",
+    pendingAction: null,
+    lastCard: null,
+    winnerId: null,
+    goal: 200,
+    burst: null,
+    log: [{ id: uid("l"), text: `Table ${players.length}/4. Host starts at 1–4 players.` }],
+  };
+}
+
+export function startFlip7Table(people: Array<{ id: string; name: string; human?: boolean }>): FlipState {
+  const seated = people.slice(0, 4);
+  if (!seated.length) return startFlip7Lobby(seated);
+  const players = seated.map(emptySeat);
+  return {
+    players,
     deck: deckBuild(),
     discard: [],
     turn: 0,
@@ -99,19 +123,25 @@ export function startFlip7Duel(a: { id: string; name: string }, b: { id: string;
     winnerId: null,
     goal: 200,
     burst: null,
-    log: [{ id: uid("l"), text: `${a.name} vs ${b.name}. Hit / Stay. First to 200.` }],
+    log: [{ id: uid("l"), text: `${players.map((p) => p.name).join(" · ")}. Hit / Stay. First to 200.` }],
   };
 }
 
-export function startFlip7(): FlipState {
-  const you = { id: uid("you"), name: "YOU" };
-  const cpu = { id: uid("cpu"), name: "CPU" };
-  const state = startFlip7Duel(you, cpu);
-  return {
-    ...state,
-    players: state.players.map((p) => (p.id === cpu.id ? { ...p, human: false } : p)),
-    log: [{ id: uid("l"), text: "Practice vs CPU. Hit / Stay. First to 200." }],
-  };
+export function startFlip7Duel(a: { id: string; name: string }, b: { id: string; name: string }): FlipState {
+  return startFlip7Table([a, b]);
+}
+
+const CPU_NAMES = ["CPU", "CPU 2", "CPU 3"];
+
+export function startFlip7(seats = 1): FlipState {
+  const n = Math.max(1, Math.min(4, Math.floor(seats) || 1));
+  return startFlip7Table(
+    Array.from({ length: n }, (_, i) => ({
+      id: i === 0 ? "you" : `cpu-${i}`,
+      name: i === 0 ? "YOU" : CPU_NAMES[i - 1]!,
+      human: i === 0,
+    })),
+  );
 }
 
 export function viewFlip7(state: FlipState, _viewerId: string): FlipState {
@@ -359,10 +389,18 @@ export function aiDecide(state: FlipState): "hit" | "stay" {
 export type FlipAction =
   | { type: "hit" }
   | { type: "stay" }
-  | { type: "target"; targetId: string };
+  | { type: "target"; targetId: string }
+  | { type: "start" };
 
 export function applyFlipAction(state: FlipState, actorId: string, action: FlipAction): FlipState {
   if (!state.players.some((p) => p.id === actorId)) return state;
+  if (state.phase === "lobby") {
+    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 1) {
+      return startFlip7Table(state.players);
+    }
+    return state;
+  }
+  if (state.phase === "over") return state;
   const cur = currentFlip(state);
   if (cur.id !== actorId) return state;
   if (action.type === "hit") return hit(state);

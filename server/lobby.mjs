@@ -664,7 +664,7 @@ function startRoom(invite, from, to, mods) {
     const white = 4 - black;
     state = mods.coda.startCodaLobby([a, b], Boolean(meta.useJokers));
   } else if (invite.game === "flip7") {
-    state = mods.flip.startFlip7Duel(a, b);
+    state = mods.flip.startFlip7Lobby([a, b]);
   } else if (invite.game === "bj") {
     state = mods.bj.startBjDuel(a, b);
   } else if (invite.game === "m24") {
@@ -728,6 +728,7 @@ function newLobbyState(game, people, mods, meta) {
   if (game === "guandan") return mods.guandan.startGuandanLobby(people);
   if (game === "uno") return mods.uno.startUnoLobby(people);
   if (game === "coda") return mods.coda.startCodaLobby(people, Boolean(meta?.useJokers));
+  if (game === "flip7") return mods.flip.startFlip7Lobby(people);
   throw new Error("Unknown table game");
 }
 
@@ -739,6 +740,7 @@ function rebuildLobby(rec, joiner, mods) {
   });
   if (rec.game === "guandan") return mods.guandan.startGuandanLobby(people);
   if (rec.game === "uno") return mods.uno.startUnoLobby(people);
+  if (rec.game === "flip7") return mods.flip.startFlip7Lobby(people);
   if (rec.game === "coda") {
     let state = mods.coda.startCodaLobby(people, Boolean(rec.state?.useJokers));
     for (const p of rec.state.players || []) {
@@ -751,7 +753,7 @@ function rebuildLobby(rec, joiner, mods) {
   return rec.state;
 }
 
-const OPEN_TABLES = new Set(["guandan", "coda", "uno"]);
+const OPEN_TABLES = new Set(["guandan", "coda", "uno", "flip7"]);
 
 export async function applyRoomAction(user, roomId, action, mods) {
   mods = mods || (await getMods());

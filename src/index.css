@@ -533,6 +533,7 @@ button:disabled {
   width: min(1200px, calc(100% - 2 * var(--gutter)));
   margin: 0 auto;
   padding: clamp(20px, 3vw, 36px) 0 clamp(32px, 5vw, 56px);
+  overflow-x: hidden;
 }
 
 .coda-page .game-layout {

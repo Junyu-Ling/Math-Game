@@ -8,7 +8,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
   const { user } = useAuth();
   const { online, error, invite, room, store, inviteCooldownMs } = useLobby();
   const tableWait =
-    Boolean(room && ["guandan", "coda", "uno"].includes(room.game) && (room.view as { phase?: string } | undefined)?.phase === "lobby");
+    Boolean(room && ["guandan", "coda", "uno", "flip7"].includes(room.game) && (room.view as { phase?: string } | undefined)?.phase === "lobby");
   const host = Boolean(user && room?.seats?.[0] === user.id);
   const seated = new Set(room?.seats || []);
   const cooling = inviteCooldownMs > 0;
@@ -34,6 +34,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       {game === "guandan" ? <p>Guandan needs four players. Host invites three people; the deal starts at 4/4.</p> : null}
       {game === "coda" ? <p>Da Vinci Code is 2–4 players. Everyone picks black/white, then ready. Host can invite more before that.</p> : null}
       {game === "uno" ? <p>UNO is 2–4 players. Host invites, then starts the deal.</p> : null}
+      {game === "flip7" ? <p>Flip 7 is 1–4 players. Host invites, then starts.</p> : null}
       {tableWait ? <p>Seated {seated.size}/4.</p> : null}
       {online.length === 0 ? (
         <p>No other accounts yet. Anyone who registers or logs in will appear here, even when they are offline.</p>
