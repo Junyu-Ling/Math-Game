@@ -130,12 +130,13 @@ function hit(state) {
       const area = me.area.filter((c) => c.id !== chance.id);
       next = withPlayer(next, me.id, (p) => ({ ...p, area, pendingFlip3: Math.max(0, p.pendingFlip3 - 1) }));
       next.discard = [...next.discard, chance, card];
+      next.burst = { playerId: me.id, id: uid("boom"), kind: "save", saveCard: chance };
       next.log = [...next.log, { id: uid("l"), text: `${me.name} hits a duplicate ${card.value}. Second Chance saves the round.`, tone: whoTone }];
       return afterHit(next, me.id);
     }
     next = withPlayer(next, me.id, (p) => ({ ...p, area: [], status: "bust", pendingFlip3: 0 }));
     next.discard = [...next.discard, ...me.area, card];
-    next.burst = { playerId: me.id, id: uid("boom") };
+    next.burst = { playerId: me.id, id: uid("boom"), kind: "bust" };
     next.log = [...next.log, { id: uid("l"), text: `${me.name} busts (duplicate ${card.value}). Round scores 0.`, tone: "bad" }];
     return advance(next);
   }

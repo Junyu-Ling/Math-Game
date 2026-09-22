@@ -32,10 +32,27 @@ export function Flip7Page() {
   const myTurn = Boolean(state && me && cur?.id === me.id && state.phase !== "over");
 
   const burst = state?.burst ?? null;
+  const [fx, setFx] = useState<{ id: string; boom: boolean; spin: boolean } | null>(null);
+  const savePlaying = Boolean(burst?.kind === "save" && fx && fx.id === burst.id && (fx.boom || fx.spin));
 
   useEffect(() => {
     if (room) setLocal(null);
   }, [room]);
+
+  useEffect(() => {
+    if (!burst) return;
+    const id = burst.id;
+    setFx({ id, boom: true, spin: false });
+    const timers: number[] = [];
+    if (burst.kind === "save") {
+      timers.push(window.setTimeout(() => setFx({ id, boom: true, spin: true }), 360));
+      timers.push(window.setTimeout(() => setFx({ id, boom: false, spin: true }), 720));
+      timers.push(window.setTimeout(() => setFx(null), 1480));
+    } else {
+      timers.push(window.setTimeout(() => setFx(null), 1000));
+    }
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [burst?.id, burst?.kind]);
 
   useEffect(() => {
     if (!practice || !local || local.phase === "over") return;
@@ -43,7 +60,7 @@ export function Flip7Page() {
     if (actor.human) return;
     let stop = false;
     void (async () => {
-      await wait(700);
+      await wait(local.burst?.kind === "save" ? 1550 : 700);
       if (stop) return;
       setLocal((s) => {
         if (!s || currentFlip(s).human) return s;
@@ -95,7 +112,12 @@ export function Flip7Page() {
           ) : (
             <>
               <div className="seat">
-                {burst?.playerId === rival.id ? <FlipBoom key={burst.id} /> : null}
+                {burst?.playerId === rival.id && fx?.id === burst.id && fx.boom ? <FlipBoom key={`${burst.id}-boom`} /> : null}
+                {burst?.playerId === rival.id && burst.kind === "save" && burst.saveCard && fx?.id === burst.id && fx.spin ? (
+                  <div className="flip-chance-hero" key={`${burst.id}-chance`}>
+                    <FlipFace card={burst.saveCard} />
+                  </div>
+                ) : null}
                 <div className="seat-label">
                   {rival.name} · {rival.total} PTS · {rival.status.toUpperCase()}
                   {rival.area.some((c) => c.kind === "chance") ? " · 2ND CHANCE" : ""}
@@ -112,7 +134,9 @@ export function Flip7Page() {
                 <div className="status-line">
                   {state.phase === "over"
                     ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
-                    : myTurn
+                    : savePlaying
+                      ? "Second Chance!"
+                      : myTurn
                       ? state.phase === "target"
                         ? `Choose who gets ${state.pendingAction === "freeze" ? "Freeze" : "Flip Three"} — yourself included.`
                         : me.pendingFlip3 > 0
@@ -120,7 +144,7 @@ export function Flip7Page() {
                           : "Flip one card, then the next player. Stay to bank this round."
                       : `${cur?.name} is acting`}
                 </div>
-                {myTurn && state.phase === "target"
+                {myTurn && state.phase === "target" && !savePlaying
                   ? activePlayers(state).map((p) => (
                       <button key={p.id} className="btn" type="button" onClick={() => act({ type: "target", targetId: p.id })}>
                         {p.id === me.id ? `Use on yourself` : `Use on ${p.name}`}
@@ -129,7 +153,12 @@ export function Flip7Page() {
                   : null}
               </div>
               <div className="seat">
-                {burst?.playerId === me.id ? <FlipBoom key={burst.id} /> : null}
+                {burst?.playerId === me.id && fx?.id === burst.id && fx.boom ? <FlipBoom key={`${burst.id}-boom`} /> : null}
+                {burst?.playerId === me.id && burst.kind === "save" && burst.saveCard && fx?.id === burst.id && fx.spin ? (
+                  <div className="flip-chance-hero" key={`${burst.id}-chance`}>
+                    <FlipFace card={burst.saveCard} />
+                  </div>
+                ) : null}
                 <div className="seat-label">
                   {me.name} · round {areaScore(me.area).score} · total {me.total}
                   {me.area.some((c) => c.kind === "chance") ? " · 2ND CHANCE" : ""}
@@ -139,7 +168,7 @@ export function Flip7Page() {
                     <FlipFace key={c.id} card={c} />
                   ))}
                 </div>
-                {myTurn && state.phase === "action" && (
+                {myTurn && state.phase === "action" && !savePlaying && (
                   <div className="row-actions">
                     <button className="btn btn-go" type="button" onClick={() => act({ type: "hit" })}>
                       HIT
