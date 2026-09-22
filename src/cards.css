@@ -573,24 +573,52 @@
 
 .table-coda.coda-multi {
   grid-template-columns: minmax(110px, 18%) minmax(0, 1fr) minmax(110px, 18%);
-  grid-template-rows: minmax(150px, 0.95fr) minmax(170px, auto) minmax(150px, 1.15fr);
+  grid-template-rows: minmax(80px, 1fr) minmax(260px, auto) minmax(80px, 1fr);
+  align-items: center;
 }
 
 .table-coda.coda-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: hidden; min-height: 0; }
 .table-coda.coda-multi > .seat-left { grid-column: 1; grid-row: 2; }
 .table-coda.coda-multi > .center-well { grid-column: 2; grid-row: 2; }
 .table-coda.coda-multi > .seat-right { grid-column: 3; grid-row: 2; }
-.table-coda.coda-multi > .seat-you { grid-column: 1 / -1; grid-row: 3; }
+.table-coda.coda-multi > .seat-you {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: grid;
+  grid-template-columns: minmax(110px, 18%) minmax(0, 1fr) minmax(110px, 18%);
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+}
+.table-coda.coda-multi > .seat-you .seat-plaque {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: start;
+  align-self: center;
+}
+.table-coda.coda-multi > .seat-you .tiles-wrap {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
 .table-coda.coda-multi .seat-left,
 .table-coda.coda-multi .seat-right {
-  min-height: 0;
+  min-height: 260px;
   overflow: hidden;
+  align-self: stretch;
+  height: auto;
 }
 .table-coda.coda-multi .seat-left .tiles-wrap,
 .table-coda.coda-multi .seat-right .tiles-wrap {
   height: 100%;
-  min-height: 0;
+  min-height: 240px;
   width: 100%;
+  overflow: hidden;
+}
+.table-coda.coda-multi > .center-well {
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  align-self: center;
 }
 .table-coda .tiles-fit.is-vertical {
   height: 100%;
