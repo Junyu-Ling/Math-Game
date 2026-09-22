@@ -677,16 +677,21 @@
 
 .draw-picks {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .draw-colors {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.draw-color-btn {
+  width: 100%;
+  white-space: nowrap;
 }
 
 .draw-color-btn.black {
@@ -1059,35 +1064,27 @@
 }
 
 .table-coda .center-well {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  justify-items: stretch;
+  justify-content: center;
+  gap: 18px;
   height: 200px;
   min-height: 200px;
   max-height: 200px;
   padding: 0;
-  gap: 0;
   overflow: visible;
 }
 
-.table-coda .center-well .coda-center-tools {
-  grid-column: 2;
-  justify-self: center;
-}
-
 .table-coda .center-well .hand-card {
-  grid-column: 3;
-  justify-self: start;
-  padding-left: 16px;
+  flex: 0 0 auto;
 }
 
 .coda-center-tools {
   position: relative;
-  min-width: min(100%, 268px);
-  min-height: 168px;
+  min-height: 148px;
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
 }
 
 .coda-center-tools .coda-tool {
