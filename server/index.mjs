@@ -31,6 +31,7 @@ import {
   saveAccount,
   snapshot,
   watchLobby,
+  purgeRetiredAccounts,
 } from "./lobby.mjs";
 import { loadMods } from "./game-mods.mjs";
 
@@ -332,29 +333,19 @@ app.get("/api/me", auth, (req, res) => {
   res.status(404).json({ error: "用户不存在" });
 });
 
-function seedDemo() {
-  const users = readUsers();
-  const demos = [
-    { email: "player1@axiom.local", password: "axiom123" },
-    { email: "player2@axiom.local", password: "axiom123" },
-  ];
-  let changed = false;
-  for (const d of demos) {
-    if (users.some((u) => u.email === d.email)) continue;
-    users.push({
-      id: `u_demo_${d.email.replace(/[^a-z0-9]/g, "_")}`,
-      email: d.email,
-      passwordHash: bcrypt.hashSync(d.password, 10),
-      chips: 1000,
-      createdAt: new Date().toISOString(),
-    });
-    changed = true;
-  }
-  if (changed) writeUsers(users);
+function dropDemoUsers() {
+  const users = readUsers().filter((u) => {
+    const email = String(u.email || "").toLowerCase();
+    return email !== "player1@axiom.local" && email !== "player2@axiom.local";
+  });
+  if (users.length !== readUsers().length) writeUsers(users);
+  return users;
 }
 
-seedDemo();
-void Promise.all(readUsers().map((u) => saveAccount(u))).catch(() => {});
+dropDemoUsers();
+void purgeRetiredAccounts()
+  .then(() => Promise.all(readUsers().map((u) => saveAccount(u))))
+  .catch(() => {});
 
 const QUEUE = "queue:coda";
 const ENQUEUE = `
@@ -614,8 +605,6 @@ wss.on("connection", (ws, req) => {
 httpServer.listen(PORT, () => {
   console.log(`AXIOM API  http://localhost:${PORT}`);
   console.log(`WebSocket  ws://localhost:${PORT}/ws`);
-  console.log("演示账号  player1@axiom.local / axiom123");
-  console.log("演示账号  player2@axiom.local / axiom123");
   console.log(mailer ? "SMTP 已配置" : "未配置 SMTP：验证码会显示在注册页，并打印在本终端");
   console.log(githubReady() ? "GitHub 登录已配置" : "未配置 GitHub：在 server/.env 填写 GITHUB_CLIENT_ID / SECRET");
 });

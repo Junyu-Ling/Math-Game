@@ -18,12 +18,7 @@ npm run dev
 
 1. 启动 Redis，再 `cd server && npm start`  
 2. 项目根 `.env`：`VITE_API_URL=http://localhost:8787`，重启 `npm run dev`  
-3. 登录演示账号后点「匹配联机」
-
-| 邮箱 | 密码 |
-| --- | --- |
-| player1@axiom.local | axiom123 |
-| player2@axiom.local | axiom123 |
+3. 用自己的邮箱或 GitHub 登录后点「匹配联机」
 
 完整步骤见 [docs/BACKEND.md](docs/BACKEND.md)。线上站点目前只开 GitHub 登录；匹配需要另外部署 `server/` 后在 Vercel 填 `MATCH_WS_URL`。
 

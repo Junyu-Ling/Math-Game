@@ -175,7 +175,7 @@ MATCH_WS_URL=wss://你的主机/ws
 
 ### `POST /api/auth/login`
 
-同上形状。演示账号直接走这一步。
+同上形状。用自己注册的邮箱登录。
 
 ### `GET /api/me`
 

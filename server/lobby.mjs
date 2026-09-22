@@ -397,6 +397,40 @@ async function mgetJson(keys) {
   return map;
 }
 
+const RETIRED_EMAILS = ["player1@axiom.local", "player2@axiom.local"];
+let retiredPurged = false;
+
+export async function forgetAccount(email) {
+  const needle = String(email || "").toLowerCase();
+  if (!needle) return;
+  const ids = new Set();
+  const named = await findAccountByEmail(needle);
+  if (named?.id) ids.add(String(named.id));
+  ids.add(`u_demo_${needle.replace(/[^a-z0-9]/g, "_")}`);
+  const roster = await smembers("axiom:users");
+  const keys = roster.flatMap((id) => [`axiom:u:${id}`, `axiom:acct:${id}`]);
+  const rows = await mgetJson(keys);
+  for (const id of roster) {
+    const rec = rows.get(`axiom:u:${id}`) || rows.get(`axiom:acct:${id}`);
+    if (String(rec?.email || "").toLowerCase() === needle) ids.add(String(id));
+  }
+  for (const id of ids) {
+    await srem("axiom:users", id);
+    await srem("axiom:online", id);
+    await kvDel(`axiom:u:${id}`);
+    await kvDel(`axiom:acct:${id}`);
+    await kvDel(`axiom:p:${id}`);
+    await kvDel(`axiom:seat:${id}`);
+  }
+  await kvDel(`axiom:acctemail:${needle}`);
+}
+
+export async function purgeRetiredAccounts() {
+  if (retiredPurged) return;
+  retiredPurged = true;
+  for (const email of RETIRED_EMAILS) await forgetAccount(email);
+}
+
 async function listRoster(viewerId) {
   const live = await listPresence();
   const liveMap = new Map(live.map((p) => [String(p.id), p]));
@@ -524,6 +558,7 @@ export async function watchLobby(user, seq = 0, inviteCount = -1, href = "", tim
 }
 
 export async function snapshot(userId, light = false) {
+  await purgeRetiredAccounts();
   const online = light ? [] : await listRoster(userId);
   const inviteIds = await smembers(`axiom:uinv:${userId}`);
   const invMap = await mgetJson(inviteIds.map((id) => `axiom:inv:${id}`));
