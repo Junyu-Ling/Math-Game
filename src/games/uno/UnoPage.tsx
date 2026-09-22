@@ -301,6 +301,8 @@ export function UnoPage() {
                     disabled={!canDraw}
                   />
                   {top ? <UnoFace card={top} /> : <div className="card-ghost" aria-hidden />}
+                </div>
+                <div className="uno-side-mark">
                   <DirMark dir={state.dir} />
                 </div>
                 {state.pendingDraw > 0 ? <div className="uno-plus-flag">+{state.pendingDraw}</div> : null}

@@ -1769,6 +1769,13 @@
   width: auto;
 }
 
+.table-uno .uno-side-mark {
+  grid-column: 3;
+  justify-self: start;
+  align-self: center;
+  padding-left: 16px;
+}
+
 .table-uno .uno-plus-flag,
 .table-uno .uno-plus-burst {
   grid-column: 2;
