@@ -17,6 +17,24 @@ function uid(prefix = "id") {
 
 // src/games/uno/engine.ts
 var COLORS = ["red", "yellow", "green", "blue"];
+function colorOrder(card) {
+  if (card.color === "red") return 0;
+  if (card.color === "yellow") return 1;
+  if (card.color === "green") return 2;
+  if (card.color === "blue") return 3;
+  return 4;
+}
+function kindOrder(card) {
+  if (card.kind === "number") return card.value ?? 0;
+  if (card.kind === "skip") return 10;
+  if (card.kind === "reverse") return 11;
+  if (card.kind === "draw2") return 12;
+  if (card.kind === "wild") return 13;
+  return 14;
+}
+function sortUnoHand(hand) {
+  return [...hand].sort((a, b) => colorOrder(a) - colorOrder(b) || kindOrder(a) - kindOrder(b) || a.id.localeCompare(b.id));
+}
 function buildDeck() {
   const cards = [];
   for (const color of COLORS) {
@@ -78,7 +96,7 @@ function startUnoDuel(a, b) {
   const deal = (p) => {
     const hand = deck.slice(0, 7);
     deck = deck.slice(7);
-    return { id: p.id, name: p.name, human: p.human !== false, hand };
+    return { id: p.id, name: p.name, human: p.human !== false, hand: sortUnoHand(hand) };
   };
   const pa = deal(a);
   const pb = deal(b);
@@ -101,7 +119,7 @@ function startUnoDuel(a, b) {
     phase: "play",
     wildCardId: null,
     winnerId: null,
-    log: [{ id: uid("l"), text: `${a.name} vs ${b.name}\u3002\u5148\u51FA\u5B8C\u624B\u724C\u3002` }]
+    log: [{ id: uid("l"), text: `${a.name} vs ${b.name}. Empty your hand to win.` }]
   };
 }
 function nextIndex(state, skip = false) {
@@ -115,7 +133,7 @@ function withPlayer(state, id, fn) {
 function winCheck(state, id) {
   const p = state.players.find((x) => x.id === id);
   if (p && p.hand.length === 0) {
-    return { ...state, phase: "over", winnerId: id, log: [...state.log, { id: uid("l"), text: `${p.name} \u51FA\u5B8C\uFF0C\u83B7\u80DC\u3002` }] };
+    return { ...state, phase: "over", winnerId: id, log: [...state.log, { id: uid("l"), text: `${p.name} emptied their hand and wins.` }] };
   }
   return state;
 }
@@ -130,16 +148,16 @@ function applyUnoAction(state, actorId, action) {
   if (action.type === "draw") {
     if (state.pendingDraw > 0) {
       const pulled2 = take(state, state.pendingDraw);
-      let next3 = withPlayer(pulled2.state, me.id, (p) => ({ ...p, hand: [...p.hand, ...pulled2.cards] }));
+      let next3 = withPlayer(pulled2.state, me.id, (p) => ({ ...p, hand: sortUnoHand([...p.hand, ...pulled2.cards]) }));
       next3.pendingDraw = 0;
-      next3.log = [...next3.log, { id: uid("l"), text: `${me.name} \u6478 ${pulled2.cards.length} \u5F20\u3002` }];
+      next3.log = [...next3.log, { id: uid("l"), text: `${me.name} draws ${pulled2.cards.length}.` }];
       next3.turn = nextIndex(next3);
       return next3;
     }
     const pulled = take(state, 1);
     const card2 = pulled.cards[0];
-    let next2 = withPlayer(pulled.state, me.id, (p) => ({ ...p, hand: card2 ? [...p.hand, card2] : p.hand }));
-    next2.log = [...next2.log, { id: uid("l"), text: `${me.name} \u6478\u724C\u3002` }];
+    let next2 = withPlayer(pulled.state, me.id, (p) => ({ ...p, hand: card2 ? sortUnoHand([...p.hand, card2]) : p.hand }));
+    next2.log = [...next2.log, { id: uid("l"), text: `${me.name} draws.` }];
     if (card2 && canPlay(next2, card2)) return next2;
     next2.turn = nextIndex(next2);
     return next2;
@@ -149,7 +167,7 @@ function applyUnoAction(state, actorId, action) {
   if (!card || !canPlay(state, card)) return state;
   let next = withPlayer(state, me.id, (p) => ({ ...p, hand: p.hand.filter((c) => c.id !== card.id) }));
   next.discard = [...next.discard, card];
-  next.log = [...next.log, { id: uid("l"), text: `${me.name} \u6253\u51FA ${labelUno(card)}\u3002` }];
+  next.log = [...next.log, { id: uid("l"), text: `${me.name} plays ${labelUno(card)}.` }];
   next = winCheck(next, me.id);
   if (next.phase === "over") return next;
   if (card.kind === "wild" || card.kind === "wild4") {
@@ -199,10 +217,10 @@ function scoreCard(c) {
 function labelUno(card) {
   if (card.kind === "number") return `${card.color} ${card.value}`;
   if (card.kind === "draw2") return `${card.color} +2`;
-  if (card.kind === "skip") return `${card.color} \u8DF3\u8FC7`;
-  if (card.kind === "reverse") return `${card.color} \u56DE\u8F6C`;
-  if (card.kind === "wild4") return "\u4E07\u80FD+4";
-  return "\u4E07\u80FD";
+  if (card.kind === "skip") return `${card.color} skip`;
+  if (card.kind === "reverse") return `${card.color} reverse`;
+  if (card.kind === "wild4") return "wild +4";
+  return "wild";
 }
 function viewUno(state, viewerId) {
   return {
@@ -220,6 +238,7 @@ export {
   currentUno,
   labelUno,
   legalCards,
+  sortUnoHand,
   startUnoDuel,
   startUnoPractice,
   topCard,

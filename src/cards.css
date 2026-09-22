@@ -1201,11 +1201,34 @@
   border: 1px solid #e5e7eb;
 }
 
-.table-coda .seat-label,
+.table-flip .seat,
+.table-bj .seat,
+.table-uno .seat {
+  align-items: center;
+}
+
 .table-flip .seat-label,
 .table-bj .seat-label,
 .table-uno .seat-label {
+  text-align: center;
   color: #9ca3af;
+}
+
+.table-coda .seat-label {
+  color: #9ca3af;
+}
+
+.table-flip .pcards,
+.table-bj .pcards,
+.table-uno .pcards {
+  justify-content: center;
+  width: 100%;
+}
+
+.table-flip .seat .row-actions,
+.table-bj .seat .row-actions,
+.table-uno .seat .row-actions {
+  justify-content: center;
 }
 
 .m24-num {

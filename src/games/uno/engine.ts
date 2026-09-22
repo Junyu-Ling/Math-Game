@@ -34,6 +34,27 @@ export type UnoState = {
 
 const COLORS: UnoColor[] = ["red", "yellow", "green", "blue"];
 
+function colorOrder(card: UnoCard): number {
+  if (card.color === "red") return 0;
+  if (card.color === "yellow") return 1;
+  if (card.color === "green") return 2;
+  if (card.color === "blue") return 3;
+  return 4;
+}
+
+function kindOrder(card: UnoCard): number {
+  if (card.kind === "number") return card.value ?? 0;
+  if (card.kind === "skip") return 10;
+  if (card.kind === "reverse") return 11;
+  if (card.kind === "draw2") return 12;
+  if (card.kind === "wild") return 13;
+  return 14;
+}
+
+export function sortUnoHand(hand: UnoCard[]): UnoCard[] {
+  return [...hand].sort((a, b) => colorOrder(a) - colorOrder(b) || kindOrder(a) - kindOrder(b) || a.id.localeCompare(b.id));
+}
+
 function buildDeck(): UnoCard[] {
   const cards: UnoCard[] = [];
   for (const color of COLORS) {
@@ -101,7 +122,7 @@ export function startUnoDuel(a: { id: string; name: string; human?: boolean }, b
   const deal = (p: { id: string; name: string; human?: boolean }): UnoPlayer => {
     const hand = deck.slice(0, 7);
     deck = deck.slice(7);
-    return { id: p.id, name: p.name, human: p.human !== false, hand };
+    return { id: p.id, name: p.name, human: p.human !== false, hand: sortUnoHand(hand) };
   };
   const pa = deal(a);
   const pb = deal(b);
@@ -164,7 +185,7 @@ export function applyUnoAction(state: UnoState, actorId: string, action: UnoActi
   if (action.type === "draw") {
     if (state.pendingDraw > 0) {
       const pulled = take(state, state.pendingDraw);
-      let next = withPlayer(pulled.state, me.id, (p) => ({ ...p, hand: [...p.hand, ...pulled.cards] }));
+      let next = withPlayer(pulled.state, me.id, (p) => ({ ...p, hand: sortUnoHand([...p.hand, ...pulled.cards]) }));
       next.pendingDraw = 0;
       next.log = [...next.log, { id: uid("l"), text: `${me.name} draws ${pulled.cards.length}.` }];
       next.turn = nextIndex(next);
@@ -172,7 +193,7 @@ export function applyUnoAction(state: UnoState, actorId: string, action: UnoActi
     }
     const pulled = take(state, 1);
     const card = pulled.cards[0];
-    let next = withPlayer(pulled.state, me.id, (p) => ({ ...p, hand: card ? [...p.hand, card] : p.hand }));
+    let next = withPlayer(pulled.state, me.id, (p) => ({ ...p, hand: card ? sortUnoHand([...p.hand, card]) : p.hand }));
     next.log = [...next.log, { id: uid("l"), text: `${me.name} draws.` }];
     if (card && canPlay(next, card)) return next;
     next.turn = nextIndex(next);
