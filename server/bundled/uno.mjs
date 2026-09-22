@@ -79,6 +79,7 @@ function topCard(state) {
   return state.discard[state.discard.length - 1];
 }
 function canPlay(state, card) {
+  if (state.justDrawnId && card.id !== state.justDrawnId) return false;
   if (state.pendingDraw > 0) return card.kind === "draw2" || card.kind === "wild4";
   if (card.kind === "wild" || card.kind === "wild4") return true;
   const top = topCard(state);
@@ -88,6 +89,9 @@ function canPlay(state, card) {
   if (card.kind !== "number" && card.kind === top.kind) return true;
   return false;
 }
+function needsUnoCall(player) {
+  return player.hand.length <= 2 && !player.calledUno;
+}
 function startUnoPractice() {
   return startUnoDuel({ id: "you", name: "YOU", human: true }, { id: "cpu", name: "CPU", human: false });
 }
@@ -96,7 +100,7 @@ function startUnoDuel(a, b) {
   const deal = (p) => {
     const hand = deck.slice(0, 7);
     deck = deck.slice(7);
-    return { id: p.id, name: p.name, human: p.human !== false, hand: sortUnoHand(hand) };
+    return { id: p.id, name: p.name, human: p.human !== false, hand: sortUnoHand(hand), calledUno: false };
   };
   const pa = deal(a);
   const pb = deal(b);
@@ -116,6 +120,7 @@ function startUnoDuel(a, b) {
     turn: 0,
     dir: 1,
     pendingDraw: start?.kind === "draw2" ? 2 : 0,
+    justDrawnId: null,
     phase: "play",
     wildCardId: null,
     winnerId: null,
@@ -137,6 +142,12 @@ function winCheck(state, id) {
   }
   return state;
 }
+function giveCards(state, id, cards) {
+  return withPlayer(state, id, (p) => {
+    const hand = sortUnoHand([...p.hand, ...cards]);
+    return { ...p, hand, calledUno: hand.length > 1 ? false : p.calledUno };
+  });
+}
 function applyUnoAction(state, actorId, action) {
   if (state.phase === "over") return state;
   const me = currentUno(state);
@@ -145,27 +156,43 @@ function applyUnoAction(state, actorId, action) {
     if (action.type !== "color" || state.wildCardId == null) return state;
     return { ...state, color: action.color, phase: "play", wildCardId: null, turn: nextIndex(state, false) };
   }
+  if (action.type === "uno") {
+    if (me.hand.length > 2 || me.calledUno) return state;
+    return withPlayer(state, me.id, (p) => ({ ...p, calledUno: true }));
+  }
+  if (action.type === "keep") {
+    if (!state.justDrawnId) return state;
+    return { ...state, justDrawnId: null, turn: nextIndex(state), log: [...state.log, { id: uid("l"), text: `${me.name} keeps the draw.` }] };
+  }
   if (action.type === "draw") {
+    if (state.justDrawnId) return state;
     if (state.pendingDraw > 0) {
       const pulled2 = take(state, state.pendingDraw);
-      let next3 = withPlayer(pulled2.state, me.id, (p) => ({ ...p, hand: sortUnoHand([...p.hand, ...pulled2.cards]) }));
+      let next3 = giveCards(pulled2.state, me.id, pulled2.cards);
       next3.pendingDraw = 0;
+      next3.justDrawnId = null;
       next3.log = [...next3.log, { id: uid("l"), text: `${me.name} draws ${pulled2.cards.length}.` }];
       next3.turn = nextIndex(next3);
       return next3;
     }
     const pulled = take(state, 1);
     const card2 = pulled.cards[0];
-    let next2 = withPlayer(pulled.state, me.id, (p) => ({ ...p, hand: card2 ? sortUnoHand([...p.hand, card2]) : p.hand }));
+    let next2 = card2 ? giveCards(pulled.state, me.id, [card2]) : pulled.state;
     next2.log = [...next2.log, { id: uid("l"), text: `${me.name} draws.` }];
-    if (card2 && canPlay(next2, card2)) return next2;
+    if (card2 && canPlay({ ...next2, justDrawnId: null }, card2)) {
+      next2.justDrawnId = card2.id;
+      return next2;
+    }
+    next2.justDrawnId = null;
     next2.turn = nextIndex(next2);
     return next2;
   }
   if (action.type !== "play") return state;
+  if (needsUnoCall(me)) return state;
   const card = me.hand.find((c) => c.id === action.cardId);
   if (!card || !canPlay(state, card)) return state;
   let next = withPlayer(state, me.id, (p) => ({ ...p, hand: p.hand.filter((c) => c.id !== card.id) }));
+  next.justDrawnId = null;
   next.discard = [...next.discard, card];
   next.log = [...next.log, { id: uid("l"), text: `${me.name} plays ${labelUno(card)}.` }];
   next = winCheck(next, me.id);
@@ -200,10 +227,18 @@ function aiUno(state) {
     counts.sort((a, b) => b.n - a.n);
     return { type: "color", color: counts[0]?.c ?? "red" };
   }
+  if (state.justDrawnId) {
+    const drawn = me.hand.find((c) => c.id === state.justDrawnId);
+    if (!drawn || !canPlay(state, drawn)) return { type: "keep" };
+    if (needsUnoCall(me)) return { type: "uno" };
+    const color2 = COLORS.map((c) => ({ c, n: me.hand.filter((x) => x.color === c).length })).sort((a, b) => b.n - a.n)[0]?.c;
+    return { type: "play", cardId: drawn.id, color: color2 };
+  }
   const legal = legalCards(state, me.id);
   const ranked = [...legal].sort((a, b) => scoreCard(b) - scoreCard(a));
   const pick = ranked[0];
   if (!pick) return { type: "draw" };
+  if (needsUnoCall(me)) return { type: "uno" };
   const color = COLORS.map((c) => ({ c, n: me.hand.filter((x) => x.color === c).length })).sort((a, b) => b.n - a.n)[0]?.c;
   return { type: "play", cardId: pick.id, color };
 }
@@ -238,6 +273,7 @@ export {
   currentUno,
   labelUno,
   legalCards,
+  needsUnoCall,
   sortUnoHand,
   startUnoDuel,
   startUnoPractice,

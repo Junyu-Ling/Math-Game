@@ -5,6 +5,8 @@ import {
   aiUno,
   canPlay,
   currentUno,
+  legalCards,
+  needsUnoCall,
   startUnoPractice,
   topCard,
   type UnoAction,
@@ -30,6 +32,11 @@ export function UnoPage() {
   const cur = state ? currentUno(state) : null;
   const myTurn = Boolean(state && me && cur?.id === me.id && state.phase !== "over");
   const top = state ? topCard(state) : undefined;
+  const shoutUno = Boolean(
+    me && myTurn && state?.phase === "play" && needsUnoCall(me) && legalCards(state, me.id).length > 0,
+  );
+  const drewPlayable = Boolean(myTurn && state?.phase === "play" && state.justDrawnId);
+  const canDraw = Boolean(myTurn && state?.phase === "play" && !state.justDrawnId);
 
   useEffect(() => {
     if (room) setLocal(null);
@@ -88,7 +95,7 @@ export function UnoPage() {
             <GameSetup
               kicker="UNO"
               title="Empty your hand"
-              blurb="Match color, number, or action. In a duel, reverse equals skip."
+              blurb="Match color, number, or action. Say UNO with two cards left. Draw one if you cannot play."
               game="uno"
               onPractice={() => setLocal(startUnoPractice())}
             />
@@ -97,6 +104,7 @@ export function UnoPage() {
               <div className="seat">
                 <div className="seat-label">
                   {rival.name} · {rival.hand.length} cards{cur?.id === rival.id ? " · TURN" : ""}
+                  {rival.calledUno && rival.hand.length === 1 ? " · UNO" : ""}
                 </div>
                 <div className="pcards">
                   {rival.hand.map((c) => (
@@ -105,32 +113,58 @@ export function UnoPage() {
                 </div>
               </div>
               <div className="center-well">
-                <DeckStack count={state.deck.length} label="Draw" onClick={myTurn && state.phase === "play" ? () => act({ type: "draw" }) : undefined} />
+                <DeckStack
+                  count={state.deck.length}
+                  label="Draw"
+                  onClick={canDraw ? () => act({ type: "draw" }) : undefined}
+                  disabled={!canDraw}
+                />
                 {top ? <UnoFace card={top} /> : null}
-                <div className={`uno-color-chip ${state.color}`}>{state.color.toUpperCase()}</div>
+                <div className="uno-center-actions">
+                  <div className={`uno-color-chip ${state.color}`}>{state.color.toUpperCase()}</div>
+                  {shoutUno ? (
+                    <button className="uno-shout" type="button" onClick={() => act({ type: "uno" })}>
+                      UNO
+                    </button>
+                  ) : null}
+                  {drewPlayable ? (
+                    <button className="btn btn-ghost" type="button" onClick={() => act({ type: "keep" })}>
+                      KEEP
+                    </button>
+                  ) : null}
+                </div>
                 <div className="status-line">
                   {state.phase === "over"
                     ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
                     : state.pendingDraw > 0
                       ? `Draw ${state.pendingDraw}, or stack +2 / +4`
-                      : myTurn
-                        ? state.phase === "color"
-                          ? "Pick a wild color"
-                          : "Play or draw"
-                        : `${cur?.name} is acting`}
+                      : shoutUno
+                        ? drewPlayable
+                          ? "Say UNO to play it, or keep it"
+                          : "Say UNO, then play"
+                        : drewPlayable
+                          ? "Play the drawn card, or keep it"
+                          : myTurn
+                            ? state.phase === "color"
+                              ? "Pick a wild color"
+                              : legalCards(state, me.id).length
+                                ? "Play a matching card"
+                                : "No match — draw one"
+                            : `${cur?.name} is acting`}
                 </div>
                 {myTurn && state.phase === "color" ? <UnoColorPick onPick={(color) => act({ type: "color", color })} /> : null}
               </div>
               <div className="seat">
                 <div className="seat-label">
                   {me.name} · {me.hand.length} cards{myTurn ? " · TURN" : ""}
+                  {me.calledUno && me.hand.length === 1 ? " · UNO" : ""}
                 </div>
                 <div className="pcards">
                   {me.hand.map((c) => (
                     <UnoFace
                       key={c.id}
                       card={c}
-                      playable={myTurn && state.phase === "play" && canPlay(state, c)}
+                      playable={myTurn && state.phase === "play" && !shoutUno && canPlay(state, c)}
                       onClick={() => act({ type: "play", cardId: c.id })}
                     />
                   ))}

@@ -509,13 +509,15 @@ export function DeckStack({
   count,
   label,
   onClick,
+  disabled,
 }: {
   count: number;
   label?: string;
   onClick?: () => void;
+  disabled?: boolean;
 }) {
   return (
-    <button className="deck-stack" type="button" onClick={onClick}>
+    <button className="deck-stack" type="button" onClick={onClick} disabled={disabled}>
       <i />
       <i />
       <i />
