@@ -56,42 +56,62 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     }
     let stop = false;
     let timer = 0;
+    let abort: AbortController | null = null;
+    const applySnap = (next: LobbySnap, prevFallback: boolean) => {
+      setSnap((prev) => {
+        const light = Boolean(next.light);
+        const room = next.room
+          ? takeRoom(next.room, prev.room)
+          : light && prevFallback
+            ? prev.room
+            : next.room ?? (light ? prev.room : null);
+        if (!room) roomSeq.current = light ? roomSeq.current : 0;
+        return {
+          online: light && !next.online.length ? prev.online : next.online,
+          invites: next.invites,
+          room,
+          store: next.store || prev.store,
+        };
+      });
+      setError("");
+      if (next.room?.game && next.room.game !== roomGame.current) {
+        const path = GAME_PATH[next.room.game];
+        if (path && window.location.pathname !== path) nav(path);
+      }
+      if (next.room) roomGame.current = next.room.game;
+      else if (!next.light) roomGame.current = null;
+    };
+    let lastFull = 0;
     const tick = async () => {
-      const inRoom = Boolean(snapRef.current.room);
       try {
-        const next = await lobbyApi.sync(token, window.location.pathname, inRoom);
+        abort?.abort();
+        abort = new AbortController();
+        const inRoom = Boolean(snapRef.current.room);
+        const needRoster = !inRoom && Date.now() - lastFull > 2500;
+        const next = needRoster
+          ? await lobbyApi.sync(token, window.location.pathname, false)
+          : await lobbyApi.watch(
+              token,
+              snapRef.current.room?.seq ?? 0,
+              snapRef.current.invites.length,
+              window.location.pathname,
+              abort.signal,
+            );
         if (stop) return;
-        setSnap((prev) => {
-          const light = Boolean(next.light);
-          const room = next.room
-            ? takeRoom(next.room, prev.room)
-            : light
-              ? prev.room
-              : null;
-          if (!room) roomSeq.current = light ? roomSeq.current : 0;
-          return {
-            online: light && !next.online.length ? prev.online : next.online,
-            invites: next.invites,
-            room,
-            store: next.store || prev.store,
-          };
-        });
-        setError("");
-        const g = next.room?.game || null;
-        if (g && g !== roomGame.current) {
-          const path = GAME_PATH[g];
-          if (path && window.location.pathname !== path) nav(path);
-        }
-        roomGame.current = g;
+        if (!next.light) lastFull = Date.now();
+        applySnap(next, inRoom || Boolean(next.light));
       } catch (ex) {
-        if (!stop) setError(ex instanceof Error ? ex.message : "Lobby sync failed");
+        if (stop) return;
+        if (ex instanceof Error && ex.name === "AbortError") return;
+        setError(ex instanceof Error ? ex.message : "Lobby sync failed");
       } finally {
-        if (!stop) timer = window.setTimeout(tick, snapRef.current.room ? 350 : 900);
+        if (!stop) timer = window.setTimeout(tick, 30);
       }
     };
     void tick();
     return () => {
       stop = true;
+      abort?.abort();
       window.clearTimeout(timer);
     };
   }, [token, user, nav]);

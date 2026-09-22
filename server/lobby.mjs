@@ -79,6 +79,69 @@ async function kvSet(key, value, ttlSec) {
   memSet(key, raw, ttlSec);
 }
 
+const waiters = new Map();
+
+function wakeLocal(ids) {
+  for (const id of ids) {
+    const list = waiters.get(id);
+    if (!list?.length) continue;
+    waiters.delete(id);
+    for (const fn of list) fn();
+  }
+}
+
+export async function wakeUsers(ids) {
+  const uniq = [...new Set((ids || []).map(String).filter(Boolean))];
+  if (!uniq.length) return;
+  wakeLocal(uniq);
+  const r = client();
+  if (!r) return;
+  try {
+    const pipe = r.pipeline();
+    for (const id of uniq) {
+      pipe.lpush(`axiom:wakeq:${id}`, "1");
+      pipe.ltrim(`axiom:wakeq:${id}`, 0, 7);
+      pipe.expire(`axiom:wakeq:${id}`, 30);
+    }
+    await pipe.exec();
+  } catch {
+    /* memory */
+  }
+}
+
+export async function waitWake(userId, timeoutMs) {
+  const id = String(userId);
+  const r = client();
+  if (r) {
+    try {
+      const hit = await r.blpop(`axiom:wakeq:${id}`, Math.max(1, Math.ceil(timeoutMs / 1000)));
+      return Boolean(hit);
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(80, timeoutMs)));
+      return false;
+    }
+  }
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      const list = waiters.get(id) || [];
+      waiters.set(
+        id,
+        list.filter((fn) => fn !== onWake),
+      );
+      resolve(ok);
+    };
+    const onWake = () => finish(true);
+    const t = setTimeout(() => finish(false), timeoutMs);
+    const list = waiters.get(id) || [];
+    list.push(onWake);
+    waiters.set(id, list);
+    void t;
+  });
+}
+
 async function kvDel(key) {
   const r = client();
   if (r) {
@@ -334,7 +397,7 @@ async function getRoomRecord(roomId) {
   return readJson(`axiom:room:${roomId}`);
 }
 
-async function saveRoom(room) {
+async function saveRoom(room, opts = {}) {
   const rec = {
     id: room.id,
     game: room.game,
@@ -345,7 +408,8 @@ async function saveRoom(room) {
   };
   await kvSet(`axiom:room:${room.id}`, rec, ROOM_SEC);
   for (const id of room.seats) await kvSet(`axiom:seat:${id}`, room.id, ROOM_SEC);
-  await rememberSeats(room);
+  if (!opts.skipRemember) await rememberSeats(room);
+  await wakeUsers(room.seats);
 }
 
 async function rememberSeats(room) {
@@ -373,6 +437,11 @@ async function attachMods(rec) {
 }
 
 export async function heartbeat(user, href = "", light = false) {
+  await touchPresence(user, href);
+  return snapshot(String(user.id), light);
+}
+
+export async function touchPresence(user, href = "") {
   const id = String(user.id);
   const seat = await getSeat(id);
   const rec = {
@@ -386,8 +455,24 @@ export async function heartbeat(user, href = "", light = false) {
   };
   await kvSet(`axiom:p:${id}`, rec, ONLINE_SEC);
   await sadd("axiom:online", id, ONLINE_SEC + 5);
-  await saveAccount(user);
-  return snapshot(id, light);
+}
+
+export async function watchLobby(user, seq = 0, inviteCount = -1, href = "", timeoutMs = 12000) {
+  const id = String(user.id);
+  const wantSeq = Number(seq) || 0;
+  const wantInv = Number(inviteCount);
+  await touchPresence(user, href);
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const snap = await snapshot(id, true);
+    const roomSeq = snap.room?.seq || 0;
+    if (roomSeq !== wantSeq) return snap;
+    if (wantInv >= 0 && snap.invites.length !== wantInv) return snap;
+    const left = timeoutMs - (Date.now() - started);
+    if (left < 250) break;
+    await waitWake(id, Math.min(left, 4000));
+  }
+  return snapshot(id, true);
 }
 
 export async function snapshot(userId, light = false) {
@@ -460,6 +545,7 @@ export async function createInvite(from, toId, game, meta = {}) {
   await sadd(`axiom:uinv:${fromId}`, id, INVITE_SEC);
   await sadd(`axiom:uinv:${toId}`, id, INVITE_SEC);
   await kvSet(`axiom:invcd:${fromId}`, String(Date.now()), 15);
+  await wakeUsers([toId, fromId]);
   return invite;
 }
 
@@ -470,6 +556,7 @@ export async function respondInvite(user, inviteId, accept, mods) {
   await kvDel(`axiom:inv:${inviteId}`);
   await srem(`axiom:uinv:${invite.fromId}`, inviteId);
   await srem(`axiom:uinv:${invite.toId}`, inviteId);
+  await wakeUsers([invite.fromId, invite.toId]);
   if (!accept) return { ok: true, declined: true };
   if (invite.game === "guandan") {
     return joinGuandanTable(user, invite, mods);
@@ -589,7 +676,7 @@ export async function applyRoomAction(user, roomId, action, mods) {
     }
   }
   room.seq = (room.seq || 0) + 1;
-  await saveRoom(room);
+  await saveRoom(room, { skipRemember: true });
   return publicRoom(room, user.id);
 }
 
@@ -603,6 +690,7 @@ export async function leaveRoom(userId) {
     if (hostLeft || rec.seats.length <= 2) {
       for (const id of rec.seats) await kvDel(`axiom:seat:${id}`);
       await kvDel(`axiom:room:${rid}`);
+      await wakeUsers(rec.seats);
       return snapshot(userId);
     }
     rec.seats = rec.seats.filter((id) => id !== userId);
@@ -624,6 +712,7 @@ export async function leaveRoom(userId) {
   }
   for (const id of rec?.seats || [userId]) await kvDel(`axiom:seat:${id}`);
   await kvDel(`axiom:room:${rid}`);
+  await wakeUsers(rec?.seats || [userId]);
   return snapshot(userId);
 }
 

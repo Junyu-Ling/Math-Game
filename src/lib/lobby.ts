@@ -60,6 +60,10 @@ export const lobbyApi = {
     const q = `href=${encodeURIComponent(href)}${light ? "&light=1" : ""}`;
     return call(token, `/api/lobby?${q}`);
   },
+  watch(token: string, seq: number, invites: number, href = "", signal?: AbortSignal) {
+    const q = `watch=1&seq=${encodeURIComponent(String(seq))}&invites=${encodeURIComponent(String(invites))}&href=${encodeURIComponent(href)}`;
+    return call(token, `/api/lobby?${q}`, { signal });
+  },
   invite(token: string, toId: string, game: string, meta: Record<string, unknown> = {}) {
     return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "invite", toId, game, meta }) });
   },

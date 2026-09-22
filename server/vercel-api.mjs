@@ -25,6 +25,7 @@ import {
   stashVerify,
   takeVerify,
   clearVerify,
+  watchLobby,
 } from "./lobby.mjs";
 import { loadMods } from "./game-mods.mjs";
 
@@ -182,6 +183,14 @@ export async function handle(req, res, path) {
     try {
       const user = authUser(req);
       if (req.method === "GET" || req.method === "HEAD") {
+        if (query(req, "watch") === "1") {
+          send(
+            res,
+            200,
+            await watchLobby(user, Number(query(req, "seq") || 0), Number(query(req, "invites") || -1), query(req, "href")),
+          );
+          return;
+        }
         send(res, 200, await heartbeat(user, query(req, "href"), query(req, "light") === "1"));
         return;
       }

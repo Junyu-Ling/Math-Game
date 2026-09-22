@@ -30,6 +30,7 @@ import {
   respondInvite,
   saveAccount,
   snapshot,
+  watchLobby,
 } from "./lobby.mjs";
 import { loadMods } from "./game-mods.mjs";
 
@@ -482,7 +483,13 @@ app.patch("/api/me/chips", auth, (req, res) => {
 });
 
 app.get("/api/lobby", auth, async (req, res) => {
-  res.json(await heartbeat(req.user, String(req.query.href || ""), String(req.query.light || "") === "1"));
+  const href = String(req.query.href || "");
+  if (String(req.query.watch || "") === "1") {
+    return res.json(
+      await watchLobby(req.user, Number(req.query.seq || 0), Number(req.query.invites ?? -1), href),
+    );
+  }
+  res.json(await heartbeat(req.user, href, String(req.query.light || "") === "1"));
 });
 
 app.post("/api/lobby", auth, async (req, res) => {
