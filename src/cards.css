@@ -1466,8 +1466,30 @@
 .table-flip .center-well {
   flex-direction: column;
   flex-wrap: nowrap;
-  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   padding: 4px 0;
+}
+
+.table-flip .flip-center-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  width: min(100%, 460px);
+}
+
+.table-flip .flip-center-row .deck-stack {
+  flex: 0 0 auto;
+}
+
+.table-flip .flip-center-row .status-line {
+  flex: 1 1 auto;
+  text-align: left;
+  min-width: 0;
+  max-width: 280px;
 }
 
 .table-flip .target-slot {

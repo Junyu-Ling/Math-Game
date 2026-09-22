@@ -130,19 +130,21 @@ export function Flip7Page() {
                 </div>
               </div>
               <div className="center-well">
-                <DeckStack count={state.deck.length} />
-                <div className="status-line">
-                  {state.phase === "over"
-                    ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
-                    : savePlaying
-                      ? "Second Chance!"
-                      : myTurn
-                      ? state.phase === "target"
-                        ? `Choose who gets ${state.pendingAction === "freeze" ? "Freeze" : "Flip Three"} — yourself included.`
-                        : me.pendingFlip3 > 0
-                          ? `Flip Three: ${me.pendingFlip3} flip${me.pendingFlip3 === 1 ? "" : "s"} left.`
-                          : "Flip one card, then the next player. Stay to bank this round."
-                      : `${cur?.name} is acting`}
+                <div className="flip-center-row">
+                  <DeckStack count={state.deck.length} />
+                  <div className="status-line">
+                    {state.phase === "over"
+                      ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+                      : savePlaying
+                        ? "Second Chance!"
+                        : myTurn
+                        ? state.phase === "target"
+                          ? `Choose who gets ${state.pendingAction === "freeze" ? "Freeze" : "Flip Three"} — yourself included.`
+                          : me.pendingFlip3 > 0
+                            ? `Flip Three: ${me.pendingFlip3} flip${me.pendingFlip3 === 1 ? "" : "s"} left.`
+                            : "Flip one card, then the next player. Stay to bank this round."
+                        : `${cur?.name} is acting`}
+                  </div>
                 </div>
                 <div className="target-slot">
                   {myTurn && state.phase === "target" && !savePlaying
