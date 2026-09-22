@@ -829,7 +829,7 @@
   width: var(--tile-w, 56px);
   height: var(--tile-h, 84px);
   flex: 0 0 var(--tile-w, 56px);
-  margin: 28px 10px 14px;
+  margin: 10px 10px;
   border: 2px dashed rgba(230, 194, 122, 0.72);
   border-radius: 7px;
   background: rgba(230, 194, 122, 0.08);
@@ -840,14 +840,6 @@
   border-color: transparent;
   background: transparent;
   pointer-events: none;
-}
-
-.table-coda .gap.slim {
-  width: 12px;
-  flex-basis: 12px;
-  margin-left: 2px;
-  margin-right: 2px;
-  background: rgba(230, 194, 122, 0.12);
 }
 
 .table-coda .gap.ghost {
@@ -1109,11 +1101,6 @@
   .table-coda .tiles-wrap {
     --tile-w: 48px;
     --tile-h: 72px;
-  }
-  .table-coda .gap,
-  .table-coda .gap.on,
-  .table-coda .gap.ghost {
-    margin: 22px 10px 12px;
   }
   .mj.mini {
     --w: 36px;

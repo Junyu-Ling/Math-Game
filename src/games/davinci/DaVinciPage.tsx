@@ -99,7 +99,7 @@ function Row({
         key: `g-${i}`,
         node: (
           <button
-            className={`gap on ${chosen ? "ghost" : "slim"}`}
+            className={`gap on ${chosen ? "ghost" : ""}`}
             type="button"
             onClick={() => onGap?.(i)}
             aria-label="Insert slot"
