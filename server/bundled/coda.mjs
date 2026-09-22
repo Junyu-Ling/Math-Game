@@ -100,6 +100,7 @@ function expireFresh(fresh, ownerId) {
   return next;
 }
 function needsArrangeWait(inserter, pending) {
+  if (!inserter.human) return false;
   return Boolean(pending || inserter.stash);
 }
 function instantInsert(state, pending, resume) {
@@ -621,7 +622,7 @@ function finishRps(state) {
 function playRps(state, you, actorId) {
   if (state.phase !== "rps" || state.rpsReveal) return state;
   const me = actorId ? state.players.find((p) => p.id === actorId) : state.players.find((p) => p.human);
-  const foe = state.players.find((p) => p.id !== me?.id);
+  const foe = state.players.find((p) => p.id !== me?.id && p.human) ?? state.players.find((p) => p.id !== me?.id);
   if (!me || !foe) return state;
   if (state.rpsThrows[me.id]) return state;
   if (!foe.human) {

@@ -12,6 +12,7 @@ import {
   verifyOauthState,
 } from "./github-auth.mjs";
 import {
+  adjustCpu,
   applyRoomAction,
   createInvite,
   findAccountByEmail,
@@ -210,6 +211,12 @@ export async function handle(req, res, path) {
       if (op === "action") {
         const room = await applyRoomAction(user, String(body.roomId || ""), body.action);
         send(res, 200, { room });
+        return;
+      }
+      if (op === "cpu") {
+        const mods = await loadMods();
+        const result = await adjustCpu(user, String(body.game || ""), String(body.mode || "add"), mods, body.meta || {});
+        send(res, 200, { ...(await heartbeat(user)), ...result });
         return;
       }
       if (op === "leave") {

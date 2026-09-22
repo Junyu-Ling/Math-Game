@@ -573,10 +573,10 @@
 
 .table-coda.coda-multi {
   grid-template-columns: minmax(110px, 18%) minmax(0, 1fr) minmax(110px, 18%);
-  grid-template-rows: minmax(120px, 0.9fr) minmax(170px, auto) minmax(150px, 1.15fr);
+  grid-template-rows: minmax(150px, 0.95fr) minmax(170px, auto) minmax(150px, 1.15fr);
 }
 
-.table-coda.coda-multi > .seat-partner { grid-column: 2; grid-row: 1; }
+.table-coda.coda-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: hidden; min-height: 0; }
 .table-coda.coda-multi > .seat-left { grid-column: 1; grid-row: 2; }
 .table-coda.coda-multi > .center-well { grid-column: 2; grid-row: 2; }
 .table-coda.coda-multi > .seat-right { grid-column: 3; grid-row: 2; }
@@ -744,6 +744,16 @@
   justify-content: center;
   gap: 8px;
   margin: 0 0 16px;
+}
+
+.cpu-bar {
+  margin: 0 0 16px;
+}
+
+.cpu-bar p {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  color: #6b7280;
 }
 
 .lobby-roster {
@@ -1049,12 +1059,27 @@
 }
 
 .table-coda .center-well {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  justify-items: stretch;
   height: 200px;
   min-height: 200px;
   max-height: 200px;
   padding: 0;
-  flex-wrap: nowrap;
-  overflow: hidden;
+  gap: 0;
+  overflow: visible;
+}
+
+.table-coda .center-well .coda-center-tools {
+  grid-column: 2;
+  justify-self: center;
+}
+
+.table-coda .center-well .hand-card {
+  grid-column: 3;
+  justify-self: start;
+  padding-left: 16px;
 }
 
 .coda-center-tools {
@@ -1331,7 +1356,7 @@
   grid-template-rows: minmax(100px, auto) minmax(180px, 1fr) minmax(160px, auto);
 }
 
-.table-uno.uno-multi > .seat-partner { grid-column: 2; grid-row: 1; }
+.table-uno.uno-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: hidden; min-height: 0; }
 .table-uno.uno-multi > .seat-left { grid-column: 1; grid-row: 2; }
 .table-uno.uno-multi > .center-well { grid-column: 2; grid-row: 2; }
 .table-uno.uno-multi > .seat-right { grid-column: 3; grid-row: 2; }
@@ -1603,7 +1628,7 @@
   grid-template-rows: minmax(100px, auto) minmax(180px, 1fr) minmax(160px, auto);
 }
 
-.table-flip.flip-multi > .seat-partner { grid-column: 2; grid-row: 1; }
+.table-flip.flip-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: hidden; min-height: 0; }
 .table-flip.flip-multi > .seat-left { grid-column: 1; grid-row: 2; }
 .table-flip.flip-multi > .center-well { grid-column: 2; grid-row: 2; }
 .table-flip.flip-multi > .seat-right { grid-column: 3; grid-row: 2; }
@@ -1684,35 +1709,38 @@
 }
 
 .table-flip .center-well {
-  flex-direction: column;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
+  justify-items: stretch;
+  gap: 12px 0;
   padding: 4px 0;
 }
 
 .table-flip .flip-center-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 22px;
-  width: min(100%, 460px);
+  display: contents;
 }
 
 .table-flip .flip-center-row .deck-stack {
-  flex: 0 0 auto;
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
 }
 
 .table-flip .flip-center-row .status-line {
-  flex: 1 1 auto;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: start;
   text-align: left;
   min-width: 0;
   max-width: 280px;
+  padding-left: 16px;
 }
 
 .table-flip .target-slot {
+  grid-column: 1 / -1;
+  grid-row: 2;
   display: flex;
   gap: 12px;
   justify-content: center;
@@ -1722,20 +1750,33 @@
 }
 
 .table-uno .center-well {
-  flex-direction: column;
-  flex-wrap: nowrap;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  justify-items: center;
+  align-items: center;
+  gap: 12px 0;
   padding: 4px 0;
   position: relative;
 }
 
 .table-uno .center-cards {
+  grid-column: 2;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 22px;
   min-height: 140px;
-  width: 100%;
+  width: auto;
+}
+
+.table-uno .uno-plus-flag,
+.table-uno .uno-plus-burst {
+  grid-column: 2;
+}
+
+.table-uno .uno-center-actions,
+.table-uno .status-line {
+  grid-column: 1 / -1;
 }
 
 .table-uno .seat:first-child .pcards {

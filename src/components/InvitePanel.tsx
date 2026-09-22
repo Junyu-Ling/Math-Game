@@ -31,10 +31,10 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       {store === "memory" ? (
         <p>Lobby is in-memory. Set REDIS_URL in production so accounts can see each other.</p>
       ) : null}
-      {game === "guandan" ? <p>Guandan needs four players. Host invites three people; the deal starts at 4/4.</p> : null}
-      {game === "coda" ? <p>Da Vinci Code is 2–4 players. Everyone picks black/white, then ready. Host can invite more before that.</p> : null}
-      {game === "uno" ? <p>UNO is 2–4 players. Host invites, then starts the deal.</p> : null}
-      {game === "flip7" ? <p>Flip 7 is 1–4 players. Host invites, then starts.</p> : null}
+      {game === "guandan" ? <p>Guandan needs four. Invite people, add CPUs for empty seats, or both. Deal starts at 4/4.</p> : null}
+      {game === "coda" ? <p>Da Vinci Code is 2–4. Mix humans and CPUs, everyone picks black/white, then ready.</p> : null}
+      {game === "uno" ? <p>UNO is 2–4. Mix humans and CPUs, then the host starts.</p> : null}
+      {game === "flip7" ? <p>Flip 7 is 1–4. Mix humans and CPUs, then the host starts.</p> : null}
       {tableWait ? <p>Seated {seated.size}/4.</p> : null}
       {online.length === 0 ? (
         <p>No other accounts yet. Anyone who registers or logs in will appear here, even when they are offline.</p>

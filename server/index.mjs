@@ -21,6 +21,7 @@ import {
   verifyOauthState,
 } from "./github-auth.mjs";
 import {
+  adjustCpu,
   applyRoomAction,
   createInvite,
   heartbeat,
@@ -498,6 +499,11 @@ app.post("/api/lobby", auth, async (req, res) => {
     if (op === "action") {
       const room = await applyRoomAction(req.user, String(req.body.roomId || ""), req.body.action);
       return res.json({ room });
+    }
+    if (op === "cpu") {
+      const mods = await loadMods();
+      const result = await adjustCpu(req.user, String(req.body.game || ""), String(req.body.mode || "add"), mods, req.body.meta || {});
+      return res.json({ ...(await snapshot(req.user.id)), ...result });
     }
     if (op === "leave") {
       return res.json(await leaveRoom(req.user.id));

@@ -13,6 +13,7 @@ type LobbyCtx = {
   invite: (toId: string, game: string, meta?: Record<string, unknown>) => Promise<void>;
   respond: (id: string, accept: boolean) => Promise<void>;
   sendAction: (action: object) => Promise<void>;
+  adjustCpu: (game: string, mode: "add" | "remove" | "fill", meta?: Record<string, unknown>) => Promise<void>;
   leave: () => Promise<void>;
 };
 
@@ -157,6 +158,15 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         setSnap((prev) => ({
           ...prev,
           room: takeRoom(next.room as RoomSnap, prev.room),
+        }));
+      },
+      async adjustCpu(game, mode, meta = {}) {
+        if (!token) throw new Error("Sign in first");
+        const next = await lobbyApi.cpu(token, game, mode, meta);
+        setSnap((prev) => ({
+          ...next,
+          online: next.online?.length ? next.online : prev.online,
+          room: takeRoom(next.room, prev.room),
         }));
       },
       async leave() {

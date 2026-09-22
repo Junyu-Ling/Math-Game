@@ -15,6 +15,7 @@ import {
 import { DeckStack, FlipFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
 import { InvitePanel } from "../../components/InvitePanel";
+import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { wait } from "../../lib/shuffle";
@@ -169,7 +170,7 @@ export function Flip7Page() {
               <h2>{waiting ? `Table ${state?.players.length ?? 0}/4` : "First to 200"}</h2>
               <p>
                 {waiting
-                  ? "1–4 players. Host starts the round when everyone is seated."
+                  ? "1–4 players. Mix humans and CPUs. Host starts when everyone is seated."
                   : "Hit or stay. Freeze and Flip Three can target any active player, including you. Practice solo or with CPUs."}
               </p>
               {waiting && state ? (
@@ -177,7 +178,7 @@ export function Flip7Page() {
                   {state.players.map((p, i) => (
                     <li key={p.id}>
                       <b>{p.name}</b>
-                      <span>{i === 0 ? "host" : "seated"}</span>
+                      <span>{seatTag(p, i, state.players[0]?.id)}</span>
                     </li>
                   ))}
                 </ul>
@@ -191,6 +192,7 @@ export function Flip7Page() {
                   ))}
                 </div>
               ) : null}
+              <MixedCpuBar game="flip7" />
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {waiting ? (
                   host && (state?.players.length ?? 0) >= 1 ? (

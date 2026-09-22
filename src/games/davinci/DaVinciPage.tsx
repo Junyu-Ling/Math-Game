@@ -35,6 +35,7 @@ import { wait } from "../../lib/shuffle";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { InvitePanel } from "../../components/InvitePanel";
+import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 
 type Flash = {
   kind: "hit" | "miss" | "win" | "lose";
@@ -626,17 +627,19 @@ export function DaVinciPage() {
               <h2>{waiting ? `Table ${state?.players.length ?? 0}/4` : matching ? "Invite pending" : "Opening draw"}</h2>
               <p>
                 {waiting
-                  ? "Each player picks how many black and white tiles to start with (4 total), then ready. Game starts when everyone is ready."
+                  ? "Each player picks black and white (4 total), then ready. Add CPUs for empty seats; humans and CPUs can sit together."
                   : matching
                     ? "Waiting for them to accept."
-                    : `2–4 players. Start with ${OPENING} tiles. Sign in to invite; everyone picks their own mix before the deal.`}
+                    : `2–4 players. Mix invited humans with CPUs. Start with ${OPENING} tiles.`}
               </p>
               {waiting && state ? (
                 <ul className="lobby-roster">
-                  {state.players.map((p) => (
+                  {state.players.map((p, i) => (
                     <li key={p.id}>
                       <b>{p.name}</b>
                       <span>
+                        {seatTag(p, i, state.players[0]?.id)}
+                        {" · "}
                         black {p.black ?? 2} · white {p.white ?? 2}
                         {p.ready ? " · ready" : ""}
                       </span>
@@ -694,6 +697,7 @@ export function DaVinciPage() {
                       ))}
                     </div>
                   ) : null}
+                  <MixedCpuBar game="coda" meta={{ useJokers: jokers }} />
                   <div className="row-actions" style={{ justifyContent: "center" }}>
                     {waiting ? (
                       <button className="btn" type="button" disabled={Boolean(you?.ready)} onClick={() => dispatch({ type: "ready" })}>

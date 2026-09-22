@@ -16,6 +16,39 @@ function uid(prefix) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
 }
 
+const CPU_NAMES = ["CPU", "CPU 2", "CPU 3"];
+
+function isCpuId(id) {
+  return /^(cpu|bot|ai)/i.test(String(id || ""));
+}
+
+function humanSeatIds(seats) {
+  return (seats || []).filter((id) => !isCpuId(id));
+}
+
+function isCpuPlayer(p) {
+  return Boolean(p && (p.human === false || isCpuId(p.id)));
+}
+
+function nextCpu(seats) {
+  const used = new Set((seats || []).map(String));
+  let i = 1;
+  while (used.has(`cpu-${i}`)) i += 1;
+  const n = [...used].filter(isCpuId).length;
+  return { id: `cpu-${i}`, name: CPU_NAMES[n] || `CPU ${n + 1}`, human: false };
+}
+
+function peopleFromSeats(rec, extra) {
+  return (rec.seats || []).map((id) => {
+    const existing = rec.state?.players?.find((p) => p.id === id);
+    const cpu = isCpuId(id);
+    if (existing) return { id, name: existing.name, human: !cpu && existing.human !== false };
+    if (extra && extra.id === id) return { id, name: extra.name, human: extra.human !== false && !cpu };
+    if (cpu) return { id, name: "CPU", human: false };
+    return { id, name: "Player", human: true };
+  });
+}
+
 export function lobbyStoreKind() {
   return process.env.REDIS_URL ? "redis" : "memory";
 }
@@ -479,18 +512,18 @@ async function saveRoom(room, opts = {}) {
     try {
       const pipe = r.pipeline();
       pipe.set(`axiom:room:${room.id}`, JSON.stringify(rec), "EX", ROOM_SEC);
-      for (const id of room.seats) pipe.set(`axiom:seat:${id}`, room.id, "EX", ROOM_SEC);
+      for (const id of humanSeatIds(room.seats)) pipe.set(`axiom:seat:${id}`, room.id, "EX", ROOM_SEC);
       await pipe.exec();
     } catch {
       await kvSet(`axiom:room:${room.id}`, rec, ROOM_SEC);
-      for (const id of room.seats) await kvSet(`axiom:seat:${id}`, room.id, ROOM_SEC);
+      for (const id of humanSeatIds(room.seats)) await kvSet(`axiom:seat:${id}`, room.id, ROOM_SEC);
     }
   } else {
     await kvSet(`axiom:room:${room.id}`, rec, ROOM_SEC);
-    for (const id of room.seats) await kvSet(`axiom:seat:${id}`, room.id, ROOM_SEC);
+    for (const id of humanSeatIds(room.seats)) await kvSet(`axiom:seat:${id}`, room.id, ROOM_SEC);
   }
   if (!opts.skipRemember) await rememberSeats(room);
-  await wakeUsers(room.seats);
+  await wakeUsers(humanSeatIds(room.seats));
 }
 
 async function rememberSeats(room) {
@@ -587,6 +620,7 @@ async function expireArrange(room) {
     room.state = room.mods.coda.finishRps(room.state);
   }
   room.endsAt = null;
+  playCpuTurns(room);
   await saveRoom(room);
 }
 
@@ -702,6 +736,7 @@ async function joinOpenTable(user, invite, mods) {
     rec.state = rebuildLobby(rec, joiner, mods);
     if (game === "guandan" && rec.seats.length === 4) {
       rec.state = mods.guandan.startGuandanTable(rec.state.players.map((p) => ({ id: p.id, name: p.name })));
+      playCpuTurns(rec);
     }
     rec.seq = (rec.seq || 0) + 1;
     rec.mods = mods;
@@ -733,11 +768,7 @@ function newLobbyState(game, people, mods, meta) {
 }
 
 function rebuildLobby(rec, joiner, mods) {
-  const people = rec.seats.map((id) => {
-    const existing = rec.state.players.find((p) => p.id === id);
-    if (existing) return { id, name: existing.name };
-    return joiner;
-  });
+  const people = peopleFromSeats(rec, joiner);
   if (rec.game === "guandan") return mods.guandan.startGuandanLobby(people);
   if (rec.game === "uno") return mods.uno.startUnoLobby(people);
   if (rec.game === "flip7") return mods.flip.startFlip7Lobby(people);
@@ -746,11 +777,101 @@ function rebuildLobby(rec, joiner, mods) {
     for (const p of rec.state.players || []) {
       if (!people.some((x) => x.id === p.id)) continue;
       state = mods.coda.applyAction(state, p.id, { type: "pick", black: p.black ?? 2, white: p.white ?? 2 });
-      if (p.ready) state = mods.coda.applyAction(state, p.id, { type: "ready" });
+      if (p.ready && !isCpuId(p.id)) state = mods.coda.applyAction(state, p.id, { type: "ready" });
     }
-    return state;
+    return readyCodaCpus(state, mods);
   }
   return rec.state;
+}
+
+function readyCodaCpus(state, mods) {
+  let next = state;
+  for (const p of next.players || []) {
+    if (!isCpuPlayer(p)) continue;
+    next = mods.coda.applyAction(next, p.id, { type: "pick", black: 2, white: 2 });
+    next = mods.coda.applyAction(next, p.id, { type: "ready" });
+  }
+  return next;
+}
+
+function playCpuTurns(room) {
+  const mods = room.mods;
+  if (!mods || !room.state) return;
+  let guard = 0;
+  while (guard++ < 48) {
+    const s = room.state;
+    if (!s || s.phase === "over" || s.phase === "lobby" || s.phase === "arrange") break;
+
+    if (room.game === "coda") {
+      if (s.phase === "rps" && !s.rpsReveal) {
+        const cpu = s.players.find((p) => isCpuPlayer(p) && !s.rpsThrows?.[p.id]);
+        if (!cpu) break;
+        const hand = ["rock", "paper", "scissors"][Math.floor(Math.random() * 3)];
+        room.state = mods.coda.applyAction(s, cpu.id, { type: "rps", throw: hand });
+        continue;
+      }
+      const cur = s.players[s.turn];
+      if (!isCpuPlayer(cur)) break;
+      if (s.phase === "draw") {
+        room.state = mods.coda.applyAction(s, cur.id, { type: "draw", color: mods.coda.aiDrawColor(s) });
+        continue;
+      }
+      if (s.phase === "guess") {
+        const g = mods.coda.aiGuess(s);
+        if (!g) break;
+        if (!s.selected || s.selected.playerId !== g.playerId || s.selected.index !== g.index) {
+          room.state = mods.coda.applyAction(s, cur.id, { type: "select", playerId: g.playerId, index: g.index });
+          continue;
+        }
+        room.state = mods.coda.applyAction(s, cur.id, { type: "guess", value: g.value });
+        continue;
+      }
+      if (s.phase === "continue") {
+        const keep = mods.coda.aiShouldContinue(s);
+        room.state = mods.coda.applyAction(s, cur.id, { type: keep ? "continue" : "stay" });
+        continue;
+      }
+      break;
+    }
+
+    if (room.game === "uno") {
+      const cur = s.players[s.turn];
+      if (!isCpuPlayer(cur)) break;
+      room.state = mods.uno.applyUnoAction(s, cur.id, mods.uno.aiUno(s));
+      continue;
+    }
+
+    if (room.game === "flip7") {
+      const cur = s.players[s.turn];
+      if (!isCpuPlayer(cur)) break;
+      if (s.phase === "target") {
+        room.state = mods.flip.applyFlipAction(s, cur.id, { type: "target", targetId: mods.flip.aiTarget(s) });
+        continue;
+      }
+      if (s.phase === "action") {
+        room.state = mods.flip.applyFlipAction(s, cur.id, { type: mods.flip.aiDecide(s) });
+        continue;
+      }
+      break;
+    }
+
+    if (room.game === "guandan") {
+      if (s.phase !== "play") break;
+      const cur = s.players[s.turn];
+      if (!cur || !isCpuId(cur.id)) break;
+      try {
+        room.state = mods.guandan.applyGuandanAction(s, cur.id, mods.guandan.guandanBotAct(s, cur.id));
+      } catch {
+        try {
+          room.state = mods.guandan.applyGuandanAction(s, cur.id, { type: "pass" });
+        } catch {
+          break;
+        }
+      }
+      continue;
+    }
+    break;
+  }
 }
 
 const OPEN_TABLES = new Set(["guandan", "coda", "uno", "flip7"]);
@@ -784,6 +905,7 @@ export async function applyRoomAction(user, roomId, action, mods) {
       room.state = mods.guandan.applyGuandanAction(room.state, user.id, action);
     }
   }
+  playCpuTurns(room);
   room.seq = (room.seq || 0) + 1;
   await saveRoom(room, { skipRemember: true });
   return publicRoom(room, user.id);
@@ -796,10 +918,11 @@ export async function leaveRoom(userId) {
   if (rec?.game && OPEN_TABLES.has(rec.game) && rec.state?.phase === "lobby") {
     const hostLeft = rec.seats[0] === userId;
     await kvDel(`axiom:seat:${userId}`);
-    if (hostLeft || rec.seats.length <= 2) {
-      for (const id of rec.seats) await kvDel(`axiom:seat:${id}`);
+    const humansLeft = humanSeatIds(rec.seats).filter((id) => id !== userId);
+    if (hostLeft || humansLeft.length < 1) {
+      for (const id of humanSeatIds(rec.seats)) await kvDel(`axiom:seat:${id}`);
       await kvDel(`axiom:room:${rid}`);
-      await wakeUsers(rec.seats);
+      await wakeUsers(humanSeatIds(rec.seats));
       return snapshot(userId);
     }
     rec.seats = rec.seats.filter((id) => id !== userId);
@@ -844,4 +967,72 @@ function publicRoom(room, viewerId) {
     seq: room.seq || 0,
     view,
   };
+}
+
+export async function adjustCpu(user, game, mode, mods, meta = {}) {
+  mods = mods || (await getMods());
+  game = String(game || "");
+  if (!OPEN_TABLES.has(game)) throw new Error("This game has no open table");
+  const userId = String(user.id);
+  const hostSeat = await getSeat(userId);
+  let rec = hostSeat ? await getRoomRecord(hostSeat) : null;
+  if (rec) rec = { ...rec, mods };
+
+  const add = mode === "add" || mode === "fill";
+  const fill = mode === "fill";
+  if (!rec) {
+    if (!add) throw new Error("No table yet");
+    const host = { id: userId, name: playerName(user), human: true };
+    const cpu = nextCpu([]);
+    const people = [host, cpu];
+    const state = newLobbyState(game, people, mods, meta);
+    rec = {
+      id: uid("room"),
+      game,
+      seats: people.map((p) => p.id),
+      state: game === "coda" ? readyCodaCpus(state, mods) : state,
+      endsAt: null,
+      seq: 1,
+      mods,
+    };
+    if (fill) {
+      while (rec.seats.length < 4) {
+        const extra = nextCpu(rec.seats);
+        rec.seats = [...rec.seats, extra.id];
+        rec.state = rebuildLobby(rec, extra, mods);
+      }
+    }
+    maybeDealGuandan(rec, mods);
+    playCpuTurns(rec);
+    await saveRoom(rec);
+    return { ok: true, room: publicRoom(rec, userId) };
+  }
+
+  if (rec.game !== game) throw new Error("This table is already another game");
+  if (rec.state?.phase !== "lobby") throw new Error("The game already started");
+  if (rec.seats[0] !== userId) throw new Error("Only the host can add CPUs");
+
+  if (add) {
+    const target = fill ? 4 : Math.min(4, rec.seats.length + 1);
+    while (rec.seats.length < target) {
+      const cpu = nextCpu(rec.seats);
+      rec.seats = [...rec.seats, cpu.id];
+      rec.state = rebuildLobby(rec, cpu, mods);
+    }
+  } else {
+    const lastCpu = [...rec.seats].reverse().find((id) => isCpuId(id));
+    if (!lastCpu) throw new Error("No CPU to remove");
+    rec.seats = rec.seats.filter((id) => id !== lastCpu);
+    rec.state = rebuildLobby(rec, null, mods);
+  }
+  maybeDealGuandan(rec, mods);
+  playCpuTurns(rec);
+  rec.seq = (rec.seq || 0) + 1;
+  await saveRoom(rec);
+  return { ok: true, room: publicRoom(rec, userId) };
+}
+
+function maybeDealGuandan(rec, mods) {
+  if (rec.game !== "guandan" || rec.seats.length !== 4 || rec.state?.phase !== "lobby") return;
+  rec.state = mods.guandan.startGuandanTable(rec.state.players.map((p) => ({ id: p.id, name: p.name })));
 }

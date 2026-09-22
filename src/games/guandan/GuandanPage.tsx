@@ -12,6 +12,7 @@ import {
 import { PokerFace } from "../../components/PlayingCard";
 import { GameSetup } from "../../components/GameSetup";
 import { InvitePanel } from "../../components/InvitePanel";
+import { MixedCpuBar } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { wait } from "../../lib/shuffle";
@@ -173,10 +174,11 @@ export function GuandanPage() {
               <GameSetup
                 kicker="GUANDAN"
                 title="Four players. Partners sit across."
-                blurb="Two decks plus jokers, 27 cards each. Invite three online players. The table deals when all four seats are filled. Practice puts you with three CPUs."
+                blurb="Two decks plus jokers, 27 cards each. Invite friends, fill empty seats with CPUs, or both. The table deals at 4/4. Practice puts you with three CPUs."
                 game="guandan"
                 onPractice={() => setLocal(startGuandanPractice())}
               />
+              <MixedCpuBar game="guandan" />
             </div>
           ) : me && left && partner && right ? (
             <>

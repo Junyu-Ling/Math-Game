@@ -16,6 +16,7 @@ import {
 import { DeckStack, UnoColorPick, UnoFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
 import { InvitePanel } from "../../components/InvitePanel";
+import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { wait } from "../../lib/shuffle";
@@ -222,7 +223,7 @@ export function UnoPage() {
               <h2>{waiting ? `Table ${state?.players.length ?? 0}/4` : "Empty your hand"}</h2>
               <p>
                 {waiting
-                  ? "2–4 players. Host starts the deal when everyone is seated."
+                  ? "2–4 players. Mix humans and CPUs. Host starts the deal when at least two are seated."
                   : "Match color, number, or action. Ring the bell before you go down to one card. Miss it and draw two."}
               </p>
               {waiting && state ? (
@@ -230,7 +231,7 @@ export function UnoPage() {
                   {state.players.map((p, i) => (
                     <li key={p.id}>
                       <b>{p.name}</b>
-                      <span>{i === 0 ? "host" : "seated"}</span>
+                      <span>{seatTag(p, i, state.players[0]?.id)}</span>
                     </li>
                   ))}
                 </ul>
@@ -244,6 +245,7 @@ export function UnoPage() {
                   ))}
                 </div>
               ) : null}
+              <MixedCpuBar game="uno" />
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {waiting ? (
                   host && (state?.players.length ?? 0) >= 2 ? (
