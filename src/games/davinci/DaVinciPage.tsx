@@ -837,7 +837,7 @@ export function DaVinciPage() {
             <h3>RULE</h3>
             <ul>
               <li>On your draw, pick black or white. You cannot draw a color that is gone.</li>
-              <li>Opening hand is 4 tiles. Only a drawn dash needs an insert lock.</li>
+              <li>Each color has 0–11 plus one dash. The dash is shuffled in with the numbers, so it is not guaranteed in the opening 4.</li>
               <li>The veil is opening-only. Inserts wait the full 5 seconds even after you pick a slot.</li>
               <li>After the opening 4, play rock-paper-scissors. The loser guesses first.</li>
             </ul>

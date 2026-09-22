@@ -19,29 +19,22 @@ function uid(prefix = "id") {
 var ARRANGE_MS = 5e3;
 var RPS_REVEAL_MS = 3400;
 var OPENING = 4;
-function makeNumberDeck() {
+function makeDeck(useJokers) {
   const tiles = [];
   for (const color of ["black", "white"]) {
     for (let n = 0; n <= 11; n++) {
       tiles.push({ id: uid("t"), color, value: n, revealed: false });
     }
+    if (useJokers) {
+      tiles.push({ id: uid("t"), color, value: "joker", revealed: false });
+    }
   }
   return shuffle(tiles);
-}
-function makeJokers() {
-  return shuffle(
-    ["black", "white"].map((color) => ({
-      id: uid("t"),
-      color,
-      value: "joker",
-      revealed: false
-    }))
-  );
 }
 function takeByColor(deck, color, n) {
   const out = [];
   for (let i = 0; i < n; i++) {
-    const idx = deck.findIndex((t) => t.color === color && t.value !== "joker");
+    const idx = deck.findIndex((t) => t.color === color);
     if (idx < 0) break;
     out.push(deck.splice(idx, 1)[0]);
   }
@@ -124,24 +117,19 @@ function openingSplit(black, white) {
   return { black: b, white: w };
 }
 function pullOpeningJoker(player) {
-  const joker = player.tiles.find((t) => t.value === "joker");
-  const nums = sortOpening(player.tiles.filter((t) => t.value !== "joker"));
-  return { ...player, tiles: nums, stash: joker ?? null };
-}
-function scatterOpeningJokers(you, rival, deck) {
-  for (const joker of makeJokers()) {
-    const roll = Math.floor(Math.random() * 3);
-    const who = roll === 0 ? you : roll === 1 ? rival : null;
-    if (!who || who.tiles.some((t) => t.value === "joker") || who.tiles.length === 0) continue;
-    const i = Math.floor(Math.random() * who.tiles.length);
-    const removed = who.tiles.splice(i, 1)[0];
-    if (removed) deck.push(removed);
-    who.tiles.push(joker);
+  const jokers = player.tiles.filter((t) => t.value === "joker");
+  let nums = player.tiles.filter((t) => t.value !== "joker").sort((a, b) => rank(a) - rank(b));
+  if (!jokers.length) return { ...player, tiles: nums, stash: null };
+  const [stash, ...extras] = jokers;
+  for (const extra of extras) {
+    const slot = Math.floor(Math.random() * (nums.length + 1));
+    nums = [...nums.slice(0, slot), extra, ...nums.slice(slot)];
   }
+  return { ...player, tiles: nums, stash: stash ?? null };
 }
 function startCodaMatch(useJokers, a, b) {
   const base = startCoda(useJokers, a.black, a.white);
-  const deck = makeNumberDeck();
+  const deck = makeDeck(useJokers);
   const aSplit = openingSplit(a.black, a.white);
   const bSplit = openingSplit(b.black, b.white);
   const deal = (seat, n) => ({
@@ -154,7 +142,6 @@ function startCodaMatch(useJokers, a, b) {
   });
   let you = deal(a, aSplit);
   let rival = deal(b, bSplit);
-  if (useJokers) scatterOpeningJokers(you, rival, deck);
   you = pullOpeningJoker(you);
   rival = pullOpeningJoker(rival);
   const wait = Boolean(you.stash || rival.stash);
@@ -185,7 +172,7 @@ function startCodaMatch(useJokers, a, b) {
   };
 }
 function startCoda(useJokers = true, youBlack = 2, youWhite = 2) {
-  const deck = makeNumberDeck();
+  const deck = makeDeck(useJokers);
   const youSplit = openingSplit(youBlack, youWhite);
   const rivalSplit = openingSplit(2, 2);
   const deal = (name, human, b, w) => {
@@ -194,7 +181,6 @@ function startCoda(useJokers = true, youBlack = 2, youWhite = 2) {
   };
   let you = deal("YOU", true, youSplit.black, youSplit.white);
   let rival = deal("RIVAL", false, rivalSplit.black, rivalSplit.white);
-  if (useJokers) scatterOpeningJokers(you, rival, deck);
   you = pullOpeningJoker(you);
   rival = pullOpeningJoker(rival);
   const wait = Boolean(you.stash || rival.stash);

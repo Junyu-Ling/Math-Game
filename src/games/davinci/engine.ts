@@ -58,31 +58,23 @@ export type CodaState = {
   leftByColor?: { black: number; white: number };
 };
 
-function makeNumberDeck(): CodaTile[] {
+function makeDeck(useJokers: boolean): CodaTile[] {
   const tiles: CodaTile[] = [];
   for (const color of ["black", "white"] as const) {
     for (let n = 0; n <= 11; n++) {
       tiles.push({ id: uid("t"), color, value: n, revealed: false });
     }
+    if (useJokers) {
+      tiles.push({ id: uid("t"), color, value: "joker", revealed: false });
+    }
   }
   return shuffle(tiles);
-}
-
-function makeJokers(): CodaTile[] {
-  return shuffle(
-    (["black", "white"] as const).map((color) => ({
-      id: uid("t"),
-      color,
-      value: "joker" as const,
-      revealed: false,
-    })),
-  );
 }
 
 function takeByColor(deck: CodaTile[], color: Color, n: number): CodaTile[] {
   const out: CodaTile[] = [];
   for (let i = 0; i < n; i++) {
-    const idx = deck.findIndex((t) => t.color === color && t.value !== "joker");
+    const idx = deck.findIndex((t) => t.color === color);
     if (idx < 0) break;
     out.push(deck.splice(idx, 1)[0]!);
   }
@@ -175,21 +167,15 @@ function openingSplit(black: number, white: number): { black: number; white: num
 }
 
 function pullOpeningJoker(player: CodaPlayer): CodaPlayer {
-  const joker = player.tiles.find((t) => t.value === "joker");
-  const nums = sortOpening(player.tiles.filter((t) => t.value !== "joker"));
-  return { ...player, tiles: nums, stash: joker ?? null };
-}
-
-function scatterOpeningJokers(you: CodaPlayer, rival: CodaPlayer, deck: CodaTile[]) {
-  for (const joker of makeJokers()) {
-    const roll = Math.floor(Math.random() * 3);
-    const who = roll === 0 ? you : roll === 1 ? rival : null;
-    if (!who || who.tiles.some((t) => t.value === "joker") || who.tiles.length === 0) continue;
-    const i = Math.floor(Math.random() * who.tiles.length);
-    const removed = who.tiles.splice(i, 1)[0];
-    if (removed) deck.push(removed);
-    who.tiles.push(joker);
+  const jokers = player.tiles.filter((t) => t.value === "joker");
+  let nums = player.tiles.filter((t) => t.value !== "joker").sort((a, b) => rank(a) - rank(b));
+  if (!jokers.length) return { ...player, tiles: nums, stash: null };
+  const [stash, ...extras] = jokers;
+  for (const extra of extras) {
+    const slot = Math.floor(Math.random() * (nums.length + 1));
+    nums = [...nums.slice(0, slot), extra, ...nums.slice(slot)];
   }
+  return { ...player, tiles: nums, stash: stash ?? null };
 }
 
 export function startCodaMatch(
@@ -198,7 +184,7 @@ export function startCodaMatch(
   b: { id: string; name: string; black: number; white: number },
 ): CodaState {
   const base = startCoda(useJokers, a.black, a.white);
-  const deck = makeNumberDeck();
+  const deck = makeDeck(useJokers);
   const aSplit = openingSplit(a.black, a.white);
   const bSplit = openingSplit(b.black, b.white);
   const deal = (seat: { id: string; name: string }, n: { black: number; white: number }): CodaPlayer => ({
@@ -211,7 +197,6 @@ export function startCodaMatch(
   });
   let you = deal(a, aSplit);
   let rival = deal(b, bSplit);
-  if (useJokers) scatterOpeningJokers(you, rival, deck);
   you = pullOpeningJoker(you);
   rival = pullOpeningJoker(rival);
   const wait = Boolean(you.stash || rival.stash);
@@ -243,7 +228,7 @@ export function startCodaMatch(
 }
 
 export function startCoda(useJokers = true, youBlack = 2, youWhite = 2): CodaState {
-  const deck = makeNumberDeck();
+  const deck = makeDeck(useJokers);
   const youSplit = openingSplit(youBlack, youWhite);
   const rivalSplit = openingSplit(2, 2);
   const deal = (name: string, human: boolean, b: number, w: number): CodaPlayer => {
@@ -252,7 +237,6 @@ export function startCoda(useJokers = true, youBlack = 2, youWhite = 2): CodaSta
   };
   let you = deal("YOU", true, youSplit.black, youSplit.white);
   let rival = deal("RIVAL", false, rivalSplit.black, rivalSplit.white);
-  if (useJokers) scatterOpeningJokers(you, rival, deck);
   you = pullOpeningJoker(you);
   rival = pullOpeningJoker(rival);
   const wait = Boolean(you.stash || rival.stash);
