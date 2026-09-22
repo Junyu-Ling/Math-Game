@@ -31,6 +31,8 @@ export function Flip7Page() {
   const cur = state ? currentFlip(state) : null;
   const myTurn = Boolean(state && me && cur?.id === me.id && state.phase !== "over");
 
+  const burst = state?.burst ?? null;
+
   useEffect(() => {
     if (room) setLocal(null);
   }, [room]);
@@ -86,13 +88,14 @@ export function Flip7Page() {
             <GameSetup
               kicker="FLIP 7"
               title="First to 200"
-              blurb="Hit or stay. Freeze and Flip Three can target any active player, including you. Second Chance sits in front of you and saves one duplicate bust."
+              blurb="Hit or stay. Freeze and Flip Three can target any active player, including you. Second Chance saves one duplicate bust — it cannot block Freeze."
               game="flip7"
               onPractice={() => setLocal(startFlip7())}
             />
           ) : (
             <>
               <div className="seat">
+                {burst?.playerId === rival.id ? <FlipBoom key={burst.id} /> : null}
                 <div className="seat-label">
                   {rival.name} · {rival.total} PTS · {rival.status.toUpperCase()}
                   {rival.area.some((c) => c.kind === "chance") ? " · 2ND CHANCE" : ""}
@@ -126,6 +129,7 @@ export function Flip7Page() {
                   : null}
               </div>
               <div className="seat">
+                {burst?.playerId === me.id ? <FlipBoom key={burst.id} /> : null}
                 <div className="seat-label">
                   {me.name} · round {areaScore(me.area).score} · total {me.total}
                   {me.area.some((c) => c.kind === "chance") ? " · 2ND CHANCE" : ""}
@@ -151,6 +155,50 @@ export function Flip7Page() {
         </div>
         <InvitePanel game="flip7" />
       </div>
+    </div>
+  );
+}
+
+function FlipBoom() {
+  return (
+    <div className="flip-boom" aria-hidden>
+      <span className="flip-boom-spark" />
+      <span className="flip-boom-spark" />
+      <span className="flip-boom-spark" />
+      <span className="flip-boom-spark" />
+      <span className="flip-boom-spark" />
+      <span className="flip-boom-spark" />
+      <svg className="flip-boom-cloud" viewBox="0 0 240 240">
+        <path
+          fill="#1a120c"
+          d="M118 18l18 38 42-20-8 44 46 6-38 28 34 36-48-4-10 46-30-38-40 28 8-48-46-8 42-26-28-42 48 10z"
+        />
+        <path
+          fill="#ff7a18"
+          d="M120 34l14 32 36-16-6 36 38 6-32 22 28 30-40-2-8 38-26-32-34 22 8-40-38-8 36-22-24-34 40 8z"
+        />
+        <path
+          fill="#ffd23a"
+          d="M122 52l10 26 28-12-4 28 30 4-26 18 22 24-32-2-6 30-20-26-26 16 6-32-30-6 28-18-18-28 32 6z"
+        />
+        <ellipse cx="86" cy="128" rx="34" ry="28" fill="#fff4c8" />
+        <ellipse cx="154" cy="122" rx="30" ry="26" fill="#ffe9a0" />
+        <ellipse cx="120" cy="150" rx="36" ry="24" fill="#f4d27a" />
+        <ellipse cx="70" cy="96" rx="18" ry="14" fill="#2b2118" opacity="0.85" />
+        <ellipse cx="176" cy="88" rx="16" ry="13" fill="#2b2118" opacity="0.8" />
+        <text
+          x="120"
+          y="138"
+          textAnchor="middle"
+          fill="#1a120c"
+          fontFamily="Nunito,Arial Black,sans-serif"
+          fontWeight="900"
+          fontSize="36"
+          letterSpacing="2"
+        >
+          BOOM
+        </text>
+      </svg>
     </div>
   );
 }

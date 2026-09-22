@@ -73,6 +73,7 @@ function startFlip7Duel(a, b) {
     lastCard: null,
     winnerId: null,
     goal: 200,
+    burst: null,
     log: [{ id: uid("l"), text: `${a.name} vs ${b.name}. Hit / Stay. First to 200.` }]
   };
 }
@@ -134,6 +135,7 @@ function hit(state) {
     }
     next = withPlayer(next, me.id, (p) => ({ ...p, area: [], status: "bust", pendingFlip3: 0 }));
     next.discard = [...next.discard, ...me.area, card];
+    next.burst = { playerId: me.id, id: uid("boom") };
     next.log = [...next.log, { id: uid("l"), text: `${me.name} busts (duplicate ${card.value}). Round scores 0.`, tone: "bad" }];
     return advance(next);
   }
@@ -203,6 +205,7 @@ function applyTarget(state, targetId) {
   let next = state;
   if (action === "freeze") {
     const scored = areaScore(target.area).score;
+    const hadChance = hasSecondChance(target.area);
     next = withPlayer(next, target.id, (p) => ({
       ...p,
       pendingFreeze: false,
@@ -216,7 +219,7 @@ function applyTarget(state, targetId) {
       ...next.log,
       {
         id: uid("l"),
-        text: onSelf ? `${me.name} freezes themselves and banks +${scored}.` : `${me.name} freezes ${target.name} \xB7 +${scored}.`
+        text: `${onSelf ? `${me.name} freezes themselves and banks +${scored}.` : `${me.name} freezes ${target.name} \xB7 +${scored}.`}${hadChance ? " Second Chance cannot block Freeze." : ""}`
       }
     ];
   } else {

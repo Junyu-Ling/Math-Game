@@ -35,6 +35,7 @@ export type FlipState = {
   winnerId: string | null;
   log: FlipLog[];
   goal: number;
+  burst: { playerId: string; id: string } | null;
 };
 
 function deckBuild(): FlipCard[] {
@@ -97,6 +98,7 @@ export function startFlip7Duel(a: { id: string; name: string }, b: { id: string;
     lastCard: null,
     winnerId: null,
     goal: 200,
+    burst: null,
     log: [{ id: uid("l"), text: `${a.name} vs ${b.name}. Hit / Stay. First to 200.` }],
   };
 }
@@ -167,6 +169,7 @@ export function hit(state: FlipState): FlipState {
     }
     next = withPlayer(next, me.id, (p) => ({ ...p, area: [], status: "bust", pendingFlip3: 0 }));
     next.discard = [...next.discard, ...me.area, card];
+    next.burst = { playerId: me.id, id: uid("boom") };
     next.log = [...next.log, { id: uid("l"), text: `${me.name} busts (duplicate ${card.value}). Round scores 0.`, tone: "bad" }];
     return advance(next);
   }
@@ -242,6 +245,7 @@ export function applyTarget(state: FlipState, targetId: string): FlipState {
   let next = state;
   if (action === "freeze") {
     const scored = areaScore(target.area).score;
+    const hadChance = hasSecondChance(target.area);
     next = withPlayer(next, target.id, (p) => ({
       ...p,
       pendingFreeze: false,
@@ -255,9 +259,9 @@ export function applyTarget(state: FlipState, targetId: string): FlipState {
       ...next.log,
       {
         id: uid("l"),
-        text: onSelf
-          ? `${me.name} freezes themselves and banks +${scored}.`
-          : `${me.name} freezes ${target.name} · +${scored}.`,
+        text: `${
+          onSelf ? `${me.name} freezes themselves and banks +${scored}.` : `${me.name} freezes ${target.name} · +${scored}.`
+        }${hadChance ? " Second Chance cannot block Freeze." : ""}`,
       },
     ];
   } else {
