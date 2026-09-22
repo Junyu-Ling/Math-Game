@@ -15,13 +15,17 @@ import {
   triedOnTile,
   setPendingSlot,
   playRps,
+  finishRps,
   startCoda,
   stay,
   OPENING,
+  RPS_REVEAL_MS,
   type CodaAction,
   type CodaState,
   type CodaTile,
   type CodaValue,
+  type RpsReveal,
+  type RpsThrow,
 } from "./engine";
 import { MahjongTile } from "../../components/MahjongTile";
 import { DeckStack } from "../../components/PlayingCard";
@@ -43,7 +47,7 @@ function statusText(state: CodaState, myTurn: boolean, remain: number, matching:
     return w ? `${w.name} wins` : "Game over";
   }
   if (state.phase === "rps") {
-    return "Rock-paper-scissors. The loser draws first, then guesses.";
+    return "石头剪刀布. The loser guesses first.";
   }
   if (state.phase === "arrange") {
     if (state.resume === "draw") {
@@ -192,6 +196,91 @@ const BURST: Record<Flash["kind"], { title: string; sub: string }> = {
   lose: { title: "You lose", sub: "All of your tiles are open." },
 };
 
+const RPS_CHOICES: { id: RpsThrow; label: string; hint: string }[] = [
+  { id: "rock", label: "石头", hint: "Rock" },
+  { id: "scissors", label: "剪刀", hint: "Scissors" },
+  { id: "paper", label: "布", hint: "Paper" },
+];
+
+const RPS_CHANT = ["", "石头", "剪刀", "布"] as const;
+
+function rpsWinsThrow(a: RpsThrow, b: RpsThrow): boolean {
+  return (a === "rock" && b === "scissors") || (a === "paper" && b === "rock") || (a === "scissors" && b === "paper");
+}
+
+function HandShape({ kind }: { kind: "fist" | RpsThrow }) {
+  const pose = kind === "fist" ? "rock" : kind;
+  return (
+    <svg className="rps-svg" viewBox="0 0 140 140" aria-hidden>
+      {pose === "rock" ? (
+        <g fill="#f3c7a8" stroke="#c48a62" strokeWidth="4" strokeLinejoin="round">
+          <ellipse cx="72" cy="86" rx="36" ry="30" />
+          <rect x="44" y="42" width="18" height="48" rx="9" />
+          <rect x="62" y="34" width="18" height="54" rx="9" />
+          <rect x="80" y="36" width="18" height="52" rx="9" />
+          <rect x="98" y="46" width="16" height="42" rx="8" />
+          <ellipse cx="40" cy="80" rx="16" ry="13" />
+        </g>
+      ) : pose === "paper" ? (
+        <g fill="#f3c7a8" stroke="#c48a62" strokeWidth="4" strokeLinejoin="round">
+          <rect x="38" y="58" width="64" height="52" rx="16" />
+          <rect x="40" y="18" width="14" height="52" rx="7" />
+          <rect x="56" y="10" width="14" height="58" rx="7" />
+          <rect x="72" y="12" width="14" height="56" rx="7" />
+          <rect x="88" y="20" width="14" height="50" rx="7" />
+          <ellipse cx="34" cy="86" rx="14" ry="12" transform="rotate(-28 34 86)" />
+        </g>
+      ) : (
+        <g fill="#f3c7a8" stroke="#c48a62" strokeWidth="4" strokeLinejoin="round">
+          <ellipse cx="70" cy="96" rx="34" ry="26" />
+          <rect x="48" y="14" width="16" height="70" rx="8" transform="rotate(-12 56 49)" />
+          <rect x="76" y="14" width="16" height="70" rx="8" transform="rotate(12 84 49)" />
+          <rect x="42" y="72" width="18" height="28" rx="8" />
+          <rect x="80" y="72" width="16" height="26" rx="8" />
+          <ellipse cx="36" cy="92" rx="14" ry="11" />
+        </g>
+      )}
+    </svg>
+  );
+}
+
+function RpsHand({
+  kind,
+  side,
+  pose,
+  won,
+}: {
+  kind: "fist" | RpsThrow;
+  side: "you" | "rival";
+  pose: "idle" | "pump" | "show";
+  won?: boolean | null;
+}) {
+  const winClass = won === true ? " win" : won === false ? " lose" : "";
+  return (
+    <div className={`rps-hand ${side} ${pose}${winClass}`}>
+      <HandShape kind={kind} />
+    </div>
+  );
+}
+
+function rpsCaption(
+  reveal: RpsReveal | null,
+  myThrow: RpsThrow | undefined,
+  waiting: boolean,
+  shown: boolean,
+  youId: string,
+): string {
+  if (reveal && shown) {
+    if (reveal.a === reveal.b) return "平局，再出一次";
+    const youThrow = reveal.aId === youId ? reveal.a : reveal.b;
+    const foeThrow = reveal.aId === youId ? reveal.b : reveal.a;
+    return rpsWinsThrow(youThrow, foeThrow) ? "你赢了，对方先猜" : "你输了，你先猜";
+  }
+  if (reveal) return "出拳";
+  if (waiting && myThrow) return "已出拳，等对方";
+  return "出拳。输的人先猜。";
+}
+
 export function DaVinciPage() {
   const { user } = useAuth();
   const lobby = useLobby();
@@ -203,6 +292,7 @@ export function DaVinciPage() {
   const [remain, setRemain] = useState(ARRANGE_MS / 1000);
   const [flash, setFlash] = useState<Flash | null>(null);
   const [youId, setYouId] = useState<string | null>(null);
+  const [rpsBeat, setRpsBeat] = useState(0);
   const endsAtRef = useRef<number | null>(null);
   const prevLog = useRef(0);
   const online = Boolean(codaRoom);
@@ -248,6 +338,28 @@ export function DaVinciPage() {
     else if (action.type === "slot") setState((s) => (s ? setPendingSlot(s, action.index, you?.id) : s));
     else if (action.type === "rps") setState((s) => (s ? playRps(s, action.throw, you?.id) : s));
   }
+
+  useEffect(() => {
+    if (!state?.rpsReveal) {
+      setRpsBeat(0);
+      return;
+    }
+    setRpsBeat(1);
+    const t1 = window.setTimeout(() => setRpsBeat(2), 520);
+    const t2 = window.setTimeout(() => setRpsBeat(3), 1040);
+    const t3 = window.setTimeout(() => setRpsBeat(4), 1560);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+    };
+  }, [state?.rpsReveal]);
+
+  useEffect(() => {
+    if (!state?.rpsReveal || online) return;
+    const t = window.setTimeout(() => setState((s) => (s ? finishRps(s) : s)), RPS_REVEAL_MS);
+    return () => window.clearTimeout(t);
+  }, [state?.rpsReveal, online]);
 
   useEffect(() => {
     if (!arranging) return;
@@ -330,6 +442,21 @@ export function DaVinciPage() {
   const selectedTried = new Set(
     playing && state?.selected ? triedOnTile(state, state.selected.playerId, state.selected.index) : [],
   );
+  const rpsReveal = state?.rpsReveal ?? null;
+  const myRpsThrow = you ? state?.rpsThrows[you.id] : undefined;
+  const rpsShown = rpsBeat >= 4 && Boolean(rpsReveal);
+  const rpsPumping = rpsBeat >= 1 && rpsBeat <= 3 && Boolean(rpsReveal);
+  const rpsPose = rpsPumping ? "pump" : rpsShown ? "show" : "idle";
+  const youRpsKind: "fist" | RpsThrow =
+    rpsShown && rpsReveal && you ? (rpsReveal.aId === you.id ? rpsReveal.a : rpsReveal.b) : "fist";
+  const rivalRpsKind: "fist" | RpsThrow =
+    rpsShown && rpsReveal && rival ? (rpsReveal.aId === rival.id ? rpsReveal.a : rpsReveal.b) : "fist";
+  const youRpsWon =
+    rpsShown && rpsReveal && rpsReveal.a !== rpsReveal.b && youRpsKind !== "fist" && rivalRpsKind !== "fist"
+      ? rpsWinsThrow(youRpsKind, rivalRpsKind)
+      : null;
+  const rpsChant = rpsPumping ? RPS_CHANT[rpsBeat] : "vs";
+  const rpsLocked = Boolean(myRpsThrow || rpsReveal);
 
   function setBlack(n: number) {
     const black = Math.max(0, Math.min(OPENING, n));
@@ -575,24 +702,47 @@ export function DaVinciPage() {
             </div>
           </div>
 
-          {rpsing ? (
+          {rpsing && you && rival && state ? (
             <div className="coda-deal coda-rps">
-              <p className="kicker">FIRST MOVE</p>
-              <h2>Rock paper scissors</h2>
-              <p>The loser draws one tile, then guessing starts.</p>
+              <p className="kicker">石头剪刀布</p>
+              <div className="rps-arena">
+                <div className="rps-side rival">
+                  <span className="rps-name">{rival.name}</span>
+                  <RpsHand
+                    key={`rival-${rpsBeat}-${rivalRpsKind}`}
+                    kind={rivalRpsKind}
+                    side="rival"
+                    pose={rpsPose}
+                    won={youRpsWon === null ? null : !youRpsWon}
+                  />
+                </div>
+                <div key={rpsBeat} className={`rps-mid${rpsPumping ? " chant" : ""}`} aria-live="polite">
+                  {rpsChant}
+                </div>
+                <div className="rps-side you">
+                  <RpsHand
+                    key={`you-${rpsBeat}-${youRpsKind}`}
+                    kind={youRpsKind}
+                    side="you"
+                    pose={rpsPose}
+                    won={youRpsWon}
+                  />
+                  <span className="rps-name">{you.name}</span>
+                </div>
+              </div>
+              <p>{rpsCaption(rpsReveal, myRpsThrow, rpsLocked, rpsShown, you.id)}</p>
               <div className="rps-row">
-                {([
-                  ["rock", "Rock"],
-                  ["scissors", "Scissors"],
-                  ["paper", "Paper"],
-                ] as const).map(([id, label]) => (
+                {RPS_CHOICES.map((c) => (
                   <button
-                    key={id}
-                    className="btn btn-ghost"
+                    key={c.id}
+                    className={`rps-pick${myRpsThrow === c.id ? " on" : ""}`}
                     type="button"
-                    onClick={() => dispatch({ type: "rps", throw: id })}
+                    disabled={rpsLocked}
+                    onClick={() => dispatch({ type: "rps", throw: c.id })}
                   >
-                    {label}
+                    <HandShape kind={c.id} />
+                    <b>{c.label}</b>
+                    <span>{c.hint}</span>
                   </button>
                 ))}
               </div>
@@ -689,7 +839,7 @@ export function DaVinciPage() {
               <li>On your draw, pick black or white. You cannot draw a color that is gone.</li>
               <li>Opening hand is 4 tiles. Only a drawn dash needs an insert lock.</li>
               <li>The veil is opening-only. Inserts wait the full 5 seconds even after you pick a slot.</li>
-              <li>After the opening 4, play RPS. The loser draws first, then guesses.</li>
+              <li>After the opening 4, throw 石头剪刀布. The loser guesses first.</li>
             </ul>
           </div>
           <div>

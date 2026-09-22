@@ -17,6 +17,7 @@ function uid(prefix = "id") {
 
 // src/games/davinci/engine.ts
 var ARRANGE_MS = 5e3;
+var RPS_REVEAL_MS = 3400;
 var OPENING = 4;
 function makeNumberDeck() {
   const tiles = [];
@@ -91,6 +92,7 @@ function emptyArrange() {
     frozenRival: null,
     resume: null,
     rpsThrows: {},
+    rpsReveal: null,
     stashSlots: {}
   };
 }
@@ -172,11 +174,12 @@ function startCodaMatch(useJokers, a, b) {
     frozenRival: wait ? rival.tiles.map((t) => ({ ...t })) : null,
     resume: wait ? "draw" : null,
     rpsThrows: {},
+    rpsReveal: null,
     stashSlots,
     log: [
       {
         id: uid("l"),
-        text: wait ? "Online opening: if anyone drew a dash, arrange for 5 seconds." : "Online opening of 4 tiles in hand. RPS decides who starts."
+        text: wait ? "Online opening: if anyone drew a dash, arrange for 5 seconds." : "Online opening of 4 tiles in hand. RPS \u2014 loser guesses first."
       }
     ]
   };
@@ -214,12 +217,13 @@ function startCoda(useJokers = true, youBlack = 2, youWhite = 2) {
     frozenRival: wait ? rival.tiles.map((t) => ({ ...t })) : null,
     resume: wait ? "draw" : null,
     rpsThrows: {},
+    rpsReveal: null,
     stashSlots,
     tried: {},
     log: [
       {
         id: uid("l"),
-        text: you.stash ? "Opening dash drawn. Insert, still 4 tiles, then lock." : wait ? "Opening 4 in hand. Rival drew a dash. Arrange, then RPS." : "Opening 4 in hand, no dash. RPS decides who starts."
+        text: you.stash ? "Opening dash drawn. Insert, still 4 tiles, then lock." : wait ? "Opening 4 in hand. Rival drew a dash. Arrange, then RPS." : "Opening 4 in hand, no dash. RPS \u2014 loser guesses first."
       }
     ]
   };
@@ -494,23 +498,32 @@ function finishArrange(state) {
   return {
     ...next,
     phase: "rps",
-    log: [...next.log, { id: uid("l"), text: "Arrange done. Tiles locked. RPS \u2014 loser draws first." }]
+    log: [...next.log, { id: uid("l"), text: "Arrange done. Tiles locked. RPS \u2014 loser guesses first." }]
   };
 }
 var RPS_LABEL = { rock: "rock", paper: "paper", scissors: "scissors" };
 function rpsWins(a, b) {
   return a === "rock" && b === "scissors" || a === "paper" && b === "rock" || a === "scissors" && b === "paper";
 }
-function resolveRps(state, aId, a, bId, b) {
+function beginRpsReveal(state, aId, a, bId, b) {
+  return {
+    ...state,
+    rpsThrows: { [aId]: a, [bId]: b },
+    rpsReveal: { aId, a, bId, b }
+  };
+}
+function finishRps(state) {
+  if (state.phase !== "rps" || !state.rpsReveal) return state;
+  const { aId, a, bId, b } = state.rpsReveal;
   if (a === b) {
     return {
       ...state,
       rpsThrows: {},
-      log: [...state.log, { id: uid("l"), text: `Tie, both ${RPS_LABEL[a]}. Again.` }]
+      rpsReveal: null,
+      log: [...state.log, { id: uid("l"), text: `Tie, both ${RPS_LABEL[a]}. Throw again.` }]
     };
   }
-  const aWins = rpsWins(a, b);
-  const loserId = aWins ? bId : aId;
+  const loserId = rpsWins(a, b) ? bId : aId;
   const loserTurn = state.players.findIndex((p) => p.id === loserId);
   return {
     ...state,
@@ -519,34 +532,35 @@ function resolveRps(state, aId, a, bId, b) {
     drawn: null,
     selected: null,
     rpsThrows: {},
+    rpsReveal: null,
     log: [
       ...state.log,
       {
         id: uid("l"),
-        text: `${state.players.find((p) => p.id === aId)?.name} plays ${RPS_LABEL[a]}, ${state.players.find((p) => p.id === bId)?.name} plays ${RPS_LABEL[b]}. Loser draws first.`
+        text: `${state.players.find((p) => p.id === aId)?.name} ${RPS_LABEL[a]} vs ${state.players.find((p) => p.id === bId)?.name} ${RPS_LABEL[b]}. Loser guesses first.`
       }
     ]
   };
 }
 function playRps(state, you, actorId) {
-  if (state.phase !== "rps") return state;
+  if (state.phase !== "rps" || state.rpsReveal) return state;
   const me = actorId ? state.players.find((p) => p.id === actorId) : state.players.find((p) => p.human);
   const foe = state.players.find((p) => p.id !== me?.id);
   if (!me || !foe) return state;
+  if (state.rpsThrows[me.id]) return state;
   if (!foe.human) {
     const ai = ["rock", "paper", "scissors"][Math.floor(Math.random() * 3)];
-    return resolveRps(state, me.id, you, foe.id, ai);
+    return beginRpsReveal(state, me.id, you, foe.id, ai);
   }
-  const mine = you;
   const theirs = state.rpsThrows[foe.id];
   if (!theirs) {
     return {
       ...state,
-      rpsThrows: { ...state.rpsThrows, [me.id]: mine },
-      log: [...state.log, { id: uid("l"), text: `${me.name} has thrown. Waiting.` }]
+      rpsThrows: { ...state.rpsThrows, [me.id]: you },
+      log: [...state.log, { id: uid("l"), text: `${me.name} is ready. Waiting for the other hand.` }]
     };
   }
-  return resolveRps({ ...state, rpsThrows: { ...state.rpsThrows, [me.id]: mine } }, me.id, mine, foe.id, theirs);
+  return beginRpsReveal({ ...state, rpsThrows: { ...state.rpsThrows, [me.id]: you } }, me.id, you, foe.id, theirs);
 }
 function placeDrawn(state, index) {
   return setPendingSlot(state, index);
@@ -635,7 +649,8 @@ function viewFor(state, viewerId) {
       black: state.deck.filter((t) => t.color === "black").length,
       white: state.deck.filter((t) => t.color === "white").length
     },
-    rpsThrows: {},
+    rpsThrows: state.rpsReveal ? { [state.rpsReveal.aId]: state.rpsReveal.a, [state.rpsReveal.bId]: state.rpsReveal.b } : state.rpsThrows[viewerId] ? { [viewerId]: state.rpsThrows[viewerId] } : {},
+    rpsReveal: state.rpsReveal,
     stashSlots: state.stashSlots[viewerId] !== void 0 ? { [viewerId]: state.stashSlots[viewerId] } : {},
     pendingSlot: me.id === viewerId ? state.pendingSlot : null,
     humanDraft: me.id === viewerId ? state.humanDraft : null,
@@ -651,6 +666,7 @@ function viewFor(state, viewerId) {
 export {
   ARRANGE_MS,
   OPENING,
+  RPS_REVEAL_MS,
   aiDrawColor,
   aiGuess,
   applyAction,
@@ -659,6 +675,7 @@ export {
   deckCounts,
   drawCard,
   finishArrange,
+  finishRps,
   formatTile,
   guessTile,
   insertIndices,

@@ -501,7 +501,11 @@ export async function snapshot(userId, light = false) {
 
 async function expireArrange(room) {
   if (room.game !== "coda" || !room.endsAt || Date.now() < room.endsAt) return;
-  room.state = room.mods.coda.finishArrange(room.state);
+  if (room.state.phase === "arrange") {
+    room.state = room.mods.coda.finishArrange(room.state);
+  } else if (room.state.rpsReveal && room.mods.coda.finishRps) {
+    room.state = room.mods.coda.finishRps(room.state);
+  }
   room.endsAt = null;
   await saveRoom(room);
 }
@@ -659,6 +663,8 @@ export async function applyRoomAction(user, roomId, action, mods) {
     room.state = mods.coda.applyAction(room.state, user.id, action);
     if (room.state.phase === "arrange" && before.phase !== "arrange") {
       room.endsAt = Date.now() + mods.coda.ARRANGE_MS;
+    } else if (room.state.rpsReveal && !before.rpsReveal) {
+      room.endsAt = Date.now() + (mods.coda.RPS_REVEAL_MS || 2800);
     }
   } else if (room.game === "flip7") {
     room.state = mods.flip.applyFlipAction(room.state, user.id, action);

@@ -25,7 +25,15 @@ export type CodaPhase = "arrange" | "rps" | "draw" | "guess" | "continue" | "ove
 export type RpsThrow = "rock" | "paper" | "scissors";
 
 export const ARRANGE_MS = 5000;
+export const RPS_REVEAL_MS = 3400;
 export const OPENING = 4;
+
+export type RpsReveal = {
+  aId: string;
+  a: RpsThrow;
+  bId: string;
+  b: RpsThrow;
+};
 
 export type CodaState = {
   players: CodaPlayer[];
@@ -44,6 +52,7 @@ export type CodaState = {
   frozenRival: CodaTile[] | null;
   resume: "draw" | "next" | null;
   rpsThrows: Partial<Record<string, RpsThrow>>;
+  rpsReveal: RpsReveal | null;
   stashSlots: Partial<Record<string, number>>;
   tried: Record<string, CodaValue[]>;
   leftByColor?: { black: number; white: number };
@@ -130,6 +139,7 @@ function emptyArrange() {
     frozenRival: null as CodaTile[] | null,
     resume: null as "draw" | "next" | null,
     rpsThrows: {} as Partial<Record<string, RpsThrow>>,
+    rpsReveal: null as RpsReveal | null,
     stashSlots: {} as Partial<Record<string, number>>,
   };
 }
@@ -221,11 +231,12 @@ export function startCodaMatch(
     frozenRival: wait ? rival.tiles.map((t) => ({ ...t })) : null,
     resume: wait ? "draw" : null,
     rpsThrows: {},
+    rpsReveal: null,
     stashSlots,
     log: [
       {
         id: uid("l"),
-        text: wait ? "Online opening: if anyone drew a dash, arrange for 5 seconds." : "Online opening of 4 tiles in hand. RPS decides who starts.",
+        text: wait ? "Online opening: if anyone drew a dash, arrange for 5 seconds." : "Online opening of 4 tiles in hand. RPS — loser guesses first.",
       },
     ],
   };
@@ -264,6 +275,7 @@ export function startCoda(useJokers = true, youBlack = 2, youWhite = 2): CodaSta
     frozenRival: wait ? rival.tiles.map((t) => ({ ...t })) : null,
     resume: wait ? "draw" : null,
     rpsThrows: {},
+    rpsReveal: null,
     stashSlots,
     tried: {},
     log: [
@@ -273,7 +285,7 @@ export function startCoda(useJokers = true, youBlack = 2, youWhite = 2): CodaSta
           ? "Opening dash drawn. Insert, still 4 tiles, then lock."
           : wait
             ? "Opening 4 in hand. Rival drew a dash. Arrange, then RPS."
-            : "Opening 4 in hand, no dash. RPS decides who starts.",
+            : "Opening 4 in hand, no dash. RPS — loser guesses first.",
       },
     ],
   };
@@ -577,7 +589,7 @@ export function finishArrange(state: CodaState): CodaState {
   return {
     ...next,
     phase: "rps",
-    log: [...next.log, { id: uid("l"), text: "Arrange done. Tiles locked. RPS — loser draws first." }],
+    log: [...next.log, { id: uid("l"), text: "Arrange done. Tiles locked. RPS — loser guesses first." }],
   };
 }
 
@@ -591,16 +603,26 @@ function rpsWins(a: RpsThrow, b: RpsThrow): boolean {
   );
 }
 
-function resolveRps(state: CodaState, aId: string, a: RpsThrow, bId: string, b: RpsThrow): CodaState {
+function beginRpsReveal(state: CodaState, aId: string, a: RpsThrow, bId: string, b: RpsThrow): CodaState {
+  return {
+    ...state,
+    rpsThrows: { [aId]: a, [bId]: b },
+    rpsReveal: { aId, a, bId, b },
+  };
+}
+
+export function finishRps(state: CodaState): CodaState {
+  if (state.phase !== "rps" || !state.rpsReveal) return state;
+  const { aId, a, bId, b } = state.rpsReveal;
   if (a === b) {
     return {
       ...state,
       rpsThrows: {},
-      log: [...state.log, { id: uid("l"), text: `Tie, both ${RPS_LABEL[a]}. Again.` }],
+      rpsReveal: null,
+      log: [...state.log, { id: uid("l"), text: `Tie, both ${RPS_LABEL[a]}. Throw again.` }],
     };
   }
-  const aWins = rpsWins(a, b);
-  const loserId = aWins ? bId : aId;
+  const loserId = rpsWins(a, b) ? bId : aId;
   const loserTurn = state.players.findIndex((p) => p.id === loserId);
   return {
     ...state,
@@ -609,35 +631,36 @@ function resolveRps(state: CodaState, aId: string, a: RpsThrow, bId: string, b: 
     drawn: null,
     selected: null,
     rpsThrows: {},
+    rpsReveal: null,
     log: [
       ...state.log,
       {
         id: uid("l"),
-        text: `${state.players.find((p) => p.id === aId)?.name} plays ${RPS_LABEL[a]}, ${state.players.find((p) => p.id === bId)?.name} plays ${RPS_LABEL[b]}. Loser draws first.`,
+        text: `${state.players.find((p) => p.id === aId)?.name} ${RPS_LABEL[a]} vs ${state.players.find((p) => p.id === bId)?.name} ${RPS_LABEL[b]}. Loser guesses first.`,
       },
     ],
   };
 }
 
 export function playRps(state: CodaState, you: RpsThrow, actorId?: string): CodaState {
-  if (state.phase !== "rps") return state;
+  if (state.phase !== "rps" || state.rpsReveal) return state;
   const me = actorId ? state.players.find((p) => p.id === actorId) : state.players.find((p) => p.human);
   const foe = state.players.find((p) => p.id !== me?.id);
   if (!me || !foe) return state;
+  if (state.rpsThrows[me.id]) return state;
   if (!foe.human) {
     const ai = (["rock", "paper", "scissors"] as const)[Math.floor(Math.random() * 3)]!;
-    return resolveRps(state, me.id, you, foe.id, ai);
+    return beginRpsReveal(state, me.id, you, foe.id, ai);
   }
-  const mine = you;
   const theirs = state.rpsThrows[foe.id];
   if (!theirs) {
     return {
       ...state,
-      rpsThrows: { ...state.rpsThrows, [me.id]: mine },
-      log: [...state.log, { id: uid("l"), text: `${me.name} has thrown. Waiting.` }],
+      rpsThrows: { ...state.rpsThrows, [me.id]: you },
+      log: [...state.log, { id: uid("l"), text: `${me.name} is ready. Waiting for the other hand.` }],
     };
   }
-  return resolveRps({ ...state, rpsThrows: { ...state.rpsThrows, [me.id]: mine } }, me.id, mine, foe.id, theirs);
+  return beginRpsReveal({ ...state, rpsThrows: { ...state.rpsThrows, [me.id]: you } }, me.id, you, foe.id, theirs);
 }
 
 export function placeDrawn(state: CodaState, index: number): CodaState {
@@ -743,7 +766,12 @@ export function viewFor(state: CodaState, viewerId: string): CodaState {
       black: state.deck.filter((t) => t.color === "black").length,
       white: state.deck.filter((t) => t.color === "white").length,
     },
-    rpsThrows: {},
+    rpsThrows: state.rpsReveal
+      ? { [state.rpsReveal.aId]: state.rpsReveal.a, [state.rpsReveal.bId]: state.rpsReveal.b }
+      : state.rpsThrows[viewerId]
+        ? { [viewerId]: state.rpsThrows[viewerId] }
+        : {},
+    rpsReveal: state.rpsReveal,
     stashSlots:
       state.stashSlots[viewerId] !== undefined ? { [viewerId]: state.stashSlots[viewerId] } : {},
     pendingSlot: me.id === viewerId ? state.pendingSlot : null,
