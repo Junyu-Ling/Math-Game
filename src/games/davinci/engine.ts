@@ -55,6 +55,7 @@ export type CodaState = {
   rpsReveal: RpsReveal | null;
   stashSlots: Partial<Record<string, number>>;
   tried: Record<string, CodaValue[]>;
+  fresh: Record<string, string>;
   leftByColor?: { black: number; white: number };
 };
 
@@ -136,6 +137,18 @@ function emptyArrange() {
   };
 }
 
+function markFresh(fresh: Record<string, string> | undefined, tileId: string, ownerId: string): Record<string, string> {
+  return { ...(fresh ?? {}), [tileId]: ownerId };
+}
+
+function expireFresh(fresh: Record<string, string> | undefined, ownerId: string): Record<string, string> {
+  const next: Record<string, string> = {};
+  for (const [id, owner] of Object.entries(fresh ?? {})) {
+    if (owner !== ownerId) next[id] = owner;
+  }
+  return next;
+}
+
 function needsArrangeWait(inserter: CodaPlayer, pending: CodaTile | null): boolean {
   return Boolean(pending || inserter.stash);
 }
@@ -152,6 +165,8 @@ function instantInsert(state: CodaState, pending: CodaTile | null, resume: "draw
     players,
     drawn: null,
     selected: null,
+    fresh:
+      pending && resume === "next" ? markFresh(state.fresh, pending.id, inserter.id) : (state.fresh ?? {}),
     ...emptyArrange(),
   };
   next = checkEliminations(next);
@@ -262,6 +277,7 @@ export function startCoda(useJokers = true, youBlack = 2, youWhite = 2): CodaSta
     rpsReveal: null,
     stashSlots,
     tried: {},
+    fresh: {},
     log: [
       {
         id: uid("l"),
@@ -343,7 +359,14 @@ function nextTurn(state: CodaState): CodaState {
     i = (i + 1) % state.players.length;
     const p = state.players[i];
     if (p && !p.out) {
-      return { ...state, turn: i, phase: "draw", drawn: null, selected: null };
+      return {
+        ...state,
+        turn: i,
+        phase: "draw",
+        drawn: null,
+        selected: null,
+        fresh: expireFresh(state.fresh, p.id),
+      };
     }
   }
   return state;
@@ -565,6 +588,10 @@ export function finishArrange(state: CodaState): CodaState {
     ...state,
     players,
     drawn: null,
+    fresh:
+      state.pending && state.resume === "next" && inserterId
+        ? markFresh(state.fresh, state.pending.id, inserterId)
+        : (state.fresh ?? {}),
     ...emptyArrange(),
   };
   next = checkEliminations(next);
@@ -847,5 +874,6 @@ export function viewFor(state: CodaState, viewerId: string): CodaState {
     })),
     drawn: state.drawn ? (showDrawn ? state.drawn : maskTile(state.drawn)) : null,
     pending: state.pending ? (showPending ? state.pending : maskTile(state.pending)) : null,
+    fresh: state.fresh ?? {},
   };
 }

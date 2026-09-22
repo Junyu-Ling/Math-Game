@@ -89,6 +89,16 @@ function emptyArrange() {
     stashSlots: {}
   };
 }
+function markFresh(fresh, tileId, ownerId) {
+  return { ...fresh ?? {}, [tileId]: ownerId };
+}
+function expireFresh(fresh, ownerId) {
+  const next = {};
+  for (const [id, owner] of Object.entries(fresh ?? {})) {
+    if (owner !== ownerId) next[id] = owner;
+  }
+  return next;
+}
 function needsArrangeWait(inserter, pending) {
   return Boolean(pending || inserter.stash);
 }
@@ -104,6 +114,7 @@ function instantInsert(state, pending, resume) {
     players,
     drawn: null,
     selected: null,
+    fresh: pending && resume === "next" ? markFresh(state.fresh, pending.id, inserter.id) : state.fresh ?? {},
     ...emptyArrange()
   };
   next = checkEliminations(next);
@@ -206,6 +217,7 @@ function startCoda(useJokers = true, youBlack = 2, youWhite = 2) {
     rpsReveal: null,
     stashSlots,
     tried: {},
+    fresh: {},
     log: [
       {
         id: uid("l"),
@@ -276,7 +288,14 @@ function nextTurn(state) {
     i = (i + 1) % state.players.length;
     const p = state.players[i];
     if (p && !p.out) {
-      return { ...state, turn: i, phase: "draw", drawn: null, selected: null };
+      return {
+        ...state,
+        turn: i,
+        phase: "draw",
+        drawn: null,
+        selected: null,
+        fresh: expireFresh(state.fresh, p.id)
+      };
     }
   }
   return state;
@@ -476,6 +495,7 @@ function finishArrange(state) {
     ...state,
     players,
     drawn: null,
+    fresh: state.pending && state.resume === "next" && inserterId ? markFresh(state.fresh, state.pending.id, inserterId) : state.fresh ?? {},
     ...emptyArrange()
   };
   next = checkEliminations(next);
@@ -712,7 +732,8 @@ function viewFor(state, viewerId) {
       stash: p.stash ? p.id === viewerId ? p.stash : maskTile(p.stash) : null
     })),
     drawn: state.drawn ? showDrawn ? state.drawn : maskTile(state.drawn) : null,
-    pending: state.pending ? showPending ? state.pending : maskTile(state.pending) : null
+    pending: state.pending ? showPending ? state.pending : maskTile(state.pending) : null,
+    fresh: state.fresh ?? {}
   };
 }
 export {

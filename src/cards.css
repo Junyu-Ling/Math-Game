@@ -184,10 +184,7 @@
 .coda-frame { display: none; }
 
 .mj .mark {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  display: block;
+  display: none;
 }
 
 .mj.white .mark {
@@ -198,6 +195,38 @@
 .mj.black .mark {
   border: 2px solid rgba(214, 176, 96, 0.45);
   background: radial-gradient(circle at 40% 35%, #4a4034, #1a1612);
+}
+
+.mj-fresh {
+  position: absolute;
+  left: 50%;
+  top: -7px;
+  z-index: 11;
+  width: 16px;
+  height: 12px;
+  margin-left: -8px;
+  background: linear-gradient(180deg, #f4e0a8, #d4b36a);
+  border: 1px solid #b08838;
+  border-radius: 2px 2px 3px 3px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.mj-fresh::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: -5px;
+  height: 6px;
+  background: #c9a45a;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.mj.fresh .coda-face {
+  box-shadow:
+    0 0 0 2px #e6c27a,
+    0 10px 18px rgba(0, 0, 0, 0.35);
 }
 
 .mj-arrow {

@@ -9,10 +9,11 @@ type Props = {
   down?: boolean;
   dim?: boolean;
   mini?: boolean;
+  fresh?: boolean;
   onClick?: () => void;
 };
 
-export function MahjongTile({ tile, hide, selected, aimed, flash, down, dim, mini, onClick }: Props) {
+export function MahjongTile({ tile, hide, selected, aimed, flash, down, dim, mini, fresh, onClick }: Props) {
   const show = tile.revealed || !hide;
   const num = tile.value === "joker" ? "-" : String(tile.value);
   const className = [
@@ -25,11 +26,13 @@ export function MahjongTile({ tile, hide, selected, aimed, flash, down, dim, min
     flash === "miss" ? "fx-miss" : "",
     dim ? "dim" : "",
     mini ? "mini" : "",
+    fresh ? "fresh" : "",
   ].join(" ");
 
   const body = (
     <>
       {aimed ? <span className="mj-arrow" aria-hidden /> : null}
+      {fresh ? <span className="mj-fresh" aria-hidden /> : null}
       <span className="mj-shade" />
       <span className="coda-flip">
         <span className="coda-face">
