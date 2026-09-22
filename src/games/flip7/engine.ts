@@ -120,6 +120,14 @@ export function currentFlip(state: FlipState): FlipPlayer {
   return state.players[state.turn] ?? state.players[0]!;
 }
 
+export function activePlayers(state: FlipState): FlipPlayer[] {
+  return state.players.filter((p) => p.status === "active");
+}
+
+function hasSecondChance(area: FlipCard[]): boolean {
+  return area.some((c) => c.kind === "chance");
+}
+
 function takeCard(state: FlipState): { state: FlipState; card: FlipCard } {
   let deck = state.deck;
   let discard = state.discard;
@@ -154,13 +162,20 @@ export function hit(state: FlipState): FlipState {
       const area = me.area.filter((c) => c.id !== chance.id);
       next = withPlayer(next, me.id, (p) => ({ ...p, area, pendingFlip3: Math.max(0, p.pendingFlip3 - 1) }));
       next.discard = [...next.discard, chance, card];
-      next.log = [...next.log, { id: uid("l"), text: `${me.name} hit a duplicate ${card.value} and spent Second Chance.`, tone: whoTone }];
+      next.log = [...next.log, { id: uid("l"), text: `${me.name} hits a duplicate ${card.value}. Second Chance saves the round.`, tone: whoTone }];
       return afterHit(next, me.id);
     }
     next = withPlayer(next, me.id, (p) => ({ ...p, area: [], status: "bust", pendingFlip3: 0 }));
     next.discard = [...next.discard, ...me.area, card];
     next.log = [...next.log, { id: uid("l"), text: `${me.name} busts (duplicate ${card.value}). Round scores 0.`, tone: "bad" }];
     return advance(next);
+  }
+
+  if (card.kind === "chance" && hasSecondChance(me.area)) {
+    next = withPlayer(next, me.id, (p) => ({ ...p, pendingFlip3: Math.max(0, p.pendingFlip3 - 1) }));
+    next.discard = [...next.discard, card];
+    next.log = [...next.log, { id: uid("l"), text: `${me.name} already has Second Chance. The extra is discarded.`, tone: whoTone }];
+    return afterHit(next, me.id);
   }
 
   next = withPlayer(next, me.id, (p) => ({
@@ -171,7 +186,10 @@ export function hit(state: FlipState): FlipState {
   next.log = [...next.log, { id: uid("l"), text: `${me.name} flips ${cardLabel(card)}.`, tone: whoTone }];
 
   if (card.kind === "freeze" || card.kind === "flip3") {
-    return { ...next, phase: "target", pendingAction: card.kind };
+    const aimed: FlipState = { ...next, phase: "target", pendingAction: card.kind };
+    const live = activePlayers(aimed);
+    if (live.length <= 1) return applyTarget(aimed, me.id);
+    return aimed;
   }
   return afterHit(next, me.id);
 }
@@ -215,31 +233,46 @@ export function stay(state: FlipState): FlipState {
 export function applyTarget(state: FlipState, targetId: string): FlipState {
   if (state.phase !== "target" || !state.pendingAction) return state;
   const me = currentFlip(state);
+  const live = activePlayers(state);
+  const forced = live.length <= 1 ? me.id : targetId;
+  const target = state.players.find((p) => p.id === forced);
+  if (!target || target.status !== "active") return state;
   const action = state.pendingAction;
+  const onSelf = target.id === me.id;
   let next = state;
   if (action === "freeze") {
-    const target = state.players.find((p) => p.id === targetId);
-    const scored = target ? areaScore(target.area).score : 0;
-    next = withPlayer(next, targetId, (p) => ({
+    const scored = areaScore(target.area).score;
+    next = withPlayer(next, target.id, (p) => ({
       ...p,
       pendingFreeze: false,
+      pendingFlip3: 0,
       status: "stayed",
       total: p.total + scored,
       area: [],
     }));
-    if (target) next.discard = [...next.discard, ...target.area];
-    next.log = [...next.log, { id: uid("l"), text: `${me.name} freezes ${nameOf(state, targetId)} · +${scored}.` }];
+    next.discard = [...next.discard, ...target.area];
+    next.log = [
+      ...next.log,
+      {
+        id: uid("l"),
+        text: onSelf
+          ? `${me.name} freezes themselves and banks +${scored}.`
+          : `${me.name} freezes ${target.name} · +${scored}.`,
+      },
+    ];
   } else {
-    next = withPlayer(next, targetId, (p) => ({ ...p, pendingFlip3: p.pendingFlip3 + 3 }));
-    next.log = [...next.log, { id: uid("l"), text: `${me.name} uses Flip Three on ${nameOf(state, targetId)}.` }];
+    next = withPlayer(next, target.id, (p) => ({ ...p, pendingFlip3: p.pendingFlip3 + 3 }));
+    next.log = [
+      ...next.log,
+      {
+        id: uid("l"),
+        text: onSelf ? `${me.name} uses Flip Three on themselves.` : `${me.name} uses Flip Three on ${target.name}.`,
+      },
+    ];
   }
   next.pendingAction = null;
   next.phase = "action";
   return afterHit(next, me.id);
-}
-
-function nameOf(state: FlipState, id: string) {
-  return state.players.find((p) => p.id === id)?.name ?? "?";
 }
 
 function checkWin(state: FlipState, playerId: string): FlipState {
@@ -335,7 +368,15 @@ export function applyFlipAction(state: FlipState, actorId: string, action: FlipA
 
 export function aiTarget(state: FlipState): string {
   const me = currentFlip(state);
-  const others = state.players.filter((p) => p.id !== me.id);
-  const threat = [...others].sort((a, b) => b.total + areaScore(b.area).score - (a.total + areaScore(a.area).score))[0];
-  return threat?.id ?? others[0]?.id ?? me.id;
+  const live = activePlayers(state);
+  if (live.length <= 1) return me.id;
+  const mine = areaScore(me.area);
+  const others = live.filter((p) => p.id !== me.id);
+  if (state.pendingAction === "freeze") {
+    if (mine.score >= 16 || mine.numbers >= 5) return me.id;
+    const threat = [...others].sort((a, b) => areaScore(b.area).score - areaScore(a.area).score)[0];
+    return threat?.id ?? me.id;
+  }
+  if (mine.numbers >= 4 && mine.numbers < 7) return me.id;
+  return others[0]?.id ?? me.id;
 }

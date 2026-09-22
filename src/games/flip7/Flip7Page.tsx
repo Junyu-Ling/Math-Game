@@ -5,6 +5,7 @@ import {
   aiTarget,
   applyFlipAction,
   areaScore,
+  activePlayers,
   currentFlip,
   startFlip7,
   type FlipAction,
@@ -85,7 +86,7 @@ export function Flip7Page() {
             <GameSetup
               kicker="FLIP 7"
               title="First to 200"
-              blurb="On your turn flip one card, or stay to bank. Play then passes. Seven distinct numbers add +15. A duplicate number busts."
+              blurb="Hit or stay. Freeze and Flip Three can target any active player, including you. Second Chance sits in front of you and saves one duplicate bust."
               game="flip7"
               onPractice={() => setLocal(startFlip7())}
             />
@@ -94,6 +95,7 @@ export function Flip7Page() {
               <div className="seat">
                 <div className="seat-label">
                   {rival.name} · {rival.total} PTS · {rival.status.toUpperCase()}
+                  {rival.area.some((c) => c.kind === "chance") ? " · 2ND CHANCE" : ""}
                   {cur?.id === rival.id ? " · TURN" : ""}
                 </div>
                 <div className="pcards">
@@ -109,23 +111,24 @@ export function Flip7Page() {
                     ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
                     : myTurn
                       ? state.phase === "target"
-                        ? "Pick a rival: Freeze or Flip Three"
-                        : "Flip one card, then the next player. Stay to bank this round."
+                        ? `Choose who gets ${state.pendingAction === "freeze" ? "Freeze" : "Flip Three"} — yourself included.`
+                        : me.pendingFlip3 > 0
+                          ? `Flip Three: ${me.pendingFlip3} flip${me.pendingFlip3 === 1 ? "" : "s"} left.`
+                          : "Flip one card, then the next player. Stay to bank this round."
                       : `${cur?.name} is acting`}
                 </div>
                 {myTurn && state.phase === "target"
-                  ? state.players
-                      .filter((p) => p.id !== me.id)
-                      .map((p) => (
-                        <button key={p.id} className="btn" type="button" onClick={() => act({ type: "target", targetId: p.id })}>
-                          Use on {p.name}
-                        </button>
-                      ))
+                  ? activePlayers(state).map((p) => (
+                      <button key={p.id} className="btn" type="button" onClick={() => act({ type: "target", targetId: p.id })}>
+                        {p.id === me.id ? `Use on yourself` : `Use on ${p.name}`}
+                      </button>
+                    ))
                   : null}
               </div>
               <div className="seat">
                 <div className="seat-label">
                   {me.name} · round {areaScore(me.area).score} · total {me.total}
+                  {me.area.some((c) => c.kind === "chance") ? " · 2ND CHANCE" : ""}
                 </div>
                 <div className="pcards">
                   {me.area.map((c) => (
