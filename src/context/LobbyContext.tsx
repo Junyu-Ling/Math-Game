@@ -13,7 +13,7 @@ type LobbyCtx = {
   invite: (toId: string, game: string, meta?: Record<string, unknown>) => Promise<void>;
   respond: (id: string, accept: boolean) => Promise<void>;
   sendAction: (action: object) => Promise<void>;
-  adjustCpu: (game: string, mode: "add" | "remove" | "fill", meta?: Record<string, unknown>) => Promise<void>;
+  adjustCpu: (game: string, mode: "add" | "remove" | "fill" | "open", meta?: Record<string, unknown>) => Promise<void>;
   leave: () => Promise<void>;
 };
 

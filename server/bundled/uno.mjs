@@ -153,7 +153,7 @@ function startUnoTable(people) {
     deck = deck.slice(1);
   }
   const color = start?.color === "black" ? "red" : start?.color;
-  return {
+  return settlePending({
     players,
     deck,
     discard: start ? [start] : [],
@@ -168,7 +168,7 @@ function startUnoTable(people) {
     drawBurst: start?.kind === "draw2" ? { n: 2, playerId: players[0].id, key: uid("fx") } : null,
     stackKind: start?.kind === "draw2" ? "draw2" : null,
     log: [{ id: uid("l"), text: `${players.map((p) => p.name).join(" vs ")}. Empty your hand to win.` }]
-  };
+  });
 }
 function nextIndex(state, skip = false) {
   const step = skip ? 2 : 1;
@@ -212,7 +212,7 @@ function applyUnoAction(state, actorId, action) {
   if (me.id !== actorId) return state;
   if (state.phase === "color") {
     if (action.type !== "color" || state.wildCardId == null) return state;
-    return { ...state, color: action.color, phase: "play", wildCardId: null, turn: nextIndex(state, false) };
+    return settlePending({ ...state, color: action.color, phase: "play", wildCardId: null, turn: nextIndex(state, false) });
   }
   if (action.type === "keep") {
     if (!state.justDrawnId) return state;
@@ -272,7 +272,7 @@ function applyUnoAction(state, actorId, action) {
     if (action.color) {
       next.color = action.color;
       next.turn = nextIndex(next, false);
-      return next;
+      return settlePending(next);
     }
     next.phase = "color";
     next.wildCardId = card.id;
@@ -290,7 +290,23 @@ function applyUnoAction(state, actorId, action) {
     return next;
   }
   next.turn = nextIndex(next, card.kind === "skip");
-  return next;
+  return settlePending(next);
+}
+function takePenalty(state) {
+  const me = currentUno(state);
+  const pulled = take(state, state.pendingDraw);
+  let next = giveCards(pulled.state, me.id, pulled.cards);
+  next.pendingDraw = 0;
+  next.justDrawnId = null;
+  next.stackKind = null;
+  next.log = [...next.log, { id: uid("l"), text: `${me.name} draws ${pulled.cards.length}.` }];
+  next.turn = nextIndex(next);
+  return burst(next, pulled.cards.length, me.id);
+}
+function settlePending(state) {
+  if (state.phase !== "play" || state.pendingDraw <= 0 || state.justDrawnId) return state;
+  if (legalCards(state, currentUno(state).id).length > 0) return state;
+  return takePenalty(state);
 }
 function legalCards(state, playerId) {
   const p = state.players.find((x) => x.id === playerId);

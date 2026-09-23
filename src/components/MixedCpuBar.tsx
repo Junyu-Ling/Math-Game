@@ -17,8 +17,18 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
 
   return (
     <div className="cpu-bar">
-      <p>Humans and CPUs can sit together. Add CPUs to empty seats, then invite or start.</p>
+      <p>A new table starts with you. Add CPUs only when you want them. 2–4 players can sit.</p>
       <div className="row-actions" style={{ justifyContent: "center" }}>
+        {!here ? (
+          <button
+            className="btn"
+            type="button"
+            disabled={!canEdit}
+            onClick={() => void adjustCpu(game, "open", meta).catch((ex) => alert(ex.message))}
+          >
+            Open table
+          </button>
+        ) : null}
         <button
           className="btn btn-ghost"
           type="button"
@@ -30,7 +40,7 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
         <button
           className="btn btn-ghost"
           type="button"
-          disabled={!canEdit || full}
+          disabled={!here || !canEdit || full}
           onClick={() => void adjustCpu(game, "fill", meta).catch((ex) => alert(ex.message))}
         >
           Fill with CPU

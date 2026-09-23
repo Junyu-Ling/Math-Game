@@ -1043,27 +1043,24 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
 
   const add = mode === "add" || mode === "fill";
   const fill = mode === "fill";
+  const open = mode === "open";
   if (!rec) {
-    if (!add) throw new Error("No table yet");
+    if (!add && !open) throw new Error("No table yet");
     const host = { id: userId, name: playerName(user), human: true };
-    const cpu = nextCpu([]);
-    const people = [host, cpu];
-    const state = newLobbyState(game, people, mods, meta);
+    const state = newLobbyState(game, [host], mods, meta);
     rec = {
       id: uid("room"),
       game,
-      seats: people.map((p) => p.id),
-      state: game === "coda" ? readyCodaCpus(state, mods) : state,
+      seats: [host.id],
+      state,
       endsAt: null,
       seq: 1,
       mods,
     };
-    if (fill) {
-      while (rec.seats.length < 4) {
-        const extra = nextCpu(rec.seats);
-        rec.seats = [...rec.seats, extra.id];
-        rec.state = rebuildLobby(rec, extra, mods);
-      }
+    if (mode === "add") {
+      const cpu = nextCpu(rec.seats);
+      rec.seats = [...rec.seats, cpu.id];
+      rec.state = rebuildLobby(rec, cpu, mods);
     }
     armCpuThink(rec);
     await saveRoom(rec);
@@ -1071,6 +1068,7 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
   }
 
   if (rec.game !== game) throw new Error("This table is already another game");
+  if (open) return { ok: true, room: publicRoom(rec, userId) };
   if (rec.state?.phase !== "lobby") throw new Error("The game already started");
   if (rec.seats[0] !== userId) throw new Error("Only the host can add CPUs");
 

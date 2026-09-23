@@ -76,7 +76,7 @@ export const lobbyApi = {
   action(token: string, roomId: string, action: object) {
     return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "action", roomId, action }) });
   },
-  cpu(token: string, game: string, mode: "add" | "remove" | "fill", meta: Record<string, unknown> = {}) {
+  cpu(token: string, game: string, mode: "add" | "remove" | "fill" | "open", meta: Record<string, unknown> = {}) {
     return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "cpu", game, mode, meta }) });
   },
   leave(token: string) {

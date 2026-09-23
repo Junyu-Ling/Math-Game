@@ -1011,7 +1011,7 @@ export function DaVinciPage() {
               <li>On your draw, pick black or white. You cannot draw a color that is gone.</li>
               <li>Each color has 0–11 plus one dash. The dash is shuffled in with the numbers, so it is not guaranteed in the opening 4.</li>
               <li>The veil is opening-only. Inserts wait the full 5 seconds even after you pick a slot.</li>
-              <li>After the opening 4, play rock-paper-scissors. The loser guesses first.</li>
+              <li>After the opening 4, two players play rock-paper-scissors and the loser guesses first. With 3 or 4, a random player draws first.</li>
             </ul>
           </div>
           <div>
