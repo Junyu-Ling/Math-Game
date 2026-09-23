@@ -572,9 +572,13 @@
 }
 
 .table-coda.coda-multi {
-  grid-template-columns: minmax(128px, 20%) minmax(0, 1fr) minmax(128px, 20%);
-  grid-template-rows: minmax(150px, 1fr) minmax(200px, 1.15fr) minmax(168px, 1fr);
+  grid-template-columns: minmax(120px, 18%) minmax(0, 1fr) minmax(120px, 18%);
+  grid-template-rows: auto minmax(300px, auto) auto;
   align-items: center;
+  height: auto;
+  min-height: 640px;
+  max-height: none;
+  overflow: visible;
 }
 
 .table-coda.coda-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: visible; min-height: 148px; }
@@ -603,18 +607,19 @@
 .table-coda.coda-multi .seat-left,
 .table-coda.coda-multi .seat-right {
   min-height: 0;
-  overflow: hidden;
-  align-self: stretch;
-  height: 100%;
+  overflow: visible;
+  align-self: center;
+  height: auto;
 }
 .table-coda.coda-multi .seat-left .tiles-wrap,
 .table-coda.coda-multi .seat-right .tiles-wrap {
-  height: 100%;
+  --tile-w: 78px;
+  --tile-h: 116px;
+  height: auto;
   min-height: 0;
   width: 100%;
-  overflow: hidden;
-  padding: 6px 4px;
-  box-sizing: border-box;
+  overflow: visible;
+  padding: 0;
 }
 .table-coda.coda-multi > .center-well {
   height: auto;
@@ -623,25 +628,30 @@
   align-self: center;
 }
 .table-coda .tiles-fit.is-vertical {
-  height: 100%;
+  height: auto;
   width: 100%;
+  overflow: visible;
 }
 .table-coda .tiles-fit.is-vertical .tiles {
   flex-direction: column;
   align-items: center;
   min-height: 0;
-  padding: 8px 4px;
+  padding: 4px 0;
 }
 .table-coda.coda-multi .tiles-fit.is-vertical .tiles > * + * {
-  margin-top: -36px;
+  margin-top: 8px;
 }
 .side-tile {
-  width: calc(var(--tile-h, 84px) + 16px);
-  height: calc(var(--tile-h, 84px) + 16px);
+  width: calc(var(--tile-h, 84px) + 8px);
+  height: calc(var(--tile-w, 56px) + 8px);
   display: grid;
   place-items: center;
   overflow: visible;
   flex: 0 0 auto;
+}
+.seat-left .side-tile .mj,
+.seat-right .side-tile .mj {
+  margin: 0;
 }
 .seat-left .side-tile .mj {
   transform: rotate(-90deg);
@@ -1663,8 +1673,8 @@
 }
 
 .side-card {
-  width: calc(var(--ch, 130px) + 16px);
-  height: calc(var(--ch, 130px) + 16px);
+  width: calc(var(--ch, 130px) + 8px);
+  height: calc(var(--cw, 86px) + 8px);
   display: grid;
   place-items: center;
   flex: 0 0 auto;

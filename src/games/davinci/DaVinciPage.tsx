@@ -160,7 +160,11 @@ function Row({
     const row = rowRef.current;
     if (!wrap || !row) return;
     const fit = () => {
-      const next = measureFit(wrap, row, Boolean(vertical));
+      if (vertical) {
+        setZoom((z) => (z === 1 ? z : 1));
+        return;
+      }
+      const next = measureFit(wrap, row, false);
       if (next == null) return;
       setZoom((z) => (Math.abs(z - next) < 0.004 ? z : next));
     };
