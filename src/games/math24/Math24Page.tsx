@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { applyM24Action, startM24Practice, type M24DuelState } from "./engine";
 import { PokerFace } from "../../components/PlayingCard";
 import { GameSetup } from "../../components/GameSetup";
+import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -80,6 +81,8 @@ export function Math24Page() {
       <div className="game-layout">
         <div className="table table-m24">
           {!state ? (
+            <>
+            <LobbyDecor game="m24" />
             <GameSetup
               kicker="MATH 24"
               title="First to make 24"
@@ -87,6 +90,7 @@ export function Math24Page() {
               game="m24"
               onPractice={() => setLocal(startM24Practice())}
             />
+            </>
           ) : (
             <>
               <div className="m24-board">

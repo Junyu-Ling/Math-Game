@@ -16,6 +16,7 @@ import { DeckStack, FlipFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
 import { InvitePanel } from "../../components/InvitePanel";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { wait } from "../../lib/shuffle";
@@ -165,6 +166,8 @@ export function Flip7Page() {
       <div className="game-layout">
         <div className={`table table-flip ${multi ? "flip-multi" : ""} ${solo ? "flip-solo" : ""}`}>
           {!playing || !state || !me || !seated ? (
+            <>
+            <LobbyDecor game="flip7" />
             <div className="coda-deal">
               <p className="kicker">{waiting ? "TABLE" : "FLIP 7"}</p>
               <h2>{waiting ? `Table ${state?.players.length ?? 0}/4` : "First to 200"}</h2>
@@ -209,6 +212,7 @@ export function Flip7Page() {
                 )}
               </div>
             </div>
+            </>
           ) : (
             <>
               {seated.partner ? (

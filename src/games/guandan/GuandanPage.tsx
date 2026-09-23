@@ -13,6 +13,7 @@ import { PokerFace } from "../../components/PlayingCard";
 import { GameSetup } from "../../components/GameSetup";
 import { InvitePanel } from "../../components/InvitePanel";
 import { MixedCpuBar } from "../../components/MixedCpuBar";
+import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { wait } from "../../lib/shuffle";
@@ -165,6 +166,8 @@ export function GuandanPage() {
       <div className="game-layout">
         <div className="table table-gd">
           {!state || waiting || !playing ? (
+            <>
+            <LobbyDecor game="guandan" />
             <div className="coda-deal">
               {waiting && state ? (
                 <p className="kicker">
@@ -180,6 +183,7 @@ export function GuandanPage() {
               />
               <MixedCpuBar game="guandan" />
             </div>
+            </>
           ) : me && left && partner && right ? (
             <>
               <SeatBlock

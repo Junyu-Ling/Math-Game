@@ -9,6 +9,7 @@ import {
 } from "./engine";
 import { PokerFace } from "../../components/PlayingCard";
 import { GameSetup } from "../../components/GameSetup";
+import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -95,6 +96,8 @@ export function HoldemPage() {
       <div className="game-layout">
         <div className="table table-bj">
           {!state || !me || !rival ? (
+            <>
+            <LobbyDecor game="holdem" />
             <GameSetup
               kicker="HOLD’EM"
               title="Heads-up Texas Hold’em"
@@ -102,6 +105,7 @@ export function HoldemPage() {
               game="holdem"
               onPractice={() => setLocal(startHoldemPractice())}
             />
+            </>
           ) : (
             <>
               <div className="seat">

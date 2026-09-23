@@ -17,6 +17,7 @@ import { DeckStack, UnoColorPick, UnoFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
 import { InvitePanel } from "../../components/InvitePanel";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { wait } from "../../lib/shuffle";
@@ -218,6 +219,8 @@ export function UnoPage() {
       <div className="game-layout">
         <div className={`table table-uno ${multi ? "uno-multi" : ""}`}>
           {!playing || !state || !me || !seated ? (
+            <>
+            <LobbyDecor game="uno" />
             <div className="coda-deal">
               <p className="kicker">{waiting ? "TABLE" : "UNO"}</p>
               <h2>{waiting ? `Table ${state?.players.length ?? 0}/4` : "Empty your hand"}</h2>
@@ -262,6 +265,7 @@ export function UnoPage() {
                 )}
               </div>
             </div>
+            </>
           ) : (
             <>
               {seated.partner ? (

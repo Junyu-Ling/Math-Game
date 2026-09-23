@@ -653,6 +653,40 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+}
+
+.lobby-decor {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  --cw: 78px;
+  --ch: 116px;
+}
+
+.lobby-decor .decor-card {
+  position: absolute;
+  display: block;
+  filter: drop-shadow(0 14px 18px rgba(17, 17, 17, 0.12));
+}
+
+.lobby-decor .decor-card.a { top: 7%; left: 6%; transform: rotate(-14deg); }
+.lobby-decor .decor-card.b { top: 9%; right: 7%; transform: rotate(12deg); }
+.lobby-decor .decor-card.c { bottom: 9%; left: 8%; transform: rotate(9deg); }
+.lobby-decor .decor-card.d { bottom: 11%; right: 7%; transform: rotate(-11deg); }
+
+.lobby-decor .mj {
+  --w: 64px;
+  --h: 96px;
+  margin: 0;
+  cursor: default;
+}
+
+.table:has(> .lobby-decor) > .coda-deal {
+  position: relative;
+  z-index: 2;
 }
 
 .table-coda > .coda-deal {
@@ -1405,6 +1439,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .table-flip > .seat,

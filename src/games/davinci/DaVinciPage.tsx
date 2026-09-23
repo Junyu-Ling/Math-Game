@@ -35,6 +35,7 @@ import { wait } from "../../lib/shuffle";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { InvitePanel } from "../../components/InvitePanel";
+import { LobbyDecor } from "../../components/LobbyDecor";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 
 type Flash = {
@@ -446,7 +447,8 @@ export function DaVinciPage() {
 
   useEffect(() => {
     if (!arranging) return;
-    const deadline = online && endsAtRef.current ? endsAtRef.current : Date.now() + ARRANGE_MS;
+    const roomEnds = online ? codaRoom?.endsAt ?? endsAtRef.current : null;
+    const deadline = roomEnds && roomEnds > Date.now() ? roomEnds : Date.now() + ARRANGE_MS;
     let id = 0;
     const tick = () => {
       const left = Math.max(0, deadline - Date.now());
@@ -459,7 +461,7 @@ export function DaVinciPage() {
     tick();
     id = window.setInterval(tick, 50);
     return () => window.clearInterval(id);
-  }, [state?.arrangeId, arranging, online]);
+  }, [state?.arrangeId, arranging, online, codaRoom?.endsAt]);
 
   useEffect(() => {
     if (!flash) return;
@@ -624,6 +626,8 @@ export function DaVinciPage() {
           <div className="coda-lamp" />
           <div className="coda-ring" />
           {!playing || !you || !state || others.length < 1 ? (
+            <>
+            <LobbyDecor game="coda" />
             <div className="coda-deal">
               <p className="kicker">{waiting ? "TABLE" : matching ? "INVITE" : "OPENING DRAW"}</p>
               <h2>{waiting ? `Table ${state?.players.length ?? 0}/4` : matching ? "Invite pending" : "Opening draw"}</h2>
@@ -718,6 +722,7 @@ export function DaVinciPage() {
                 </button>
               )}
             </div>
+            </>
           ) : (
             <>
           {seated.partner ? (

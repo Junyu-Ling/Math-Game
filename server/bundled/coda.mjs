@@ -528,19 +528,6 @@ function setPendingSlot(state, index, actorId) {
   if (actor.stash && state.resume === "draw") {
     const allowed2 = insertIndices(actor.tiles, actor.stash);
     if (!allowed2.includes(index)) return state;
-    const queue = actor.queue ?? [];
-    if (queue.length) {
-      const placed = {
-        ...insertInto(actor, actor.stash, index),
-        stash: queue[0] ?? null,
-        queue: queue.slice(1)
-      };
-      return {
-        ...state,
-        players: state.players.map((p) => p.id === actor.id ? placed : p),
-        stashSlots: { ...state.stashSlots, [actor.id]: index }
-      };
-    }
     const next = {
       ...state,
       stashSlots: { ...state.stashSlots, [actor.id]: index }
@@ -559,22 +546,41 @@ function settleStash(player, preferred) {
   const slot = pickSlot(player.tiles, player.stash, preferred, !player.human);
   return { ...insertInto(player, player.stash, slot), stash: null, queue: player.queue ?? [] };
 }
-function placeOpeningDashes(player, preferred) {
-  const held = [...player.stash ? [player.stash] : [], ...player.queue ?? []];
-  if (!held.length) return { ...player, stash: null, queue: [] };
-  let tiles = player.tiles;
-  let hint = preferred;
-  for (const card of held) {
-    const slot = pickSlot(tiles, card, hint, !player.human);
-    tiles = [...tiles.slice(0, slot), card, ...tiles.slice(slot)];
-    hint = player.human ? slot + 1 : null;
+function lockOpeningDash(player, preferred) {
+  if (!player.stash) {
+    const [stash2, ...queue2] = player.queue ?? [];
+    return { ...player, stash: stash2 ?? null, queue: queue2 };
   }
-  return { ...player, tiles, stash: null, queue: [] };
+  const slot = pickSlot(player.tiles, player.stash, preferred, !player.human);
+  const tiles = [...player.tiles];
+  tiles.splice(slot, 0, player.stash);
+  const [stash, ...queue] = player.queue ?? [];
+  return { ...player, tiles, stash: stash ?? null, queue };
 }
 function finishArrange(state) {
   if (state.phase !== "arrange") return state;
   if (state.resume === "draw") {
-    const players2 = state.players.map((p) => placeOpeningDashes(p, state.stashSlots[p.id] ?? null));
+    const players2 = state.players.map((p) => lockOpeningDash(p, state.stashSlots[p.id] ?? null));
+    if (players2.some((p) => p.stash)) {
+      const stashSlots = {};
+      for (const p of players2) {
+        if (p.stash) stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
+      }
+      const first = players2.find((p) => p.stash);
+      return {
+        ...state,
+        players: players2,
+        phase: "arrange",
+        resume: "draw",
+        arrangeId: state.arrangeId + 1,
+        stashSlots,
+        pending: first?.stash ?? null,
+        pendingSlot: first ? stashSlots[first.id] ?? 0 : null,
+        humanDraft: null,
+        drawn: first?.stash ?? null,
+        log: [...state.log, { id: uid("l"), text: "Next dash. Number tiles stay \u2014 choose where this one sits." }]
+      };
+    }
     let next2 = {
       ...state,
       players: players2,

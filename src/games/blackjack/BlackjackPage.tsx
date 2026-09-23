@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { aiBjAction, applyBjDuelAction, hardSoft, startBjPractice, type BjDuelAction, type BjDuelState } from "./engine";
 import { PokerFace } from "../../components/PlayingCard";
 import { GameSetup } from "../../components/GameSetup";
+import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -68,6 +69,8 @@ export function BlackjackPage() {
       <div className="game-layout">
         <div className="table table-bj">
           {!state || !me || !rival ? (
+            <>
+            <LobbyDecor game="bj" />
             <GameSetup
               kicker="BLACKJACK"
               title="Closest without going over 21"
@@ -75,6 +78,7 @@ export function BlackjackPage() {
               game="bj"
               onPractice={() => setLocal(startBjPractice())}
             />
+            </>
           ) : (
             <>
               <div className="seat">

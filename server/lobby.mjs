@@ -615,7 +615,13 @@ export async function snapshot(userId, light = false) {
 async function expireArrange(room) {
   if (room.game !== "coda" || !room.endsAt || Date.now() < room.endsAt) return;
   if (room.state.phase === "arrange") {
+    const before = room.state.arrangeId;
     room.state = room.mods.coda.finishArrange(room.state);
+    if (room.state.phase === "arrange" && room.state.arrangeId !== before) {
+      room.endsAt = Date.now() + (room.mods.coda.ARRANGE_MS || 5000);
+      await saveRoom(room);
+      return;
+    }
   } else if (room.state.rpsReveal && room.mods.coda.finishRps) {
     room.state = room.mods.coda.finishRps(room.state);
   }

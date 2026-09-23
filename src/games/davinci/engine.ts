@@ -630,19 +630,6 @@ export function setPendingSlot(state: CodaState, index: number, actorId?: string
   if (actor.stash && state.resume === "draw") {
     const allowed = insertIndices(actor.tiles, actor.stash);
     if (!allowed.includes(index)) return state;
-    const queue = actor.queue ?? [];
-    if (queue.length) {
-      const placed: CodaPlayer = {
-        ...insertInto(actor, actor.stash, index),
-        stash: queue[0] ?? null,
-        queue: queue.slice(1),
-      };
-      return {
-        ...state,
-        players: state.players.map((p) => (p.id === actor.id ? placed : p)),
-        stashSlots: { ...state.stashSlots, [actor.id]: index },
-      };
-    }
     const next: CodaState = {
       ...state,
       stashSlots: { ...state.stashSlots, [actor.id]: index },
@@ -663,23 +650,42 @@ function settleStash(player: CodaPlayer, preferred: number | null): CodaPlayer {
   return { ...insertInto(player, player.stash, slot), stash: null, queue: player.queue ?? [] };
 }
 
-function placeOpeningDashes(player: CodaPlayer, preferred: number | null): CodaPlayer {
-  const held = [...(player.stash ? [player.stash] : []), ...(player.queue ?? [])];
-  if (!held.length) return { ...player, stash: null, queue: [] };
-  let tiles = player.tiles;
-  let hint = preferred;
-  for (const card of held) {
-    const slot = pickSlot(tiles, card, hint, !player.human);
-    tiles = [...tiles.slice(0, slot), card, ...tiles.slice(slot)];
-    hint = player.human ? slot + 1 : null;
+function lockOpeningDash(player: CodaPlayer, preferred: number | null): CodaPlayer {
+  if (!player.stash) {
+    const [stash, ...queue] = player.queue ?? [];
+    return { ...player, stash: stash ?? null, queue };
   }
-  return { ...player, tiles, stash: null, queue: [] };
+  const slot = pickSlot(player.tiles, player.stash, preferred, !player.human);
+  const tiles = [...player.tiles];
+  tiles.splice(slot, 0, player.stash);
+  const [stash, ...queue] = player.queue ?? [];
+  return { ...player, tiles, stash: stash ?? null, queue };
 }
 
 export function finishArrange(state: CodaState): CodaState {
   if (state.phase !== "arrange") return state;
   if (state.resume === "draw") {
-    const players = state.players.map((p) => placeOpeningDashes(p, state.stashSlots[p.id] ?? null));
+    const players = state.players.map((p) => lockOpeningDash(p, state.stashSlots[p.id] ?? null));
+    if (players.some((p) => p.stash)) {
+      const stashSlots: Partial<Record<string, number>> = {};
+      for (const p of players) {
+        if (p.stash) stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
+      }
+      const first = players.find((p) => p.stash);
+      return {
+        ...state,
+        players,
+        phase: "arrange",
+        resume: "draw",
+        arrangeId: state.arrangeId + 1,
+        stashSlots,
+        pending: first?.stash ?? null,
+        pendingSlot: first ? (stashSlots[first.id] ?? 0) : null,
+        humanDraft: null,
+        drawn: first?.stash ?? null,
+        log: [...state.log, { id: uid("l"), text: "Next dash. Number tiles stay — choose where this one sits." }],
+      };
+    }
     let next: CodaState = {
       ...state,
       players,
