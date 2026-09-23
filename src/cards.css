@@ -1675,6 +1675,19 @@
   margin-top: 8px;
 }
 
+.table-uno .side-card {
+  --cw: 70px;
+  --ch: 106px;
+}
+
+.table-uno .cards-fit.is-vertical .pcards > * {
+  position: relative;
+}
+
+.table-uno .cards-fit.is-vertical .pcards > * + * {
+  margin-top: calc(18px - (var(--cw) + 8px));
+}
+
 .side-card {
   width: calc(var(--ch, 130px) + 8px);
   height: calc(var(--cw, 86px) + 8px);
