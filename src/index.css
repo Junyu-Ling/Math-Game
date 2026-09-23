@@ -249,6 +249,18 @@ button:disabled {
   margin: 4px 0 14px;
 }
 
+.auth-switch {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.auth-switch .btn-ghost.on {
+  background: #111111;
+  color: #ffffff;
+  border-color: #111111;
+}
+
 .dim-card {
   opacity: 0.38;
   pointer-events: none;

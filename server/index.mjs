@@ -27,6 +27,7 @@ import {
   heartbeat,
   leaveRoom,
   lobbyStoreKind,
+  findAccountByEmail,
   rememberPlayer,
   respondInvite,
   saveAccount,
@@ -34,6 +35,7 @@ import {
   watchLobby,
   purgeRetiredAccounts,
 } from "./lobby.mjs";
+import { accountForEmailCode, consumeEmailCode, requestEmailCode } from "./email-login.mjs";
 import { loadMods } from "./game-mods.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -317,7 +319,9 @@ app.post("/api/auth/login", async (req, res) => {
   const user = readUsers().find((u) => u.email === email);
   if (!user) return res.status(400).json({ error: "邮箱或密码错误" });
   if (!user.passwordHash) {
-    return res.status(400).json({ error: "该账号请用 GitHub 登录" });
+    return res.status(400).json({
+      error: user.githubId ? "该账号请用 GitHub 登录" : "该账号请用邮箱验证码登录",
+    });
   }
   if (!bcrypt.compareSync(password, user.passwordHash)) {
     return res.status(400).json({ error: "邮箱或密码错误" });
@@ -325,6 +329,47 @@ app.post("/api/auth/login", async (req, res) => {
   await rememberPlayer(user);
   const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: "7d" });
   res.json({ token, user: publicUser(user) });
+});
+
+app.post("/api/auth/email-code", async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "邮箱格式不对" });
+    }
+    res.json(await requestEmailCode(email));
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || "发送失败" });
+  }
+});
+
+app.post("/api/auth/email-login", async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const code = String(req.body?.code || "");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "邮箱格式不对" });
+    }
+    await consumeEmailCode(email, code);
+    let user = readUsers().find((u) => String(u.email || "").toLowerCase() === email);
+    if (!user) user = await findAccountByEmail(email);
+    if (user) await saveAccount(user);
+    else user = await accountForEmailCode(email);
+    const users = readUsers();
+    const idx = users.findIndex((u) => u.id === user.id || String(u.email || "").toLowerCase() === email);
+    const { passwordHash, ...rest } = user;
+    if (idx >= 0) {
+      const prev = users[idx];
+      users[idx] = { ...prev, ...rest, passwordHash: passwordHash || prev.passwordHash };
+    } else {
+      users.push(passwordHash ? { ...rest, passwordHash } : rest);
+    }
+    writeUsers(users);
+    const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: "7d" });
+    res.json({ token, user: publicUser(users[idx >= 0 ? idx : users.length - 1]) });
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || "登录失败" });
+  }
 });
 
 app.get("/api/me", auth, (req, res) => {

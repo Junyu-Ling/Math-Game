@@ -28,6 +28,8 @@ import {
   clearVerify,
   watchLobby,
 } from "./lobby.mjs";
+import { accountForEmailCode, consumeEmailCode, requestEmailCode } from "./email-login.mjs";
+import { sendCodeMail } from "./mail.mjs";
 import { loadMods } from "./game-mods.mjs";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
@@ -250,9 +252,11 @@ export async function handle(req, res, path) {
       }
       const code = String(Math.floor(100000 + Math.random() * 900000));
       await stashVerify(email, { hash: bcrypt.hashSync(password, 10), code });
+      const sent = await sendCodeMail(email, code, "Your Axiom verification code");
+      if (!sent) console.log(`[mock mail] ${email} verification code = ${code}`);
       send(res, 200, {
         needCode: true,
-        hint: process.env.SMTP_HOST
+        hint: sent
           ? "A code was sent to your email. It expires in 10 minutes."
           : `Your verification code is ${code}. It expires in 10 minutes.`,
       });
@@ -306,7 +310,11 @@ export async function handle(req, res, path) {
         return;
       }
       if (!user.passwordHash) {
-        send(res, 400, { error: "Use GitHub to sign in to this account" });
+        send(res, 400, {
+          error: user.githubId
+            ? "Use GitHub to sign in to this account"
+            : "This account uses an email code. Request a code instead.",
+        });
         return;
       }
       if (!bcrypt.compareSync(password, user.passwordHash)) {
@@ -318,6 +326,40 @@ export async function handle(req, res, path) {
       send(res, 200, { token: signUser(user), user: publicUser(user) });
     } catch (err) {
       send(res, 400, { error: String(err.message || "Login failed") });
+    }
+    return;
+  }
+
+  if (path === "auth/email-code") {
+    try {
+      const body = await readBody(req);
+      const email = String(body.email || "").trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        send(res, 400, { error: "Invalid email" });
+        return;
+      }
+      send(res, 200, await requestEmailCode(email));
+    } catch (err) {
+      send(res, err.status || 400, { error: String(err.message || "Could not send code") });
+    }
+    return;
+  }
+
+  if (path === "auth/email-login") {
+    try {
+      const body = await readBody(req);
+      const email = String(body.email || "").trim().toLowerCase();
+      const code = String(body.code || "");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        send(res, 400, { error: "Invalid email" });
+        return;
+      }
+      await consumeEmailCode(email, code);
+      const user = await accountForEmailCode(email);
+      users.set(user.id, user);
+      send(res, 200, { token: signUser(user), user: publicUser(user) });
+    } catch (err) {
+      send(res, err.status || 400, { error: String(err.message || "Login failed") });
     }
     return;
   }

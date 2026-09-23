@@ -7,6 +7,8 @@ type AuthState = {
   loading: boolean;
   live: boolean;
   login: (email: string, password: string) => Promise<void>;
+  requestEmailCode: (email: string) => Promise<{ needCode: boolean; hint?: string }>;
+  loginWithCode: (email: string, code: string) => Promise<void>;
   register: (email: string, password: string) => Promise<{ needCode: boolean; hint?: string }>;
   verify: (email: string, code: string) => Promise<void>;
   logout: () => void;
@@ -47,6 +49,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       live: authApi.live,
       async login(email, password) {
         const payload = await authApi.login(email, password);
+        authApi.persist(payload);
+        setUser(payload.user);
+        setToken(payload.token);
+      },
+      requestEmailCode: (email) => authApi.requestEmailCode(email),
+      async loginWithCode(email, code) {
+        const payload = await authApi.loginWithCode(email, code);
         authApi.persist(payload);
         setUser(payload.user);
         setToken(payload.token);

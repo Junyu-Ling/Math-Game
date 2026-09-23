@@ -376,6 +376,22 @@ export async function clearVerify(email) {
   await kvDel(`axiom:verify:${String(email).toLowerCase()}`);
 }
 
+function loginCodeKey(email) {
+  return `axiom:logincode:${String(email).toLowerCase()}`;
+}
+
+export async function stashLoginCode(email, payload) {
+  await kvSet(loginCodeKey(email), payload, 600);
+}
+
+export async function takeLoginCode(email) {
+  return readJson(loginCodeKey(email));
+}
+
+export async function clearLoginCode(email) {
+  await kvDel(loginCodeKey(email));
+}
+
 
 async function scanKeys(matchPrefix) {
   const keys = [];

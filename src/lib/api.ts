@@ -157,6 +157,52 @@ export const authApi = {
     return { token: mockToken(email), user };
   },
 
+  async requestEmailCode(email: string): Promise<{ needCode: boolean; hint?: string }> {
+    if (liveApi) {
+      return request("/api/auth/email-code", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ email }),
+      });
+    }
+    sessionStorage.setItem("axiom.loginCode", JSON.stringify({ email, code: "000000" }));
+    return { needCode: true, hint: "Local code: 000000" };
+  },
+
+  async loginWithCode(email: string, code: string): Promise<AuthPayload> {
+    if (liveApi) {
+      return request("/api/auth/email-login", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ email, code }),
+      });
+    }
+    const pending = JSON.parse(sessionStorage.getItem("axiom.loginCode") || "null") as
+      | { email: string; code: string }
+      | null;
+    if (!pending || pending.email !== email) throw new Error("No code requested");
+    if (code !== pending.code) throw new Error("Wrong code");
+    const users = readMockUsers();
+    let found = users.find((u) => u.email === email);
+    if (!found) {
+      found = {
+        id: `u_${Date.now()}`,
+        email,
+        chips: 1000,
+        createdAt: new Date().toISOString(),
+        provider: "email",
+        name: email.split("@")[0],
+        password: "",
+      };
+      users.push(found);
+      writeMockUsers(users);
+    }
+    sessionStorage.removeItem("axiom.loginCode");
+    const { password: _pw, ...user } = found;
+    void _pw;
+    return { token: mockToken(email), user };
+  },
+
   async login(email: string, password: string): Promise<AuthPayload> {
     if (liveApi) {
       return request("/api/auth/login", {
