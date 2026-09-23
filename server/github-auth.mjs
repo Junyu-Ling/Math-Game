@@ -64,10 +64,10 @@ function readCookie(req, name) {
   return "";
 }
 
-export function setOauthStateCookie(req, res, state) {
+export function setOauthStateCookie(req, res, state, name = STATE_COOKIE) {
   const secure = requestOrigin(req).startsWith("https:");
   const parts = [
-    `${STATE_COOKIE}=${encodeURIComponent(state)}`,
+    `${name}=${encodeURIComponent(state)}`,
     "Path=/",
     "Max-Age=600",
     "HttpOnly",
@@ -83,8 +83,8 @@ export function setOauthStateCookie(req, res, state) {
   res.setHeader("Set-Cookie", [...(Array.isArray(prev) ? prev : [prev]), cookie]);
 }
 
-export function verifyOauthState(req, state) {
-  const expected = readCookie(req, STATE_COOKIE);
+export function verifyOauthState(req, state, name = STATE_COOKIE) {
+  const expected = readCookie(req, name);
   const a = String(state || "");
   const b = String(expected || "");
   if (!a || !b || a.length !== b.length) return false;

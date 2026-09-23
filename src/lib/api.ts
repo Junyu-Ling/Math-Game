@@ -12,6 +12,7 @@ export type User = {
   name?: string;
   avatar?: string;
   githubId?: string;
+  googleId?: string;
 };
 
 export type AuthPayload = {
@@ -84,6 +85,7 @@ function userFromJwt(token: string): User | null {
       name: payload.name,
       avatar: payload.avatar,
       githubId: payload.githubId,
+      googleId: payload.googleId,
     };
   } catch {
     return null;
@@ -268,5 +270,9 @@ export const authApi = {
 
   githubStartUrl() {
     return liveApi ? `${apiBase}/api/auth/github/start` : "";
+  },
+
+  googleStartUrl() {
+    return liveApi ? `${apiBase}/api/auth/google/start` : "";
   },
 };

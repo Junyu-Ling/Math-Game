@@ -240,7 +240,16 @@ button:disabled {
 }
 
 .auth-method {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-bottom: 8px;
+}
+
+.btn.btn-google {
+  background: #ffffff;
+  color: var(--ink);
+  border-color: var(--line);
 }
 
 .auth-or {

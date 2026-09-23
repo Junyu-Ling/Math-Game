@@ -11,6 +11,7 @@ import {
   setOauthStateCookie,
   verifyOauthState,
 } from "./github-auth.mjs";
+import { beginGoogleLogin, fetchGoogleIdentity, googleReady, googleStateOk, googleUrls } from "./google-auth.mjs";
 import {
   adjustCpu,
   applyRoomAction,
@@ -46,6 +47,7 @@ function publicUser(u) {
     name: u.name || "",
     avatar: u.avatar || "",
     githubId: u.githubId || "",
+    googleId: u.googleId || "",
   };
 }
 
@@ -77,6 +79,38 @@ async function upsertGithubUser(identity) {
         name: identity.name,
         avatar: identity.avatar,
         provider: "github",
+        chips: 1000,
+        createdAt: new Date().toISOString(),
+      };
+  users.set(user.id, user);
+  await saveAccount(user);
+  return user;
+}
+
+async function upsertGoogleUser(identity) {
+  const fromRedis = identity.email ? await findAccountByEmail(identity.email) : null;
+  const existing =
+    fromRedis ||
+    [...users.values()].find((u) => u.googleId === identity.googleId) ||
+    [...users.values()].find((u) => u.email && u.email === identity.email);
+  const user = existing
+    ? {
+        ...existing,
+        googleId: identity.googleId,
+        login: identity.login || existing.login,
+        name: identity.name || existing.name,
+        avatar: identity.avatar || existing.avatar,
+        provider: existing.provider || "google",
+        email: existing.email || identity.email,
+      }
+    : {
+        id: identity.googleId,
+        email: identity.email,
+        googleId: identity.googleId,
+        login: identity.login,
+        name: identity.name,
+        avatar: identity.avatar,
+        provider: "google",
         chips: 1000,
         createdAt: new Date().toISOString(),
       };
@@ -124,6 +158,7 @@ export async function handle(req, res, path) {
     send(res, 200, {
       ok: true,
       github: githubReady(),
+      google: googleReady(),
       githubSecretIsUrl: githubSecretLooksLikeUrl(),
       match: false,
       lobby: true,
@@ -177,6 +212,46 @@ export async function handle(req, res, path) {
       res.end();
     } catch (err) {
       console.error("[auth/github]", err.message);
+      return fail("server");
+    }
+    return;
+  }
+
+  if (path === "auth/google/start") {
+    if (!googleReady()) {
+      res.statusCode = 503;
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.end("未配置 Google 登录。请在 Vercel 环境变量填写 GOOGLE_CLIENT_ID 和 GOOGLE_CLIENT_SECRET。");
+      return;
+    }
+    res.statusCode = 302;
+    res.setHeader("Location", beginGoogleLogin(req, res));
+    res.end();
+    return;
+  }
+
+  if (path === "auth/google/callback") {
+    const { frontend, callbackUrl } = googleUrls(req);
+    const fail = (code) => {
+      res.statusCode = 302;
+      res.setHeader("Location", `${frontend}/login?google_error=${encodeURIComponent(code)}`);
+      res.end();
+    };
+    if (!googleReady()) return fail("config");
+    if (query(req, "error")) return fail(query(req, "error") === "access_denied" ? "denied" : "server");
+    const code = query(req, "code");
+    const state = query(req, "state");
+    if (!code) return fail("missing_code");
+    if (!googleStateOk(req, state)) return fail("bad_state");
+    try {
+      const identity = await fetchGoogleIdentity(code, callbackUrl);
+      const user = await upsertGoogleUser(identity);
+      const token = signUser(user);
+      res.statusCode = 302;
+      res.setHeader("Location", `${frontend}/auth/callback#token=${encodeURIComponent(token)}`);
+      res.end();
+    } catch (err) {
+      console.error("[auth/google]", err.message);
       return fail("server");
     }
     return;
@@ -313,7 +388,9 @@ export async function handle(req, res, path) {
         send(res, 400, {
           error: user.githubId
             ? "Use GitHub to sign in to this account"
-            : "This account uses an email code. Request a code instead.",
+            : user.googleId
+              ? "Use Google to sign in to this account"
+              : "This account uses an email code. Request a code instead.",
         });
         return;
       }

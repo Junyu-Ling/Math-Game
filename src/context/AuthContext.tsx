@@ -15,6 +15,7 @@ type AuthState = {
   acceptToken: (token: string) => Promise<void>;
   setChips: (chips: number) => Promise<void>;
   githubStartUrl: string;
+  googleStartUrl: string;
 };
 
 const Ctx = createContext<AuthState | null>(null);
@@ -79,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(nextToken);
       },
       githubStartUrl: authApi.githubStartUrl(),
+      googleStartUrl: authApi.googleStartUrl(),
       async setChips(chips) {
         if (!token) return;
         const next = await authApi.updateChips(token, chips);

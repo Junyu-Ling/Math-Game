@@ -7,7 +7,6 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Redis from "ioredis";
-import nodemailer from "nodemailer";
 import { WebSocketServer } from "ws";
 import { applyAction, ARRANGE_MS, finishArrange, startCodaMatch, viewFor } from "./coda-engine.mjs";
 import {
@@ -20,6 +19,8 @@ import {
   setOauthStateCookie,
   verifyOauthState,
 } from "./github-auth.mjs";
+import { beginGoogleLogin, fetchGoogleIdentity, googleReady, googleStateOk, googleUrls } from "./google-auth.mjs";
+import { mailConfigured, sendCodeMail } from "./mail.mjs";
 import {
   adjustCpu,
   applyRoomAction,
@@ -119,16 +120,6 @@ async function cacheDel(key) {
   memKv.delete(key);
 }
 
-const mailer =
-  process.env.SMTP_HOST && process.env.SMTP_USER
-    ? nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT || 587),
-        secure: false,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-      })
-    : null;
-
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -173,6 +164,7 @@ function publicUser(u) {
     name: u.name || "",
     avatar: u.avatar || "",
     githubId: u.githubId || "",
+    googleId: u.googleId || "",
   };
 }
 
@@ -206,6 +198,36 @@ function upsertGithubUser(identity) {
   return user;
 }
 
+function upsertGoogleUser(identity) {
+  const users = readUsers();
+  let user =
+    users.find((u) => u.googleId === identity.googleId) ||
+    users.find((u) => u.email && u.email === identity.email);
+  if (!user) {
+    user = {
+      id: identity.googleId,
+      email: identity.email,
+      googleId: identity.googleId,
+      login: identity.login,
+      name: identity.name,
+      avatar: identity.avatar,
+      provider: "google",
+      chips: 1000,
+      createdAt: new Date().toISOString(),
+    };
+    users.push(user);
+  } else {
+    user.googleId = identity.googleId;
+    user.login = identity.login || user.login;
+    user.name = identity.name || user.name;
+    user.avatar = identity.avatar || user.avatar;
+    user.provider = user.provider || "google";
+    if (!user.email) user.email = identity.email;
+  }
+  writeUsers(users);
+  return user;
+}
+
 function auth(req, res, next) {
   const h = req.headers.authorization || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : "";
@@ -222,8 +244,9 @@ app.get("/api/health", async (_req, res) => {
   res.json({
     ok: true,
     redis: redisReady ? "PONG" : "memory",
-    smtp: Boolean(mailer),
+    smtp: mailConfigured(),
     github: githubReady(),
+    google: googleReady(),
     match: false,
     lobby: true,
     lobbyStore: lobbyStoreKind(),
@@ -263,6 +286,36 @@ app.get("/api/auth/github/callback", async (req, res) => {
   }
 });
 
+app.get("/api/auth/google/start", (req, res) => {
+  if (!googleReady()) {
+    return res
+      .status(503)
+      .send("Google login is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in server/.env.");
+  }
+  res.redirect(beginGoogleLogin(req, res));
+});
+
+app.get("/api/auth/google/callback", async (req, res) => {
+  const { frontend, callbackUrl } = googleUrls(req);
+  const fail = (code) => res.redirect(`${frontend}/login?google_error=${encodeURIComponent(code)}`);
+  if (!googleReady()) return fail("config");
+  if (req.query.error) return fail(req.query.error === "access_denied" ? "denied" : "server");
+  const code = String(req.query.code || "");
+  const state = String(req.query.state || "");
+  if (!code) return fail("missing_code");
+  if (!googleStateOk(req, state)) return fail("bad_state");
+  try {
+    const identity = await fetchGoogleIdentity(code, callbackUrl);
+    const user = upsertGoogleUser(identity);
+    await saveAccount(user);
+    const token = signUser(user);
+    res.redirect(`${frontend}/auth/callback#token=${encodeURIComponent(token)}`);
+  } catch (err) {
+    console.error("[auth/google]", err.message);
+    return fail("server");
+  }
+});
+
 app.post("/api/auth/register", async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   const password = String(req.body?.password || "");
@@ -276,13 +329,8 @@ app.post("/api/auth/register", async (req, res) => {
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const hash = bcrypt.hashSync(password, 10);
   await cacheSet(`verify:${email}`, JSON.stringify({ hash, code }), 600);
-  if (mailer) {
-    await mailer.sendMail({
-      from: process.env.SMTP_FROM,
-      to: email,
-      subject: "Axiom verification code",
-      text: `Your code is ${code}. It expires in 10 minutes.`,
-    });
+  const sent = await sendCodeMail(email, code, "Axiom verification code");
+  if (sent) {
     res.json({ needCode: true, hint: "A code was sent to your email. It expires in 10 minutes." });
     return;
   }
@@ -320,7 +368,11 @@ app.post("/api/auth/login", async (req, res) => {
   if (!user) return res.status(400).json({ error: "邮箱或密码错误" });
   if (!user.passwordHash) {
     return res.status(400).json({
-      error: user.githubId ? "该账号请用 GitHub 登录" : "该账号请用邮箱验证码登录",
+      error: user.githubId
+        ? "该账号请用 GitHub 登录"
+        : user.googleId
+          ? "该账号请用 Google 登录"
+          : "该账号请用邮箱验证码登录",
     });
   }
   if (!bcrypt.compareSync(password, user.passwordHash)) {
@@ -656,6 +708,7 @@ wss.on("connection", (ws, req) => {
 httpServer.listen(PORT, () => {
   console.log(`AXIOM API  http://localhost:${PORT}`);
   console.log(`WebSocket  ws://localhost:${PORT}/ws`);
-  console.log(mailer ? "SMTP 已配置" : "未配置 SMTP：验证码会显示在注册页，并打印在本终端");
+  console.log(mailConfigured() ? "SMTP 已配置" : "未配置 SMTP：验证码会显示在注册页，并打印在本终端");
   console.log(githubReady() ? "GitHub 登录已配置" : "未配置 GitHub：在 server/.env 填写 GITHUB_CLIENT_ID / SECRET");
+  console.log(googleReady() ? "Google 登录已配置" : "未配置 Google：在 server/.env 填写 GOOGLE_CLIENT_ID / SECRET");
 });

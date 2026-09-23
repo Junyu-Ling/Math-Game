@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 export function AuthCallback() {
   const { acceptToken } = useAuth();
   const nav = useNavigate();
-  const [msg, setMsg] = useState("Finishing GitHub login…");
+  const [msg, setMsg] = useState("Finishing sign-in…");
   const once = useRef(false);
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export function AuthCallback() {
 
   return (
     <div className="auth-wrap">
-      <p className="kicker">GitHub</p>
+      <p className="kicker">Account</p>
       <h1>Signing in</h1>
       <p className="lede">{msg}</p>
     </div>

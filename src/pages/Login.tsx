@@ -2,16 +2,20 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { GithubButton } from "../components/GithubButton";
+import { GoogleButton } from "../components/GoogleButton";
 import { IconMail } from "../components/Icons";
 
-const GH_ERR: Record<string, string> = {
-  config: "GITHUB_CLIENT_SECRET is missing. Add it to server/.env and restart.",
-  denied: "GitHub authorization was cancelled.",
-  missing_code: "GitHub did not return a code.",
-  bad_state: "Login state expired. Try again.",
-  server: "GitHub login failed. Try again.",
-  missing_token: "No login token received.",
-};
+function oauthError(provider: "GitHub" | "Google", code: string) {
+  const messages: Record<string, string> = {
+    config: `${provider} login is not configured. Add the client id and secret, then restart the API.`,
+    denied: `${provider} authorization was cancelled.`,
+    missing_code: `${provider} did not return a code.`,
+    bad_state: "Login state expired. Try again.",
+    server: `${provider} login failed. Try again.`,
+    missing_token: "No login token received.",
+  };
+  return messages[code] || "";
+}
 
 export function Login() {
   const { login, requestEmailCode, loginWithCode, live } = useAuth();
@@ -23,8 +27,12 @@ export function Login() {
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(GH_ERR[params.get("gh_error") || ""] || "");
-  const [err, setErr] = useState(Boolean(params.get("gh_error")));
+  const googleError = params.get("google_error") || "";
+  const githubError = params.get("gh_error") || "";
+  const [msg, setMsg] = useState(
+    googleError ? oauthError("Google", googleError) : oauthError("GitHub", githubError),
+  );
+  const [err, setErr] = useState(Boolean(googleError || githubError));
 
   function switchMode(next: "password" | "code") {
     setMode(next);
@@ -87,8 +95,9 @@ export function Login() {
     <div className="auth-wrap">
       <p className="kicker">{live ? "Live API" : "Local mock"}</p>
       <h1>Log in</h1>
-      <p className="lede">Use GitHub, a password, or a code sent to your email.</p>
+      <p className="lede">Use Google, GitHub, a password, or a code sent to your email.</p>
       <div className="auth-method">
+        <GoogleButton />
         <GithubButton />
       </div>
       <p className="auth-or">or email</p>
