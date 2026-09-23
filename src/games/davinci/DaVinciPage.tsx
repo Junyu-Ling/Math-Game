@@ -31,7 +31,8 @@ import {
 } from "./engine";
 import { MahjongTile } from "../../components/MahjongTile";
 import { DeckStack } from "../../components/PlayingCard";
-import { wait } from "../../lib/shuffle";
+import { CPU_THINK_MS, wait } from "../../lib/shuffle";
+import { measureFit } from "../../components/FitCards";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { InvitePanel } from "../../components/InvitePanel";
@@ -159,14 +160,8 @@ function Row({
     const row = rowRef.current;
     if (!wrap || !row) return;
     const fit = () => {
-      const avail = vertical ? wrap.clientHeight : wrap.clientWidth;
-      if (avail < 8) return;
-      const prev = row.style.zoom;
-      row.style.zoom = "1";
-      const box = row.getBoundingClientRect();
-      const need = vertical ? Math.max(row.scrollHeight, box.height) : Math.max(row.scrollWidth, box.width);
-      row.style.zoom = prev;
-      const next = need > avail ? Math.max(0.28, avail / need) : 1;
+      const next = measureFit(wrap, row, Boolean(vertical));
+      if (next == null) return;
       setZoom((z) => (Math.abs(z - next) < 0.004 ? z : next));
     };
     fit();
@@ -483,7 +478,7 @@ export function DaVinciPage() {
     if (!me || me.human || state.phase === "over" || arranging || state.phase === "rps" || state.phase === "lobby") return;
     let stop = false;
     (async () => {
-      await wait(180);
+      await wait(CPU_THINK_MS);
       if (stop) return;
       if (state.phase === "draw") {
         setState((s) => (s ? drawCard(s, aiDrawColor(s)) : s));

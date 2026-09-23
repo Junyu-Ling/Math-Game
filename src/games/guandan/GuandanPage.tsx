@@ -16,7 +16,7 @@ import { MixedCpuBar } from "../../components/MixedCpuBar";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
-import { wait } from "../../lib/shuffle";
+import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 import type { PokerCard } from "../../lib/poker";
 
 function BackFan({ n, side }: { n: number; side?: "left" | "right" | "top" }) {
@@ -103,7 +103,7 @@ export function GuandanPage() {
     if (!actor || !actor.id.startsWith("cpu")) return;
     let stop = false;
     void (async () => {
-      await wait(local.last || !local.jumpCard ? 550 : 1400);
+      await wait(local.last || !local.jumpCard ? CPU_THINK_MS : 1400);
       if (stop) return;
       setLocal((s) => {
         const id = s?.players[s.turn]?.id;

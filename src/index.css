@@ -295,8 +295,8 @@ button:disabled {
 
 .table-gd {
   display: grid;
-  grid-template-columns: minmax(108px, 18%) minmax(0, 1fr) minmax(108px, 18%);
-  grid-template-rows: minmax(100px, auto) minmax(180px, 1fr) minmax(196px, auto);
+  grid-template-columns: minmax(128px, 20%) minmax(0, 1fr) minmax(128px, 20%);
+  grid-template-rows: minmax(132px, auto) minmax(180px, 1fr) minmax(210px, auto);
   gap: 14px 16px;
   align-items: stretch;
   height: clamp(540px, 78dvh, 780px);
@@ -323,6 +323,9 @@ button:disabled {
   align-items: center;
   gap: 10px;
   min-width: 0;
+  overflow: visible;
+  padding: 6px;
+  box-sizing: border-box;
 }
 
 .ddz-tag {
@@ -386,6 +389,7 @@ button:disabled {
   flex-direction: column;
   --cw: 26px;
   --ch: 38px;
+  padding: 8px 10px 14px;
 }
 
 .ddz-fan.left > .card-svg,
@@ -510,7 +514,7 @@ button:disabled {
 
 @media (max-width: 860px) {
   .table-gd {
-    grid-template-columns: 64px minmax(0, 1fr) 64px;
+    grid-template-columns: minmax(88px, 22%) minmax(0, 1fr) minmax(88px, 22%);
   }
   .ddz-hand {
     --cw: 42px;

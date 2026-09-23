@@ -15,6 +15,8 @@ export function uid(prefix = "id"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+export const CPU_THINK_MS = 1000;
+
 export function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

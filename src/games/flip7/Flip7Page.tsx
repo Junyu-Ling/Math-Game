@@ -19,7 +19,7 @@ import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
-import { wait } from "../../lib/shuffle";
+import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 function aroundYou<T extends { id: string }>(players: T[], youId: string) {
   const i = Math.max(0, players.findIndex((p) => p.id === youId));
@@ -116,7 +116,7 @@ export function Flip7Page() {
     if (actor.human) return;
     let stop = false;
     void (async () => {
-      await wait(local.burst?.kind === "save" ? 1550 : 700);
+      await wait(local.burst?.kind === "save" ? 1550 : CPU_THINK_MS);
       if (stop) return;
       setLocal((s) => {
         if (!s || s.phase === "lobby" || currentFlip(s).human) return s;

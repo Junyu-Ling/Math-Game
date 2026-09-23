@@ -13,7 +13,7 @@ import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
-import { wait } from "../../lib/shuffle";
+import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 export function HoldemPage() {
   const { user } = useAuth();
@@ -39,7 +39,7 @@ export function HoldemPage() {
     if (!actor || actor.id === "you") return;
     let stop = false;
     void (async () => {
-      await wait(700);
+      await wait(CPU_THINK_MS);
       if (stop) return;
       setLocal((s) => {
         if (!s || s.players[s.turn]?.id !== "cpu") return s;

@@ -1,5 +1,35 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+export function measureFit(wrap: HTMLElement, row: HTMLElement, vertical: boolean) {
+  const style = getComputedStyle(wrap);
+  const pad = vertical
+    ? parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
+    : parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+  const avail = (vertical ? wrap.clientHeight : wrap.clientWidth) - pad - 6;
+  if (avail < 8) return null;
+  const prev = row.style.zoom;
+  row.style.zoom = "1";
+  const kids = row.children.length ? [...row.children] : [row];
+  let min = Infinity;
+  let max = -Infinity;
+  for (const kid of kids) {
+    const box = kid.getBoundingClientRect();
+    if (vertical) {
+      min = Math.min(min, box.top);
+      max = Math.max(max, box.bottom);
+    } else {
+      min = Math.min(min, box.left);
+      max = Math.max(max, box.right);
+    }
+  }
+  const rowBox = row.getBoundingClientRect();
+  const along = vertical ? Math.max(row.scrollHeight, rowBox.height) : Math.max(row.scrollWidth, rowBox.width);
+  const need = Math.max(along, max - min) + 12;
+  row.style.zoom = prev;
+  if (!Number.isFinite(need) || need <= 0) return 1;
+  return need > avail ? Math.max(0.28, avail / need) : 1;
+}
+
 export function FitCards({
   vertical = false,
   className = "",
@@ -18,14 +48,8 @@ export function FitCards({
     const row = rowRef.current;
     if (!wrap || !row) return;
     const fit = () => {
-      const avail = vertical ? wrap.clientHeight : wrap.clientWidth;
-      if (avail < 8) return;
-      const prev = row.style.zoom;
-      row.style.zoom = "1";
-      const box = row.getBoundingClientRect();
-      const need = vertical ? Math.max(row.scrollHeight, box.height) : Math.max(row.scrollWidth, box.width);
-      row.style.zoom = prev;
-      const next = need > avail ? Math.max(0.28, avail / need) : 1;
+      const next = measureFit(wrap, row, vertical);
+      if (next == null) return;
       setZoom((z) => (Math.abs(z - next) < 0.004 ? z : next));
     };
     fit();

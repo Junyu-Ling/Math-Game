@@ -572,12 +572,12 @@
 }
 
 .table-coda.coda-multi {
-  grid-template-columns: minmax(110px, 18%) minmax(0, 1fr) minmax(110px, 18%);
-  grid-template-rows: minmax(80px, 1fr) minmax(260px, auto) minmax(80px, 1fr);
+  grid-template-columns: minmax(128px, 20%) minmax(0, 1fr) minmax(128px, 20%);
+  grid-template-rows: minmax(150px, 1fr) minmax(200px, 1.15fr) minmax(168px, 1fr);
   align-items: center;
 }
 
-.table-coda.coda-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: hidden; min-height: 0; }
+.table-coda.coda-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: visible; min-height: 148px; }
 .table-coda.coda-multi > .seat-left { grid-column: 1; grid-row: 2; }
 .table-coda.coda-multi > .center-well { grid-column: 2; grid-row: 2; }
 .table-coda.coda-multi > .seat-right { grid-column: 3; grid-row: 2; }
@@ -602,17 +602,19 @@
 }
 .table-coda.coda-multi .seat-left,
 .table-coda.coda-multi .seat-right {
-  min-height: 260px;
+  min-height: 0;
   overflow: hidden;
   align-self: stretch;
-  height: auto;
+  height: 100%;
 }
 .table-coda.coda-multi .seat-left .tiles-wrap,
 .table-coda.coda-multi .seat-right .tiles-wrap {
   height: 100%;
-  min-height: 240px;
+  min-height: 0;
   width: 100%;
   overflow: hidden;
+  padding: 6px 4px;
+  box-sizing: border-box;
 }
 .table-coda.coda-multi > .center-well {
   height: auto;
@@ -630,12 +632,16 @@
   min-height: 0;
   padding: 8px 4px;
 }
+.table-coda.coda-multi .tiles-fit.is-vertical .tiles > * + * {
+  margin-top: -36px;
+}
 .side-tile {
-  width: var(--tile-h, 84px);
-  height: var(--tile-w, 56px);
+  width: calc(var(--tile-h, 84px) + 16px);
+  height: calc(var(--tile-h, 84px) + 16px);
   display: grid;
   place-items: center;
   overflow: visible;
+  flex: 0 0 auto;
 }
 .seat-left .side-tile .mj {
   transform: rotate(-90deg);
@@ -1071,6 +1077,8 @@
   display: flex;
   justify-content: center;
   overflow: hidden;
+  box-sizing: border-box;
+  padding: 8px 6px 12px;
 }
 
 .table-coda .tiles {
@@ -1092,6 +1100,11 @@
   --h: var(--tile-h, 84px);
   margin-left: 10px;
   margin-right: 10px;
+}
+
+.table-coda.coda-multi .tiles-fit:not(.is-vertical) .tiles {
+  padding: 8px 8px 16px;
+  min-height: 0;
 }
 
 .table-coda .seat.veiled .tiles {
@@ -1411,11 +1424,11 @@
 }
 
 .table-uno.uno-multi {
-  grid-template-columns: minmax(110px, 18%) minmax(0, 1fr) minmax(110px, 18%);
-  grid-template-rows: minmax(100px, auto) minmax(180px, 1fr) minmax(160px, auto);
+  grid-template-columns: minmax(148px, 22%) minmax(0, 1fr) minmax(148px, 22%);
+  grid-template-rows: minmax(168px, auto) minmax(180px, 1fr) minmax(176px, auto);
 }
 
-.table-uno.uno-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: hidden; min-height: 0; }
+.table-uno.uno-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: visible; min-height: 168px; }
 .table-uno.uno-multi > .seat-left { grid-column: 1; grid-row: 2; }
 .table-uno.uno-multi > .center-well { grid-column: 2; grid-row: 2; }
 .table-uno.uno-multi > .seat-right { grid-column: 3; grid-row: 2; }
@@ -1615,6 +1628,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  box-sizing: border-box;
+  padding: 8px 6px 12px;
 }
 
 .cards-fit.is-vertical {
@@ -1623,10 +1638,10 @@
 }
 
 .cards-fit .pcards {
-  overflow: hidden;
+  overflow: visible;
   gap: 10px;
   min-height: 0;
-  padding: 6px 8px 0;
+  padding: 4px 4px 8px;
 }
 
 .table-uno .cards-fit .pcards {
@@ -1648,11 +1663,12 @@
 }
 
 .side-card {
-  width: var(--ch, 130px);
-  height: var(--cw, 86px);
+  width: calc(var(--ch, 130px) + 16px);
+  height: calc(var(--ch, 130px) + 16px);
   display: grid;
   place-items: center;
   flex: 0 0 auto;
+  overflow: visible;
 }
 
 .seat-left .side-card > * {
@@ -1680,15 +1696,15 @@
 
 .seat-side {
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .table-flip.flip-multi {
-  grid-template-columns: minmax(110px, 18%) minmax(0, 1fr) minmax(110px, 18%);
-  grid-template-rows: minmax(100px, auto) minmax(180px, 1fr) minmax(160px, auto);
+  grid-template-columns: minmax(148px, 22%) minmax(0, 1fr) minmax(148px, 22%);
+  grid-template-rows: minmax(168px, auto) minmax(180px, 1fr) minmax(176px, auto);
 }
 
-.table-flip.flip-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: hidden; min-height: 0; }
+.table-flip.flip-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: visible; min-height: 168px; }
 .table-flip.flip-multi > .seat-left { grid-column: 1; grid-row: 2; }
 .table-flip.flip-multi > .center-well { grid-column: 2; grid-row: 2; }
 .table-flip.flip-multi > .seat-right { grid-column: 3; grid-row: 2; }
