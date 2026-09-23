@@ -848,7 +848,7 @@ function cpuIsToAct(room) {
       return s.players.some((p) => isCpuPlayer(p) && !s.rpsThrows?.[p.id]);
     }
     const cur = s.players[s.turn];
-    return Boolean(isCpuPlayer(cur) && (s.phase === "draw" || s.phase === "guess" || s.phase === "continue"));
+    return Boolean(isCpuPlayer(cur) && (s.phase === "draw" || s.phase === "guess" || s.phase === "continue" || s.phase === "penalty"));
   }
   if (room.game === "uno" || room.game === "flip7") {
     const cur = s.players[s.turn];
@@ -916,6 +916,12 @@ function playOneCpuTurn(room) {
     if (s.phase === "continue") {
       const keep = mods.coda.aiShouldContinue(s);
       room.state = mods.coda.applyAction(s, cur.id, { type: keep ? "continue" : "stay" });
+      return true;
+    }
+    if (s.phase === "penalty") {
+      const index = mods.coda.aiPenaltyIndex(s);
+      if (index < 0) return false;
+      room.state = mods.coda.applyAction(s, cur.id, { type: "penalty", index });
       return true;
     }
     return false;

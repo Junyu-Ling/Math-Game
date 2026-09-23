@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   aiDrawColor,
   aiGuess,
+  aiPenaltyIndex,
   aiShouldContinue,
   ARRANGE_MS,
   continueGuess,
@@ -15,6 +16,7 @@ import {
   selectTile,
   triedOnTile,
   setPendingSlot,
+  payPenalty,
   playRps,
   finishRps,
   startCoda,
@@ -66,13 +68,24 @@ function statusText(state: CodaState, myTurn: boolean, remain: number, matching:
     }
     return `Arrange ${remain.toFixed(1)}s · wait the full 5 seconds even after you pick a slot`;
   }
+  if (state.phase === "penalty") {
+    return myTurn
+      ? "Miss. Nothing was drawn — tap one of your hidden tiles to knock it down."
+      : `${currentPlayer(state).name} is choosing a hidden tile to knock down.`;
+  }
   if (state.phase === "guess" && state.selected) {
     return myTurn ? "Tile locked. Guess the number. Both of you see the arrow." : "Your rival is aiming at a tile.";
   }
   if (!myTurn) return `${currentPlayer(state).name} is thinking…`;
   if (state.phase === "draw") return myTurn ? "Pick black or white and draw that color." : "A rival is choosing a draw color.";
-  if (state.phase === "guess") return "Tap a hidden tile, then guess its number.";
-  if (state.phase === "continue") return "Hit. Keep guessing, or stay and insert in secret.";
+  if (state.phase === "guess") {
+    return state.deck.length === 0
+      ? "Deck is empty. Guess a hidden tile."
+      : "Tap a hidden tile, then guess its number.";
+  }
+  if (state.phase === "continue") {
+    return state.drawn ? "Hit. Keep guessing, or stay and insert in secret." : "Hit. Guess again, or end the turn.";
+  }
   return "";
 }
 
@@ -91,6 +104,7 @@ function Row({
   fresh,
   vertical,
   lockSize,
+  markHidden,
 }: {
   tiles: CodaTile[];
   hide: boolean;
@@ -106,6 +120,7 @@ function Row({
   fresh?: Record<string, string>;
   vertical?: boolean;
   lockSize?: boolean;
+  markHidden?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -140,7 +155,7 @@ function Row({
           tile={tile}
           hide={hide}
           selected={aimed}
-          aimed={aimed && !tile.revealed}
+          aimed={(aimed || Boolean(markHidden)) && !tile.revealed}
           flash={fx}
           down={Boolean(downRevealed && tile.revealed)}
           fresh={Boolean(fresh?.[tile.id])}
@@ -422,6 +437,11 @@ export function DaVinciPage() {
       if (fx) setFlash(fx);
     } else if (action.type === "continue") setState((s) => (s ? continueGuess(s) : s));
     else if (action.type === "stay") setState((s) => (s ? stay(s) : s));
+    else if (action.type === "penalty") {
+      if (!you) return;
+      setFlash({ kind: "miss", playerId: you.id, index: action.index });
+      setState((s) => (s ? payPenalty(s, action.index) : s));
+    }
     else if (action.type === "slot") setState((s) => (s ? setPendingSlot(s, action.index, you?.id) : s));
     else if (action.type === "rps") setState((s) => (s ? playRps(s, action.throw, you?.id) : s));
     else if (action.type === "pick" || action.type === "ready") {
@@ -515,6 +535,13 @@ export function DaVinciPage() {
         await wait(240);
         if (stop) return;
         setState((s) => (s ? (aiShouldContinue(s) ? continueGuess(s) : stay(s)) : s));
+        return;
+      }
+      if (state.phase === "penalty") {
+        const index = aiPenaltyIndex(state);
+        if (index < 0) return;
+        setFlash({ kind: "miss", playerId: me.id, index });
+        setState((s) => (s ? payPenalty(s, index) : s));
       }
     })();
     return () => {
@@ -864,6 +891,13 @@ export function DaVinciPage() {
                 gaps={arrangeGaps}
                 ghostAt={myInsert ? autoSlot : null}
                 lockSize={Boolean(seated.left)}
+                markHidden={Boolean(myTurn && state.phase === "penalty")}
+                onTile={(i) => {
+                  if (!myTurn || state.phase !== "penalty") return;
+                  const tile = you.tiles[i];
+                  if (!tile || tile.revealed) return;
+                  dispatch({ type: "penalty", index: i });
+                }}
                 onGap={(i) => {
                   if (!arranging || !myInsert) return;
                   dispatch({ type: "slot", index: i });
@@ -950,10 +984,14 @@ export function DaVinciPage() {
                     : `Opening mix: black ${blackN} · white ${whiteN}${seats > 2 ? ` · ${seats}P` : ""}`}
             </p>
           </div>
-          {playing && state && (state.phase === "draw" || state.phase === "guess" || state.phase === "continue") ? (
+          {playing && state && (state.phase === "draw" || state.phase === "guess" || state.phase === "continue" || state.phase === "penalty") ? (
             <div className="coda-play-actions">
               <div>
-                <h3>Guess {state.selected ? "· locked" : "· tap a hidden tile first"}</h3>
+                <h3>
+                  {state.phase === "penalty"
+                    ? "Knock down · tap one of your hidden tiles"
+                    : `Guess ${state.selected ? "· locked" : "· tap a hidden tile first"}`}
+                </h3>
                 <div className="pad">
                   {numbers.map((n) => {
                     const used = selectedTried.has(n);
@@ -999,7 +1037,7 @@ export function DaVinciPage() {
                   disabled={!(state.phase === "continue" && myTurn)}
                   onClick={() => dispatch({ type: "stay" })}
                 >
-                  STAY
+                  {state.drawn ? "STAY" : "END TURN"}
                 </button>
               </div>
             </div>
@@ -1012,6 +1050,7 @@ export function DaVinciPage() {
               <li>Each color has 0–11 plus one dash. The dash is shuffled in with the numbers, so it is not guaranteed in the opening 4.</li>
               <li>The veil is opening-only. Inserts wait the full 5 seconds even after you pick a slot.</li>
               <li>After the opening 4, two players play rock-paper-scissors and the loser guesses first. With 3 or 4, a random player draws first.</li>
+              <li>When the deck is empty, play continues. Skip the draw and guess. A hit lets you guess again or end the turn. A miss knocks down one of your own hidden tiles.</li>
             </ul>
           </div>
           <div>

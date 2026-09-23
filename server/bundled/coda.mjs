@@ -148,17 +148,24 @@ function emptyCodaPlayer(p) {
     ready: false
   };
 }
+function withTurn(state, turn) {
+  const player = state.players[turn];
+  return {
+    ...state,
+    turn,
+    phase: state.deck.length === 0 ? "guess" : "draw",
+    drawn: null,
+    selected: null,
+    fresh: player ? expireFresh(state.fresh, player.id) : state.fresh ?? {}
+  };
+}
 function afterOpening(state) {
   if (state.players.length !== 2) {
     const living = state.players.filter((p) => !p.out);
     const pick = living[Math.floor(Math.random() * Math.max(1, living.length))] ?? state.players[0];
     const turn = Math.max(0, state.players.findIndex((p) => p.id === pick?.id));
     return {
-      ...state,
-      turn,
-      phase: "draw",
-      drawn: null,
-      selected: null,
+      ...withTurn(state, turn),
       log: [...state.log, { id: uid("l"), text: `${state.players[turn]?.name} draws first.` }]
     };
   }
@@ -362,16 +369,7 @@ function nextTurn(state) {
   for (let n = 0; n < state.players.length; n++) {
     i = (i + 1) % state.players.length;
     const p = state.players[i];
-    if (p && !p.out) {
-      return {
-        ...state,
-        turn: i,
-        phase: "draw",
-        drawn: null,
-        selected: null,
-        fresh: expireFresh(state.fresh, p.id)
-      };
-    }
+    if (p && !p.out) return withTurn(state, i);
   }
   return state;
 }
@@ -395,7 +393,7 @@ function aiDrawColor(state) {
 function drawCard(state, color) {
   if (state.phase !== "draw") return state;
   if (state.deck.length === 0) {
-    return { ...state, phase: "guess", drawn: null, log: [...state.log, { id: uid("l"), text: "Deck is empty. Guess now." }] };
+    return { ...state, phase: "guess", drawn: null, selected: null };
   }
   const want = color ?? aiDrawColor(state);
   const idx = state.deck.findIndex((t) => t.color === want);
@@ -458,7 +456,7 @@ function guessTile(state, guess) {
         tiles: p.tiles.map((t, i) => i === state.selected?.index ? { ...t, revealed: true } : t)
       }
     );
-    let next2 = {
+    let next = {
       ...state,
       tried,
       players,
@@ -469,11 +467,11 @@ function guessTile(state, guess) {
         { id: uid("l"), text: `${me.name} guessed ${target.name}'s ${label}.`, tone: me.human ? "you" : "ai" }
       ]
     };
-    next2 = checkEliminations(next2);
-    if (next2.phase === "over") return next2;
-    const stillHidden = next2.players.some((p) => p.id !== me.id && !p.out && p.tiles.some((t) => !t.revealed));
-    if (!stillHidden) return stay(next2);
-    return next2;
+    next = checkEliminations(next);
+    if (next.phase === "over") return next;
+    const stillHidden = next.players.some((p) => p.id !== me.id && !p.out && p.tiles.some((t) => !t.revealed));
+    if (!stillHidden) return stay(next);
+    return next;
   }
   const revealedDrawn = state.drawn ? { ...state.drawn, revealed: true } : null;
   if (revealedDrawn) {
@@ -491,16 +489,69 @@ function guessTile(state, guess) {
       "next"
     );
   }
-  let next = {
+  const missed = {
     ...state,
     tried,
     drawn: null,
     selected: null,
-    log: [...state.log, { id: uid("l"), text: `${me.name} missed (${label}).`, tone: "bad" }]
+    log: [
+      ...state.log,
+      { id: uid("l"), text: `${me.name} missed (${label}). Knock down one of your hidden tiles.`, tone: "bad" }
+    ]
+  };
+  return beginPenalty(missed);
+}
+function hiddenIndexes(player) {
+  const out = [];
+  player.tiles.forEach((tile, index) => {
+    if (!tile.revealed) out.push(index);
+  });
+  return out;
+}
+function beginPenalty(state) {
+  const me = currentPlayer(state);
+  const hidden = hiddenIndexes(me);
+  if (hidden.length === 0) {
+    const next = checkEliminations(state);
+    if (next.phase === "over") return next;
+    return nextTurn(next);
+  }
+  if (hidden.length === 1) return payPenalty({ ...state, phase: "penalty" }, hidden[0]);
+  return { ...state, phase: "penalty", selected: null };
+}
+function payPenalty(state, index) {
+  if (state.phase !== "penalty") return state;
+  const me = currentPlayer(state);
+  const tile = me.tiles[index];
+  if (!tile || tile.revealed) return state;
+  const players = state.players.map(
+    (p) => p.id !== me.id ? p : { ...p, tiles: p.tiles.map((t, i) => i === index ? { ...t, revealed: true } : t) }
+  );
+  let next = {
+    ...state,
+    players,
+    drawn: null,
+    selected: null,
+    log: [...state.log, { id: uid("l"), text: `${me.name} knocks down ${formatTile(tile, false)}.`, tone: "bad" }]
   };
   next = checkEliminations(next);
   if (next.phase === "over") return next;
   return nextTurn(next);
+}
+function aiPenaltyIndex(state) {
+  const me = currentPlayer(state);
+  let best = -1;
+  let bestRemaining = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < me.tiles.length; index++) {
+    const tile = me.tiles[index];
+    if (!tile || tile.revealed) continue;
+    const remaining = possibleValues(me, index).length;
+    if (remaining < bestRemaining) {
+      bestRemaining = remaining;
+      best = index;
+    }
+  }
+  return best;
 }
 function continueGuess(state) {
   if (state.phase !== "continue") return state;
@@ -815,6 +866,8 @@ function applyAction(state, actorId, action) {
       return isActorTurn(state, actorId) ? continueGuess(state) : state;
     case "stay":
       return isActorTurn(state, actorId) ? stay(state) : state;
+    case "penalty":
+      return isActorTurn(state, actorId) ? payPenalty(state, action.index) : state;
     case "slot":
       return setPendingSlot(state, action.index, actorId);
     case "rps":
@@ -878,6 +931,7 @@ export {
   RPS_REVEAL_MS,
   aiDrawColor,
   aiGuess,
+  aiPenaltyIndex,
   aiShouldContinue,
   applyAction,
   continueGuess,
@@ -891,6 +945,7 @@ export {
   guessTile,
   insertIndices,
   isSorted,
+  payPenalty,
   pickCodaMix,
   placeDrawn,
   playRps,

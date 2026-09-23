@@ -25,7 +25,7 @@ export type CodaPlayer = {
 
 export type CodaLog = { id: string; text: string; tone?: "you" | "ai" | "bad" };
 
-export type CodaPhase = "lobby" | "arrange" | "rps" | "draw" | "guess" | "continue" | "over";
+export type CodaPhase = "lobby" | "arrange" | "rps" | "draw" | "guess" | "continue" | "penalty" | "over";
 export type RpsThrow = "rock" | "paper" | "scissors";
 
 export const ARRANGE_MS = 5000;
@@ -208,17 +208,25 @@ function emptyCodaPlayer(p: { id: string; name: string; human?: boolean }): Coda
   };
 }
 
+function withTurn(state: CodaState, turn: number): CodaState {
+  const player = state.players[turn];
+  return {
+    ...state,
+    turn,
+    phase: state.deck.length === 0 ? "guess" : "draw",
+    drawn: null,
+    selected: null,
+    fresh: player ? expireFresh(state.fresh, player.id) : (state.fresh ?? {}),
+  };
+}
+
 function afterOpening(state: CodaState): CodaState {
   if (state.players.length !== 2) {
     const living = state.players.filter((p) => !p.out);
     const pick = living[Math.floor(Math.random() * Math.max(1, living.length))] ?? state.players[0];
     const turn = Math.max(0, state.players.findIndex((p) => p.id === pick?.id));
     return {
-      ...state,
-      turn,
-      phase: "draw",
-      drawn: null,
-      selected: null,
+      ...withTurn(state, turn),
       log: [...state.log, { id: uid("l"), text: `${state.players[turn]?.name} draws first.` }],
     };
   }
@@ -447,16 +455,7 @@ function nextTurn(state: CodaState): CodaState {
   for (let n = 0; n < state.players.length; n++) {
     i = (i + 1) % state.players.length;
     const p = state.players[i];
-    if (p && !p.out) {
-      return {
-        ...state,
-        turn: i,
-        phase: "draw",
-        drawn: null,
-        selected: null,
-        fresh: expireFresh(state.fresh, p.id),
-      };
-    }
+    if (p && !p.out) return withTurn(state, i);
   }
   return state;
 }
@@ -484,7 +483,7 @@ export function aiDrawColor(state: CodaState): Color {
 export function drawCard(state: CodaState, color?: Color): CodaState {
   if (state.phase !== "draw") return state;
   if (state.deck.length === 0) {
-    return { ...state, phase: "guess", drawn: null, log: [...state.log, { id: uid("l"), text: "Deck is empty. Guess now." }] };
+    return { ...state, phase: "guess", drawn: null, selected: null };
   }
   const want = color ?? aiDrawColor(state);
   const idx = state.deck.findIndex((t) => t.color === want);
@@ -590,16 +589,75 @@ export function guessTile(state: CodaState, guess: CodaValue): CodaState {
       "next",
     );
   }
-  let next: CodaState = {
+  const missed: CodaState = {
     ...state,
     tried,
     drawn: null,
     selected: null,
-    log: [...state.log, { id: uid("l"), text: `${me.name} missed (${label}).`, tone: "bad" }],
+    log: [
+      ...state.log,
+      { id: uid("l"), text: `${me.name} missed (${label}). Knock down one of your hidden tiles.`, tone: "bad" },
+    ],
+  };
+  return beginPenalty(missed);
+}
+
+function hiddenIndexes(player: CodaPlayer): number[] {
+  const out: number[] = [];
+  player.tiles.forEach((tile, index) => {
+    if (!tile.revealed) out.push(index);
+  });
+  return out;
+}
+
+function beginPenalty(state: CodaState): CodaState {
+  const me = currentPlayer(state);
+  const hidden = hiddenIndexes(me);
+  if (hidden.length === 0) {
+    const next = checkEliminations(state);
+    if (next.phase === "over") return next;
+    return nextTurn(next);
+  }
+  if (hidden.length === 1) return payPenalty({ ...state, phase: "penalty" }, hidden[0]!);
+  return { ...state, phase: "penalty", selected: null };
+}
+
+export function payPenalty(state: CodaState, index: number): CodaState {
+  if (state.phase !== "penalty") return state;
+  const me = currentPlayer(state);
+  const tile = me.tiles[index];
+  if (!tile || tile.revealed) return state;
+  const players = state.players.map((p) =>
+    p.id !== me.id
+      ? p
+      : { ...p, tiles: p.tiles.map((t, i) => (i === index ? { ...t, revealed: true } : t)) },
+  );
+  let next: CodaState = {
+    ...state,
+    players,
+    drawn: null,
+    selected: null,
+    log: [...state.log, { id: uid("l"), text: `${me.name} knocks down ${formatTile(tile, false)}.`, tone: "bad" }],
   };
   next = checkEliminations(next);
   if (next.phase === "over") return next;
   return nextTurn(next);
+}
+
+export function aiPenaltyIndex(state: CodaState): number {
+  const me = currentPlayer(state);
+  let best = -1;
+  let bestRemaining = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < me.tiles.length; index++) {
+    const tile = me.tiles[index];
+    if (!tile || tile.revealed) continue;
+    const remaining = possibleValues(me, index).length;
+    if (remaining < bestRemaining) {
+      bestRemaining = remaining;
+      best = index;
+    }
+  }
+  return best;
 }
 
 export function continueGuess(state: CodaState): CodaState {
@@ -941,6 +999,7 @@ export type CodaAction =
   | { type: "guess"; value: CodaValue }
   | { type: "continue" }
   | { type: "stay" }
+  | { type: "penalty"; index: number }
   | { type: "slot"; index: number }
   | { type: "rps"; throw: RpsThrow }
   | { type: "pick"; black: number; white: number }
@@ -967,6 +1026,8 @@ export function applyAction(state: CodaState, actorId: string, action: CodaActio
       return isActorTurn(state, actorId) ? continueGuess(state) : state;
     case "stay":
       return isActorTurn(state, actorId) ? stay(state) : state;
+    case "penalty":
+      return isActorTurn(state, actorId) ? payPenalty(state, action.index) : state;
     case "slot":
       return setPendingSlot(state, action.index, actorId);
     case "rps":
