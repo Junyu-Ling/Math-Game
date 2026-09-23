@@ -19,7 +19,6 @@ export function Shell({ children }: { children: ReactNode }) {
           <NavLink to="/play/blackjack">21</NavLink>
           <NavLink to="/play/24">24</NavLink>
           <NavLink to="/play/holdem">Hold’em</NavLink>
-          <NavLink to="/play/guandan">Guandan</NavLink>
           <NavLink to="/play/uno">UNO</NavLink>
           {user ? (
             <>

@@ -44,16 +44,8 @@ const games = [
     preview: "hold" as const,
   },
   {
-    to: "/play/guandan",
-    idx: "06",
-    code: "GDAN",
-    name: "Guandan",
-    blurb: "Four players. Partners sit across. Two decks plus jokers.",
-    preview: "gdan" as const,
-  },
-  {
     to: "/play/uno",
-    idx: "07",
+    idx: "06",
     code: "UNO",
     name: "UNO",
     blurb: "Classic four-color ovals. Empty your hand to win.",
@@ -87,7 +79,7 @@ function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
       </div>
     );
   }
-  if (kind === "m24" || kind === "hold" || kind === "gdan") {
+  if (kind === "m24" || kind === "hold") {
     return (
       <div className="preview-row">
         <MiniPoker rank="A" suit="S" />
@@ -122,7 +114,7 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="kicker">Seven tables · Invite play</p>
+          <p className="kicker">Six tables · Invite play</p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
             Card art follows the physical decks. Practice against the CPU, or sign in and invite someone who is online.

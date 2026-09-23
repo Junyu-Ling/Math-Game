@@ -32,10 +32,12 @@ export function measureFit(wrap: HTMLElement, row: HTMLElement, vertical: boolea
 
 export function FitCards({
   vertical = false,
+  lockSize = false,
   className = "",
   children,
 }: {
   vertical?: boolean;
+  lockSize?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -47,6 +49,10 @@ export function FitCards({
     const wrap = wrapRef.current;
     const row = rowRef.current;
     if (!wrap || !row) return;
+    if (lockSize) {
+      setZoom((z) => (z === 1 ? z : 1));
+      return;
+    }
     const fit = () => {
       const next = measureFit(wrap, row, vertical);
       if (next == null) return;
@@ -57,7 +63,7 @@ export function FitCards({
     ro.observe(wrap);
     ro.observe(row);
     return () => ro.disconnect();
-  }, [children, vertical]);
+  }, [children, vertical, lockSize]);
 
   return (
     <div className={`cards-fit ${vertical ? "is-vertical" : ""} ${className}`.trim()} ref={wrapRef}>

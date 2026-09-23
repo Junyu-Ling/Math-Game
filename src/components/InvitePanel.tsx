@@ -8,7 +8,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
   const { user } = useAuth();
   const { online, error, invite, room, store, inviteCooldownMs } = useLobby();
   const tableWait =
-    Boolean(room && ["guandan", "coda", "uno", "flip7"].includes(room.game) && (room.view as { phase?: string } | undefined)?.phase === "lobby");
+    Boolean(room && ["coda", "uno", "flip7"].includes(room.game) && (room.view as { phase?: string } | undefined)?.phase === "lobby");
   const host = Boolean(user && room?.seats?.[0] === user.id);
   const seated = new Set(room?.seats || []);
   const cooling = inviteCooldownMs > 0;
@@ -31,7 +31,6 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       {store === "memory" ? (
         <p>Lobby is in-memory. Set REDIS_URL in production so accounts can see each other.</p>
       ) : null}
-      {game === "guandan" ? <p>Guandan needs four. Invite people, add CPUs for empty seats, or both. Deal starts at 4/4.</p> : null}
       {game === "coda" ? <p>Da Vinci Code is 2–4. Mix humans and CPUs, everyone picks black/white, then ready.</p> : null}
       {game === "uno" ? <p>UNO is 2–4. Mix humans and CPUs, then the host starts.</p> : null}
       {game === "flip7" ? <p>Flip 7 is 1–4. Mix humans and CPUs, then the host starts.</p> : null}

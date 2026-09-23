@@ -35,6 +35,7 @@ function FlipSeat({
   player,
   className,
   vertical,
+  lockSize,
   turn,
   burst,
   fx,
@@ -43,6 +44,7 @@ function FlipSeat({
   player: FlipPlayer;
   className: string;
   vertical?: boolean;
+  lockSize?: boolean;
   turn: boolean;
   burst: FlipState["burst"];
   fx: { id: string; boom: boolean; spin: boolean } | null;
@@ -61,7 +63,7 @@ function FlipSeat({
         {player.area.some((c) => c.kind === "chance") ? " · 2ND CHANCE" : ""}
         {turn ? " · TURN" : ""}
       </div>
-      <FitCards vertical={vertical}>
+      <FitCards vertical={vertical} lockSize={lockSize}>
         {player.area.map((c) => {
           const face = <FlipFace key={c.id} card={c} />;
           return vertical ? <SideCard key={c.id}>{face}</SideCard> : face;
@@ -216,13 +218,13 @@ export function Flip7Page() {
           ) : (
             <>
               {seated.partner ? (
-                <FlipSeat player={seated.partner} className="seat-partner" turn={cur?.id === seated.partner.id} burst={burst} fx={fx} />
+                <FlipSeat player={seated.partner} className="seat-partner" turn={cur?.id === seated.partner.id} burst={burst} fx={fx} lockSize={Boolean(seated.left)} />
               ) : null}
               {seated.rival ? (
-                <FlipSeat player={seated.rival} className="seat-rival" turn={cur?.id === seated.rival.id} burst={burst} fx={fx} />
+                <FlipSeat player={seated.rival} className="seat-rival" turn={cur?.id === seated.rival.id} burst={burst} fx={fx} lockSize={Boolean(seated.left)} />
               ) : null}
               {seated.left ? (
-                <FlipSeat player={seated.left} className="seat-left" vertical turn={cur?.id === seated.left.id} burst={burst} fx={fx} />
+                <FlipSeat player={seated.left} className="seat-left" vertical turn={cur?.id === seated.left.id} burst={burst} fx={fx} lockSize={Boolean(seated.left)} />
               ) : null}
               <div className="center-well">
                 <div className="flip-center-row">
@@ -252,10 +254,10 @@ export function Flip7Page() {
                 </div>
               </div>
               {seated.right ? (
-                <FlipSeat player={seated.right} className="seat-right" vertical turn={cur?.id === seated.right.id} burst={burst} fx={fx} />
+                <FlipSeat player={seated.right} className="seat-right" vertical turn={cur?.id === seated.right.id} burst={burst} fx={fx} lockSize={Boolean(seated.left)} />
               ) : null}
               <div className="seat seat-you">
-                <FlipSeat player={me} className="seat-you-inner" turn={myTurn} burst={burst} fx={fx} mine />
+                <FlipSeat player={me} className="seat-you-inner" turn={myTurn} burst={burst} fx={fx} lockSize={Boolean(seated.left)} mine />
                 <div className="row-actions">
                   <button
                     className="btn btn-go"

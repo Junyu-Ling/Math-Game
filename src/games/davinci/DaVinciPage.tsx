@@ -88,6 +88,7 @@ function Row({
   reserveSlot,
   fresh,
   vertical,
+  lockSize,
 }: {
   tiles: CodaTile[];
   hide: boolean;
@@ -102,6 +103,7 @@ function Row({
   reserveSlot?: boolean;
   fresh?: Record<string, string>;
   vertical?: boolean;
+  lockSize?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -160,7 +162,7 @@ function Row({
     const row = rowRef.current;
     if (!wrap || !row) return;
     const fit = () => {
-      if (vertical) {
+      if (vertical || lockSize) {
         setZoom((z) => (z === 1 ? z : 1));
         return;
       }
@@ -172,7 +174,7 @@ function Row({
     const ro = new ResizeObserver(() => requestAnimationFrame(fit));
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, [tiles, gaps, ghostAt, reserveSlot, vertical]);
+  }, [tiles, gaps, ghostAt, reserveSlot, vertical, lockSize]);
 
   return (
     <div className={`tiles-fit ${vertical ? "is-vertical" : ""}`} ref={wrapRef}>
@@ -195,6 +197,7 @@ function OppSeat({
   fresh,
   selectedIndex,
   onTile,
+  lockSize,
 }: {
   player: { id: string; name: string; out: boolean };
   className: string;
@@ -205,6 +208,7 @@ function OppSeat({
   fresh?: Record<string, string>;
   selectedIndex?: number;
   onTile: (i: number) => void;
+  lockSize?: boolean;
 }) {
   return (
     <div className={`seat ${className} ${opening ? "veiled" : ""}`}>
@@ -229,6 +233,7 @@ function OppSeat({
           reserveSlot
           fresh={fresh}
           vertical={className === "seat-left" || className === "seat-right"}
+          lockSize={lockSize}
           onTile={onTile}
         />
       </div>
@@ -730,6 +735,7 @@ export function DaVinciPage() {
               className="seat-partner"
               tiles={seated.partner.tiles}
               opening={opening}
+              lockSize={Boolean(seated.left)}
               turn={me?.id === seated.partner.id}
               flash={flash}
               fresh={state.fresh}
@@ -743,6 +749,7 @@ export function DaVinciPage() {
               className="seat-rival"
               tiles={rivalRow}
               opening={opening}
+              lockSize={Boolean(seated.left)}
               turn={me?.id === seated.rival.id}
               flash={flash}
               fresh={state.fresh}
@@ -756,6 +763,7 @@ export function DaVinciPage() {
               className="seat-left"
               tiles={seated.left.tiles}
               opening={opening}
+              lockSize={Boolean(seated.left)}
               turn={me?.id === seated.left.id}
               flash={flash}
               fresh={state.fresh}
@@ -824,6 +832,7 @@ export function DaVinciPage() {
               className="seat-right"
               tiles={seated.right.tiles}
               opening={opening}
+              lockSize={Boolean(seated.left)}
               turn={me?.id === seated.right.id}
               flash={flash}
               fresh={state.fresh}
@@ -851,6 +860,7 @@ export function DaVinciPage() {
                 fresh={state.fresh}
                 gaps={arrangeGaps}
                 ghostAt={myInsert ? autoSlot : null}
+                lockSize={Boolean(seated.left)}
                 onGap={(i) => {
                   if (!arranging || !myInsert) return;
                   dispatch({ type: "slot", index: i });

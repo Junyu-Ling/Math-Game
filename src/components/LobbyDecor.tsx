@@ -4,7 +4,7 @@ import type { FlipCard } from "../games/flip7/engine";
 import type { UnoCard } from "../games/uno/engine";
 import type { PokerCard } from "../lib/poker";
 
-export type LobbyGame = "coda" | "flip7" | "uno" | "guandan" | "bj" | "holdem" | "m24";
+export type LobbyGame = "coda" | "flip7" | "uno" | "bj" | "holdem" | "m24";
 
 const poker = (id: string, suit: PokerCard["suit"], rank: PokerCard["rank"]): PokerCard => ({ id, suit, rank });
 
@@ -42,14 +42,6 @@ export function LobbyDecor({ game }: { game: LobbyGame }) {
           <span className="decor-card b"><UnoFace card={uno("ub", "blue", "skip")} /></span>
           <span className="decor-card c"><UnoFace card={uno("uy", "yellow", "reverse")} /></span>
           <span className="decor-card d"><UnoFace card={uno("ug", "green", "number", 2)} /></span>
-        </>
-      ) : null}
-      {game === "guandan" ? (
-        <>
-          <span className="decor-card a"><PokerFace card={poker("ga", "S", "A")} /></span>
-          <span className="decor-card b"><PokerFace card={poker("gk", "H", "K")} /></span>
-          <span className="decor-card c"><PokerFace card={poker("gb", "J", "BJ")} /></span>
-          <span className="decor-card d"><PokerFace card={poker("gr", "J", "RJ")} /></span>
         </>
       ) : null}
       {game === "bj" ? (

@@ -784,10 +784,6 @@ async function joinOpenTable(user, invite, mods) {
     if (rec.seats.length >= 4) throw new Error("The table is full");
     rec.seats = [...rec.seats, joiner.id];
     rec.state = rebuildLobby(rec, joiner, mods);
-    if (game === "guandan" && rec.seats.length === 4) {
-      rec.state = mods.guandan.startGuandanTable(rec.state.players.map((p) => ({ id: p.id, name: p.name })));
-      armCpuThink(rec);
-    }
     rec.seq = (rec.seq || 0) + 1;
     rec.mods = mods;
     await saveRoom(rec);
@@ -810,7 +806,6 @@ async function joinOpenTable(user, invite, mods) {
 }
 
 function newLobbyState(game, people, mods, meta) {
-  if (game === "guandan") return mods.guandan.startGuandanLobby(people);
   if (game === "uno") return mods.uno.startUnoLobby(people);
   if (game === "coda") return mods.coda.startCodaLobby(people, Boolean(meta?.useJokers));
   if (game === "flip7") return mods.flip.startFlip7Lobby(people);
@@ -819,7 +814,6 @@ function newLobbyState(game, people, mods, meta) {
 
 function rebuildLobby(rec, joiner, mods) {
   const people = peopleFromSeats(rec, joiner);
-  if (rec.game === "guandan") return mods.guandan.startGuandanLobby(people);
   if (rec.game === "uno") return mods.uno.startUnoLobby(people);
   if (rec.game === "flip7") return mods.flip.startFlip7Lobby(people);
   if (rec.game === "coda") {
@@ -861,11 +855,6 @@ function cpuIsToAct(room) {
     if (!isCpuPlayer(cur)) return false;
     if (room.game === "flip7") return s.phase === "target" || s.phase === "action";
     return true;
-  }
-  if (room.game === "guandan") {
-    if (s.phase !== "play") return false;
-    const cur = s.players[s.turn];
-    return Boolean(cur && isCpuId(cur.id));
   }
   return false;
 }
@@ -950,24 +939,10 @@ function playOneCpuTurn(room) {
     }
     return false;
   }
-
-  if (room.game === "guandan") {
-    const cur = s.players[s.turn];
-    try {
-      room.state = mods.guandan.applyGuandanAction(s, cur.id, mods.guandan.guandanBotAct(s, cur.id));
-    } catch {
-      try {
-        room.state = mods.guandan.applyGuandanAction(s, cur.id, { type: "pass" });
-      } catch {
-        return false;
-      }
-    }
-    return true;
-  }
   return false;
 }
 
-const OPEN_TABLES = new Set(["guandan", "coda", "uno", "flip7"]);
+const OPEN_TABLES = new Set(["coda", "uno", "flip7"]);
 
 export async function applyRoomAction(user, roomId, action, mods) {
   mods = mods || (await getMods());
@@ -993,10 +968,6 @@ export async function applyRoomAction(user, roomId, action, mods) {
     room.state = mods.uno.applyUnoAction(room.state, user.id, action);
   } else if (room.game === "holdem") {
     room.state = mods.holdem.applyHoldemAction(room.state, user.id, action);
-  } else if (room.game === "guandan") {
-    if (room.state?.phase === "play") {
-      room.state = mods.guandan.applyGuandanAction(room.state, user.id, action);
-    }
   }
   armCpuThink(room);
   room.seq = (room.seq || 0) + 1;
@@ -1050,7 +1021,6 @@ function publicRoom(room, viewerId) {
     if (room.game === "uno") view = mods.uno.viewUno(room.state, viewerId);
     if (room.game === "flip7") view = mods.flip.viewFlip7(room.state, viewerId);
     if (room.game === "holdem") view = mods.holdem.viewHoldem(room.state, viewerId);
-    if (room.game === "guandan") view = mods.guandan.viewGuandan(room.state, viewerId);
   }
   return {
     id: room.id,
@@ -1095,7 +1065,6 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
         rec.state = rebuildLobby(rec, extra, mods);
       }
     }
-    maybeDealGuandan(rec, mods);
     armCpuThink(rec);
     await saveRoom(rec);
     return { ok: true, room: publicRoom(rec, userId) };
@@ -1118,14 +1087,8 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
     rec.seats = rec.seats.filter((id) => id !== lastCpu);
     rec.state = rebuildLobby(rec, null, mods);
   }
-  maybeDealGuandan(rec, mods);
   armCpuThink(rec);
   rec.seq = (rec.seq || 0) + 1;
   await saveRoom(rec);
   return { ok: true, room: publicRoom(rec, userId) };
-}
-
-function maybeDealGuandan(rec, mods) {
-  if (rec.game !== "guandan" || rec.seats.length !== 4 || rec.state?.phase !== "lobby") return;
-  rec.state = mods.guandan.startGuandanTable(rec.state.players.map((p) => ({ id: p.id, name: p.name })));
 }

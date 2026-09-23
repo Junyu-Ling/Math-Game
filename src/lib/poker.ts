@@ -51,9 +51,3 @@ export function makeShoe(n = 1): PokerCard[] {
   return shuffle(Array.from({ length: n }, () => makeDeck()).flat());
 }
 
-export function makeGuandanDeck(): PokerCard[] {
-  const cards = [...makeDeck(), ...makeDeck()];
-  cards.push({ id: uid("pk"), suit: "J", rank: "BJ" }, { id: uid("pk"), suit: "J", rank: "RJ" });
-  cards.push({ id: uid("pk"), suit: "J", rank: "BJ" }, { id: uid("pk"), suit: "J", rank: "RJ" });
-  return shuffle(cards);
-}

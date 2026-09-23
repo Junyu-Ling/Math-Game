@@ -12,7 +12,6 @@ import { Flip7Page } from "./games/flip7/Flip7Page";
 import { BlackjackPage } from "./games/blackjack/BlackjackPage";
 import { Math24Page } from "./games/math24/Math24Page";
 import { HoldemPage } from "./games/holdem/HoldemPage";
-import { GuandanPage } from "./games/guandan/GuandanPage";
 import { UnoPage } from "./games/uno/UnoPage";
 
 export function App() {
@@ -32,7 +31,6 @@ export function App() {
             <Route path="/play/blackjack" element={<BlackjackPage />} />
             <Route path="/play/24" element={<Math24Page />} />
             <Route path="/play/holdem" element={<HoldemPage />} />
-            <Route path="/play/guandan" element={<GuandanPage />} />
             <Route path="/play/uno" element={<UnoPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -51,7 +51,6 @@ export const GAME_LABEL: Record<string, string> = {
   bj: "Blackjack",
   m24: "Make 24",
   holdem: "Hold’em",
-  guandan: "Guandan",
   uno: "UNO",
 };
 
@@ -91,6 +90,5 @@ export const GAME_PATH: Record<string, string> = {
   bj: "/play/blackjack",
   m24: "/play/24",
   holdem: "/play/holdem",
-  guandan: "/play/guandan",
   uno: "/play/uno",
 };
