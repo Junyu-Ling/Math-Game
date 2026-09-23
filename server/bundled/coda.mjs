@@ -238,7 +238,7 @@ function dealCodaTable(state) {
       out: false
     });
   });
-  const wait = players.some((p) => p.stash);
+  const wait = Boolean(state.useJokers);
   const stashSlots = {};
   for (const p of players) {
     if (p.stash) stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
@@ -268,7 +268,7 @@ function dealCodaTable(state) {
       ...state.log,
       {
         id: uid("l"),
-        text: wait ? "Opening: if anyone drew a dash, arrange for 5 seconds." : players.length === 2 ? "Opening 4 in hand. RPS \u2014 loser guesses first." : "Opening 4 in hand. First draw is random."
+        text: wait ? "Opening arrange." : players.length === 2 ? "Opening 4 in hand. RPS \u2014 loser guesses first." : "Opening 4 in hand. First draw is random."
       }
     ]
   };
@@ -578,7 +578,7 @@ function finishArrange(state) {
         pendingSlot: first ? stashSlots[first.id] ?? 0 : null,
         humanDraft: null,
         drawn: first?.stash ?? null,
-        log: [...state.log, { id: uid("l"), text: "Next dash. Number tiles stay \u2014 choose where this one sits." }]
+        log: [...state.log, { id: uid("l"), text: "Opening arrange." }]
       };
     }
     let next2 = {
@@ -827,10 +827,22 @@ function maskTile(tile) {
   if (tile.revealed) return tile;
   return { ...tile, value: 0 };
 }
+function viewerOwnsOpeningTile(state, viewerId, tile) {
+  if (!tile) return false;
+  const owner = state.players.find((p) => p.id === viewerId);
+  if (!owner) return false;
+  if (owner.stash?.id === tile.id) return true;
+  return (owner.queue ?? []).some((t) => t.id === tile.id);
+}
 function viewFor(state, viewerId) {
   const me = currentPlayer(state);
-  const showDrawn = Boolean(state.drawn && (me.id === viewerId || state.drawn.revealed));
-  const showPending = Boolean(state.pending && (me.id === viewerId || state.pending.revealed));
+  const openingArrange = state.phase === "arrange" && state.resume === "draw";
+  const showDrawn = Boolean(
+    state.drawn && (state.drawn.revealed || (openingArrange ? viewerOwnsOpeningTile(state, viewerId, state.drawn) : me.id === viewerId))
+  );
+  const showPending = Boolean(
+    state.pending && (state.pending.revealed || (openingArrange ? viewerOwnsOpeningTile(state, viewerId, state.pending) : me.id === viewerId))
+  );
   return {
     ...state,
     deck: state.deck.map((_, i) => ({
@@ -848,14 +860,15 @@ function viewFor(state, viewerId) {
     stashSlots: state.stashSlots[viewerId] !== void 0 ? { [viewerId]: state.stashSlots[viewerId] } : {},
     pendingSlot: me.id === viewerId ? state.pendingSlot : null,
     humanDraft: me.id === viewerId ? state.humanDraft : null,
+    frozenRival: state.frozenRival ? state.frozenRival.map(maskTile) : null,
     players: state.players.map((p) => ({
       ...p,
       tiles: p.id === viewerId ? p.tiles : p.tiles.map(maskTile),
-      stash: p.stash ? p.id === viewerId ? p.stash : maskTile(p.stash) : null,
-      queue: (p.queue ?? []).map((t) => p.id === viewerId ? t : maskTile(t))
+      stash: p.id === viewerId ? p.stash : null,
+      queue: p.id === viewerId ? p.queue ?? [] : []
     })),
-    drawn: state.drawn ? showDrawn ? state.drawn : maskTile(state.drawn) : null,
-    pending: state.pending ? showPending ? state.pending : maskTile(state.pending) : null,
+    drawn: !state.drawn ? null : showDrawn ? state.drawn : openingArrange ? null : maskTile(state.drawn),
+    pending: !state.pending ? null : showPending ? state.pending : openingArrange ? null : maskTile(state.pending),
     fresh: state.fresh ?? {}
   };
 }

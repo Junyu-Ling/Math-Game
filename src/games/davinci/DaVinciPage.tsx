@@ -45,7 +45,7 @@ type Flash = {
   index?: number;
 };
 
-function statusText(state: CodaState, myTurn: boolean, remain: number, matching: boolean): string {
+function statusText(state: CodaState, myTurn: boolean, remain: number, matching: boolean, ownDash = false): string {
   if (matching) return "Waiting for the invite to be accepted.";
   if (state.phase === "lobby") {
     const ready = state.players.filter((p) => p.ready).length;
@@ -60,7 +60,9 @@ function statusText(state: CodaState, myTurn: boolean, remain: number, matching:
   }
   if (state.phase === "arrange") {
     if (state.resume === "draw") {
-      return `Opening arrange ${remain.toFixed(1)}s · tile stays out — tap a gap to insert`;
+      return ownDash
+        ? `Opening arrange ${remain.toFixed(1)}s · tile stays out — tap a gap to insert`
+        : `Opening arrange ${remain.toFixed(1)}s`;
     }
     return `Arrange ${remain.toFixed(1)}s · wait the full 5 seconds even after you pick a slot`;
   }
@@ -521,11 +523,12 @@ export function DaVinciPage() {
   }, [state, me, arranging, online, you?.id]);
 
   const numbers = useMemo(() => Array.from({ length: 12 }, (_, i) => i), []);
+  const ownOpeningDash = Boolean(opening && you?.stash);
+  const drawnTile = ownOpeningDash ? you?.stash ?? null : opening ? null : (state?.drawn ?? null);
   const showDrawn = Boolean(
-    (state?.drawn && (myTurn || me?.id === you?.id || (state.drawn.revealed && arranging))) ||
-      (opening && you?.stash),
+    drawnTile &&
+      (ownOpeningDash || myTurn || me?.id === you?.id || (arranging && drawnTile.revealed)),
   );
-  const drawnTile = opening && you?.stash ? you.stash : state?.drawn;
   const aimedRival = state?.selected && rival && state.selected.playerId === rival.id ? state.selected.index : undefined;
   const aimedYou = state?.selected && you && state.selected.playerId === you.id ? state.selected.index : undefined;
   const selectedTried = new Set(
@@ -817,7 +820,7 @@ export function DaVinciPage() {
               </div>
             </div>
             <div className="hand-card">
-              <div className="seat-label">{arranging ? "To insert" : "Drawn tile"}</div>
+              <div className="seat-label">{ownOpeningDash || (arranging && !opening) ? "To insert" : "Drawn tile"}</div>
               {showDrawn && drawnTile ? (
                 <MahjongTile tile={drawnTile} hide={!drawnTile.revealed && me?.id !== you.id} />
               ) : (
@@ -943,7 +946,7 @@ export function DaVinciPage() {
                 : waiting && state
                   ? statusText(state, false, remain, false)
                   : playing && state
-                    ? statusText(state, myTurn, remain, false)
+                    ? statusText(state, myTurn, remain, false, ownOpeningDash)
                     : `Opening mix: black ${blackN} · white ${whiteN}${seats > 2 ? ` · ${seats}P` : ""}`}
             </p>
           </div>
