@@ -446,9 +446,9 @@ export function DaVinciPage() {
 
   useEffect(() => {
     if (!arranging) return;
-    const start = endsAtRef.current ? endsAtRef.current - ARRANGE_MS : Date.now();
+    const deadline = online && endsAtRef.current ? endsAtRef.current : Date.now() + ARRANGE_MS;
+    let id = 0;
     const tick = () => {
-      const deadline = endsAtRef.current ?? start + ARRANGE_MS;
       const left = Math.max(0, deadline - Date.now());
       setRemain(left / 1000);
       if (left <= 0) {
@@ -457,7 +457,7 @@ export function DaVinciPage() {
       }
     };
     tick();
-    const id = window.setInterval(tick, 50);
+    id = window.setInterval(tick, 50);
     return () => window.clearInterval(id);
   }, [state?.arrangeId, arranging, online]);
 
@@ -568,6 +568,8 @@ export function DaVinciPage() {
     if (codaRoom) void lobby.leave();
     setFlash(null);
     setYouId("you");
+    endsAtRef.current = null;
+    setRemain(ARRANGE_MS / 1000);
     setState(startCoda(jokers, blackN, whiteN, seats));
   }
 

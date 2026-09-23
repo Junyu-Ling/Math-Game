@@ -130,14 +130,9 @@ function openingSplit(black, white) {
 }
 function pullOpeningJoker(player) {
   const jokers = player.tiles.filter((t) => t.value === "joker");
-  let nums = player.tiles.filter((t) => t.value !== "joker").sort((a, b) => rank(a) - rank(b));
-  if (!jokers.length) return { ...player, tiles: nums, stash: null };
-  const [stash, ...extras] = jokers;
-  for (const extra of extras) {
-    const slot = Math.floor(Math.random() * (nums.length + 1));
-    nums = [...nums.slice(0, slot), extra, ...nums.slice(slot)];
-  }
-  return { ...player, tiles: nums, stash: stash ?? null };
+  const nums = player.tiles.filter((t) => t.value !== "joker").sort((a, b) => rank(a) - rank(b));
+  const [stash, ...queue] = jokers;
+  return { ...player, tiles: nums, stash: stash ?? null, queue };
 }
 function emptyCodaPlayer(p) {
   return {
@@ -146,6 +141,7 @@ function emptyCodaPlayer(p) {
     human: p.human !== false,
     tiles: [],
     stash: null,
+    queue: [],
     out: false,
     black: 2,
     white: 2,
@@ -231,9 +227,13 @@ function dealCodaTable(state) {
   const deck = makeDeck(state.useJokers);
   const players = seated.map((p) => {
     const split = openingSplit(p.black ?? 2, p.white ?? 2);
+    const dealtTiles = sortOpening([
+      ...takeByColor(deck, "black", split.black),
+      ...takeByColor(deck, "white", split.white)
+    ]);
     return pullOpeningJoker({
       ...p,
-      tiles: sortOpening([...takeByColor(deck, "black", split.black), ...takeByColor(deck, "white", split.white)]),
+      tiles: dealtTiles,
       stash: null,
       out: false
     });
@@ -528,6 +528,19 @@ function setPendingSlot(state, index, actorId) {
   if (actor.stash && state.resume === "draw") {
     const allowed2 = insertIndices(actor.tiles, actor.stash);
     if (!allowed2.includes(index)) return state;
+    const queue = actor.queue ?? [];
+    if (queue.length) {
+      const placed = {
+        ...insertInto(actor, actor.stash, index),
+        stash: queue[0] ?? null,
+        queue: queue.slice(1)
+      };
+      return {
+        ...state,
+        players: state.players.map((p) => p.id === actor.id ? placed : p),
+        stashSlots: { ...state.stashSlots, [actor.id]: index }
+      };
+    }
     const next = {
       ...state,
       stashSlots: { ...state.stashSlots, [actor.id]: index }
@@ -542,12 +555,37 @@ function setPendingSlot(state, index, actorId) {
   return { ...state, pendingSlot: index };
 }
 function settleStash(player, preferred) {
-  if (!player.stash) return player;
+  if (!player.stash) return { ...player, queue: player.queue ?? [] };
   const slot = pickSlot(player.tiles, player.stash, preferred, !player.human);
-  return { ...insertInto(player, player.stash, slot), stash: null };
+  return { ...insertInto(player, player.stash, slot), stash: null, queue: player.queue ?? [] };
+}
+function placeOpeningDashes(player, preferred) {
+  const held = [...player.stash ? [player.stash] : [], ...player.queue ?? []];
+  if (!held.length) return { ...player, stash: null, queue: [] };
+  let tiles = player.tiles;
+  let hint = preferred;
+  for (const card of held) {
+    const slot = pickSlot(tiles, card, hint, !player.human);
+    tiles = [...tiles.slice(0, slot), card, ...tiles.slice(slot)];
+    hint = player.human ? slot + 1 : null;
+  }
+  return { ...player, tiles, stash: null, queue: [] };
 }
 function finishArrange(state) {
   if (state.phase !== "arrange") return state;
+  if (state.resume === "draw") {
+    const players2 = state.players.map((p) => placeOpeningDashes(p, state.stashSlots[p.id] ?? null));
+    let next2 = {
+      ...state,
+      players: players2,
+      drawn: null,
+      fresh: state.fresh ?? {},
+      ...emptyArrange()
+    };
+    next2 = checkEliminations(next2);
+    if (next2.phase === "over") return next2;
+    return afterOpening(next2);
+  }
   const inserterId = (state.players[state.turn] ?? state.players[0])?.id;
   let players = state.players.map(
     (p) => p.id === inserterId && state.humanDraft ? { ...p, tiles: state.humanDraft, stash: p.stash } : p
@@ -686,6 +724,9 @@ function tilesAiCanSee(state, viewerId) {
       if (p.id === viewerId || tile.revealed) out.push(tile);
     }
     if (p.stash && (p.id === viewerId || p.stash.revealed)) out.push(p.stash);
+    for (const tile of p.queue ?? []) {
+      if (p.id === viewerId || tile.revealed) out.push(tile);
+    }
   }
   const actor = currentPlayer(state);
   if (state.drawn && (actor.id === viewerId || state.drawn.revealed)) out.push(state.drawn);
@@ -804,7 +845,8 @@ function viewFor(state, viewerId) {
     players: state.players.map((p) => ({
       ...p,
       tiles: p.id === viewerId ? p.tiles : p.tiles.map(maskTile),
-      stash: p.stash ? p.id === viewerId ? p.stash : maskTile(p.stash) : null
+      stash: p.stash ? p.id === viewerId ? p.stash : maskTile(p.stash) : null,
+      queue: (p.queue ?? []).map((t) => p.id === viewerId ? t : maskTile(t))
     })),
     drawn: state.drawn ? showDrawn ? state.drawn : maskTile(state.drawn) : null,
     pending: state.pending ? showPending ? state.pending : maskTile(state.pending) : null,
