@@ -496,10 +496,19 @@ export async function purgeRetiredAccounts() {
   for (const email of RETIRED_EMAILS) await forgetAccount(email);
 }
 
-async function listRoster(viewerId) {
+let rosterScan = { at: 0, live: [], ids: [] };
+
+async function rosterSource() {
+  if (Date.now() - rosterScan.at < 15000) return rosterScan;
   const live = await listPresence();
-  const liveMap = new Map(live.map((p) => [String(p.id), p]));
   const ids = [...(await smembers("axiom:users")), ...live.map((p) => String(p.id))];
+  rosterScan = { at: Date.now(), live, ids };
+  return rosterScan;
+}
+
+async function listRoster(viewerId) {
+  const { live, ids } = await rosterSource();
+  const liveMap = new Map(live.map((p) => [String(p.id), p]));
   const unique = [...new Set(ids.map(String))].filter((id) => id && id !== String(viewerId)).slice(0, 200);
   const profiles = await mgetJson(unique.map((id) => `axiom:u:${id}`));
   const accounts = await mgetJson(unique.filter((id) => !profiles.has(`axiom:u:${id}`)).map((id) => `axiom:acct:${id}`));

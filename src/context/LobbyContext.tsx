@@ -87,8 +87,12 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       try {
         abort?.abort();
         abort = new AbortController();
+        if (document.hidden) {
+          if (!stop) timer = window.setTimeout(tick, 20000);
+          return;
+        }
         const inRoom = Boolean(snapRef.current.room);
-        const needRoster = !inRoom && Date.now() - lastFull > 800;
+        const needRoster = !inRoom && Date.now() - lastFull > 20000;
         const next = needRoster
           ? await lobbyApi.sync(token, window.location.pathname, false)
           : await lobbyApi.watch(
