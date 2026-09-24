@@ -7,9 +7,9 @@ type AuthState = {
   loading: boolean;
   live: boolean;
   login: (email: string, password: string) => Promise<void>;
-  requestEmailCode: (email: string) => Promise<{ needCode: boolean; hint?: string }>;
+  requestEmailCode: (email: string) => Promise<{ needCode: boolean; hint?: string; cooldownSec?: number }>;
   loginWithCode: (email: string, code: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<{ needCode: boolean; hint?: string }>;
+  register: (email: string, password: string) => Promise<{ needCode: boolean; hint?: string; cooldownSec?: number }>;
   verify: (email: string, code: string) => Promise<void>;
   logout: () => void;
   acceptToken: (token: string) => Promise<void>;

@@ -35,6 +35,7 @@ import {
   snapshot,
   watchLobby,
   purgeRetiredAccounts,
+  claimCodeSend,
 } from "./lobby.mjs";
 import { accountForEmailCode, consumeEmailCode, requestEmailCode } from "./email-login.mjs";
 import { loadMods } from "./game-mods.mjs";
@@ -326,16 +327,27 @@ app.post("/api/auth/register", async (req, res) => {
   if (readUsers().some((u) => u.email === email)) {
     return res.status(400).json({ error: "That email is already registered" });
   }
+  if (await findAccountByEmail(email)) {
+    return res.status(400).json({ error: "That email is already registered" });
+  }
+  const claim = await claimCodeSend("register", email);
+  if (!claim.ok) {
+    return res.status(429).json({ error: `Wait ${claim.wait}s before asking for another code` });
+  }
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const hash = bcrypt.hashSync(password, 10);
-  await cacheSet(`verify:${email}`, JSON.stringify({ hash, code }), 600);
-  const sent = await sendCodeMail(email, code, "Axiom verification code");
+  await cacheSet(`verify:${email}`, JSON.stringify({ hash, code, sentAt: claim.sentAt || Date.now() }), 600);
+  const sent = await sendCodeMail(email, code, "Your Verification Code – Welcome to BiteByte");
   if (sent) {
-    res.json({ needCode: true, hint: "A code was sent to your email. It expires in 10 minutes." });
+    res.json({
+      needCode: true,
+      cooldownSec: 60,
+      hint: "A code was sent to your email. It expires in 10 minutes. You can request another in 60 seconds.",
+    });
     return;
   }
   console.log(`[mock mail] ${email} code = ${code}`);
-  res.json({ needCode: true, hint: `未配置 SMTP，验证码是 ${code}` });
+  res.json({ needCode: true, cooldownSec: 60, hint: `未配置 SMTP，验证码是 ${code}` });
 });
 
 app.post("/api/auth/verify", async (req, res) => {

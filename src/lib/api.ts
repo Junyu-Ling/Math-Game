@@ -116,7 +116,7 @@ export const authApi = {
     localStorage.removeItem(USER_KEY);
   },
 
-  async register(email: string, password: string): Promise<{ needCode: boolean; hint?: string }> {
+  async register(email: string, password: string): Promise<{ needCode: boolean; hint?: string; cooldownSec?: number }> {
     if (liveApi) {
       return request("/api/auth/register", {
         method: "POST",
@@ -130,7 +130,7 @@ export const authApi = {
       "axiom.pending",
       JSON.stringify({ email, password, code: "000000" }),
     );
-    return { needCode: true, hint: "Local code: 000000" };
+    return { needCode: true, hint: "Local code: 000000", cooldownSec: 60 };
   },
 
   async verify(email: string, code: string): Promise<AuthPayload> {
@@ -159,7 +159,7 @@ export const authApi = {
     return { token: mockToken(email), user };
   },
 
-  async requestEmailCode(email: string): Promise<{ needCode: boolean; hint?: string }> {
+  async requestEmailCode(email: string): Promise<{ needCode: boolean; hint?: string; cooldownSec?: number }> {
     if (liveApi) {
       return request("/api/auth/email-code", {
         method: "POST",
@@ -168,7 +168,7 @@ export const authApi = {
       });
     }
     sessionStorage.setItem("axiom.loginCode", JSON.stringify({ email, code: "000000" }));
-    return { needCode: true, hint: "Local code: 000000" };
+    return { needCode: true, hint: "Local code: 000000", cooldownSec: 60 };
   },
 
   async loginWithCode(email: string, code: string): Promise<AuthPayload> {

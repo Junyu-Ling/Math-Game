@@ -1,5 +1,6 @@
 import {
   clearLoginCode,
+  claimCodeSend,
   findAccountByEmail,
   rememberPlayer,
   saveAccount,
@@ -8,7 +9,6 @@ import {
 } from "./lobby.mjs";
 import { sendCodeMail } from "./mail.mjs";
 
-const RESEND_MS = 60_000;
 const MAX_ATTEMPTS = 5;
 
 function fail(message, status = 400) {
@@ -18,19 +18,20 @@ function fail(message, status = 400) {
 }
 
 export async function requestEmailCode(email) {
-  const pending = await takeLoginCode(email);
-  if (pending?.sentAt && Date.now() - pending.sentAt < RESEND_MS) {
-    const wait = Math.ceil((RESEND_MS - (Date.now() - pending.sentAt)) / 1000);
-    throw fail(`Wait ${wait}s before asking for another code`, 429);
+  const claim = await claimCodeSend("login", email);
+  if (!claim.ok) {
+    throw fail(`Wait ${claim.wait}s before asking for another code`, 429);
   }
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  await stashLoginCode(email, { code, sentAt: Date.now(), attempts: 0 });
-  const sent = await sendCodeMail(email, code, "Your Axiom login code");
+  // Overwrite any previous code so older mails stop working.
+  await stashLoginCode(email, { code, sentAt: claim.sentAt || Date.now(), attempts: 0 });
+  const sent = await sendCodeMail(email, code, "Your Verification Code – Welcome to BiteByte");
   if (!sent) console.log(`[mock mail] ${email} login code = ${code}`);
   return {
     needCode: true,
+    cooldownSec: 60,
     hint: sent
-      ? "A code was sent to your email. It expires in 10 minutes."
+      ? "A code was sent to your email. It expires in 10 minutes. You can request another in 60 seconds."
       : `SMTP is not configured. Your code is ${code}. It expires in 10 minutes.`,
   };
 }

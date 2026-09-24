@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { GithubButton } from "../components/GithubButton";
@@ -27,12 +27,21 @@ export function Login() {
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [now, setNow] = useState(Date.now());
   const googleError = params.get("google_error") || "";
   const githubError = params.get("gh_error") || "";
   const [msg, setMsg] = useState(
     googleError ? oauthError("Google", googleError) : oauthError("GitHub", githubError),
   );
   const [err, setErr] = useState(Boolean(googleError || githubError));
+  const cooldownSec = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
+
+  useEffect(() => {
+    if (cooldownUntil <= Date.now()) return;
+    const id = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, [cooldownUntil]);
 
   function switchMode(next: "password" | "code") {
     setMode(next);
@@ -60,16 +69,25 @@ export function Login() {
 
   async function onSendCode(e: { preventDefault(): void }) {
     e.preventDefault();
+    if (busy || cooldownSec > 0) return;
     setMsg("");
     setErr(false);
     setBusy(true);
     try {
       const res = await requestEmailCode(email.trim().toLowerCase());
       setSent(true);
+      setCooldownUntil(Date.now() + (res.cooldownSec ?? 60) * 1000);
+      setNow(Date.now());
       setMsg(res.hint || "Check your email for the code.");
     } catch (ex) {
       setErr(true);
-      setMsg(ex instanceof Error ? ex.message : "Could not send code");
+      const text = ex instanceof Error ? ex.message : "Could not send code";
+      setMsg(text);
+      const wait = text.match(/Wait (\d+)s/i);
+      if (wait) {
+        setCooldownUntil(Date.now() + Number(wait[1]) * 1000);
+        setNow(Date.now());
+      }
     } finally {
       setBusy(false);
     }
@@ -179,13 +197,22 @@ export function Login() {
             </div>
           ) : null}
           <div className="row-actions">
-            <button className="btn btn-icon" type="submit" disabled={busy}>
+            <button
+              className="btn btn-icon"
+              type="submit"
+              disabled={busy || (!sent && cooldownSec > 0)}
+            >
               <IconMail />
-              {sent ? "Log in" : "Send code"}
+              {sent ? "Log in" : cooldownSec > 0 ? `Send code (${cooldownSec}s)` : "Send code"}
             </button>
             {sent ? (
-              <button className="btn btn-ghost" type="button" disabled={busy} onClick={onSendCode}>
-                Resend
+              <button
+                className="btn btn-ghost"
+                type="button"
+                disabled={busy || cooldownSec > 0}
+                onClick={onSendCode}
+              >
+                {cooldownSec > 0 ? `Resend (${cooldownSec}s)` : "Resend"}
               </button>
             ) : (
               <Link to="/register" className="btn btn-ghost">

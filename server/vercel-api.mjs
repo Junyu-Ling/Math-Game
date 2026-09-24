@@ -28,6 +28,7 @@ import {
   takeVerify,
   clearVerify,
   watchLobby,
+  claimCodeSend,
 } from "./lobby.mjs";
 import { accountForEmailCode, consumeEmailCode, requestEmailCode } from "./email-login.mjs";
 import { sendCodeMail } from "./mail.mjs";
@@ -325,14 +326,20 @@ export async function handle(req, res, path) {
         send(res, 400, { error: "That email is already registered" });
         return;
       }
+      const claim = await claimCodeSend("register", email);
+      if (!claim.ok) {
+        send(res, 429, { error: `Wait ${claim.wait}s before asking for another code` });
+        return;
+      }
       const code = String(Math.floor(100000 + Math.random() * 900000));
-      await stashVerify(email, { hash: bcrypt.hashSync(password, 10), code });
-      const sent = await sendCodeMail(email, code, "Your Axiom verification code");
+      await stashVerify(email, { hash: bcrypt.hashSync(password, 10), code, sentAt: claim.sentAt || Date.now() });
+      const sent = await sendCodeMail(email, code, "Your Verification Code – Welcome to BiteByte");
       if (!sent) console.log(`[mock mail] ${email} verification code = ${code}`);
       send(res, 200, {
         needCode: true,
+        cooldownSec: 60,
         hint: sent
-          ? "A code was sent to your email. It expires in 10 minutes."
+          ? "A code was sent to your email. It expires in 10 minutes. You can request another in 60 seconds."
           : `Your verification code is ${code}. It expires in 10 minutes.`,
       });
     } catch (err) {

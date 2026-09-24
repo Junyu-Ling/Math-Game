@@ -408,6 +408,37 @@ export async function clearLoginCode(email) {
   await kvDel(loginCodeKey(email));
 }
 
+const CODE_SEND_MS = 60_000;
+
+function codeSendKey(kind, email) {
+  return `axiom:codesend:${String(kind)}:${String(email).toLowerCase()}`;
+}
+
+/** Returns remaining wait seconds, or 0 if a new code may be sent. */
+export async function codeSendWaitSec(kind, email) {
+  const raw = await kvGet(codeSendKey(kind, email));
+  if (raw == null) return 0;
+  const sentAt = Number(raw);
+  if (!Number.isFinite(sentAt)) return Math.ceil(CODE_SEND_MS / 1000);
+  const left = CODE_SEND_MS - (Date.now() - sentAt);
+  return left > 0 ? Math.ceil(left / 1000) : 0;
+}
+
+/** Atomically claim a 60s send window. False if another send is already in flight or cooling down. */
+export async function claimCodeSend(kind, email) {
+  const wait = await codeSendWaitSec(kind, email);
+  if (wait > 0) return { ok: false, wait };
+  const now = Date.now();
+  const got = await kvSetNx(codeSendKey(kind, email), String(now), Math.ceil(CODE_SEND_MS / 1000));
+  if (!got) {
+    const again = await codeSendWaitSec(kind, email);
+    return { ok: false, wait: Math.max(1, again || Math.ceil(CODE_SEND_MS / 1000)) };
+  }
+  return { ok: true, wait: 0, sentAt: now };
+}
+
+export { CODE_SEND_MS };
+
 
 async function scanKeys(matchPrefix) {
   const keys = [];

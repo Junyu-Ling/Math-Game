@@ -125,18 +125,27 @@ async function sendViaResendApi(to, code, subject) {
 
 export async function sendCodeMail(to, code, subject) {
   if (resendKey()) {
-    const ok = await sendViaResendApi(to, code, subject || "Your Verification Code – Welcome to BiteByte");
-    if (ok) return true;
+    try {
+      const ok = await sendViaResendApi(to, code, subject || "Your Verification Code – Welcome to BiteByte");
+      if (ok) return true;
+    } catch (err) {
+      console.error("[mail/resend]", err instanceof Error ? err.message : err);
+    }
   }
   const transport = mailer();
   if (!transport) return false;
-  const html = fillTemplate(code);
-  await transport.sendMail({
-    from: mailFrom() || process.env.SMTP_USER,
-    to,
-    subject: subject || "Your Verification Code – Welcome to BiteByte",
-    text: `Your Bitebyte code is ${code}. It expires in 10 minutes.`,
-    html: html || undefined,
-  });
-  return true;
+  try {
+    const html = fillTemplate(code);
+    await transport.sendMail({
+      from: mailFrom() || process.env.SMTP_USER,
+      to,
+      subject: subject || "Your Verification Code – Welcome to BiteByte",
+      text: `Your Bitebyte code is ${code}. It expires in 10 minutes.`,
+      html: html || undefined,
+    });
+    return true;
+  } catch (err) {
+    console.error("[mail/smtp]", err instanceof Error ? err.message : err);
+    return false;
+  }
 }
