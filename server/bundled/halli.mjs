@@ -174,20 +174,23 @@ function ringHalli(state, actorId) {
   const fruit = ringingFruit(state);
   const key = uid("ring");
   if (fruit) {
-    let taken = 0;
-    const players2 = state.players.map((p) => {
+    const collected = [];
+    const cleared = state.players.map((p) => {
       if (p.out) return p;
-      taken += p.open.length;
+      collected.push(...p.open);
       return { ...p, open: [] };
     });
-    const withScore = players2.map((p) => p.id === actorId ? { ...p, score: p.score + taken } : p);
+    const taken = collected.length;
+    const withCards = cleared.map(
+      (p) => p.id === actorId ? { ...p, deck: [...p.deck, ...collected], score: p.score + taken, out: false } : p
+    );
     let next2 = {
       ...state,
-      players: withScore,
+      players: withCards,
       lastRing: { playerId: actorId, ok: true, fruit, key },
       log: [
         ...state.log,
-        { id: uid("l"), text: `${actor.name} rings \u2014 five ${HALLI_LABEL[fruit].toLowerCase()}! +${taken}.` }
+        { id: uid("l"), text: `${actor.name} rings \u2014 five ${HALLI_LABEL[fruit].toLowerCase()}! +${taken} cards.` }
       ]
     };
     next2 = finishIfNeeded(next2);
@@ -214,7 +217,7 @@ function ringHalli(state, actorId) {
     }
     if (p.out) return p;
     const gift = gifts[gi++];
-    return gift ? { ...p, open: [...p.open, gift] } : p;
+    return gift ? { ...p, deck: [...p.deck, gift] } : p;
   });
   let next = {
     ...state,

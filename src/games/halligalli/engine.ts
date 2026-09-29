@@ -202,20 +202,25 @@ export function ringHalli(state: HalliState, actorId: string): HalliState {
   const key = uid("ring");
 
   if (fruit) {
-    let taken = 0;
-    const players = state.players.map((p) => {
+    const collected: HalliCard[] = [];
+    const cleared = state.players.map((p) => {
       if (p.out) return p;
-      taken += p.open.length;
+      collected.push(...p.open);
       return { ...p, open: [] as HalliCard[] };
     });
-    const withScore = players.map((p) => (p.id === actorId ? { ...p, score: p.score + taken } : p));
+    const taken = collected.length;
+    const withCards = cleared.map((p) =>
+      p.id === actorId
+        ? { ...p, deck: [...p.deck, ...collected], score: p.score + taken, out: false }
+        : p,
+    );
     let next: HalliState = {
       ...state,
-      players: withScore,
+      players: withCards,
       lastRing: { playerId: actorId, ok: true, fruit, key },
       log: [
         ...state.log,
-        { id: uid("l"), text: `${actor.name} rings — five ${HALLI_LABEL[fruit].toLowerCase()}! +${taken}.` },
+        { id: uid("l"), text: `${actor.name} rings — five ${HALLI_LABEL[fruit].toLowerCase()}! +${taken} cards.` },
       ],
     };
     next = finishIfNeeded(next);
@@ -243,7 +248,8 @@ export function ringHalli(state: HalliState, actorId: string): HalliState {
     }
     if (p.out) return p;
     const gift = gifts[gi++];
-    return gift ? { ...p, open: [...p.open, gift] } : p;
+    // Wrong ring: pay one card under each rival's deck (classic Halli Galli).
+    return gift ? { ...p, deck: [...p.deck, gift] } : p;
   });
   let next: HalliState = {
     ...state,
