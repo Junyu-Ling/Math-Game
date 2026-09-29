@@ -1747,35 +1747,60 @@
 .table-flip.flip-solo > .center-well { grid-row: 1; }
 .table-flip.flip-solo > .seat-you { grid-row: 2; }
 
-.uno-dir {
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  color: #111;
-  min-width: 56px;
+.uno-dir-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(360px, 74vw);
+  height: min(360px, 74vw);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 0;
+  color: #18e85a;
 }
 
-.uno-dir svg {
-  width: 52px;
-  height: 52px;
+.uno-dir-ring svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 0 12px rgba(24, 232, 90, 0.55));
 }
 
-.uno-dir span {
-  font-size: 10px;
+.uno-dir-ring span {
+  position: absolute;
+  right: 8%;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
+  color: #fff;
+  text-shadow: 0 0 8px rgba(10, 154, 58, 0.8);
+  background: linear-gradient(180deg, #2be866, #0fbf48);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  padding: 4px 12px;
+  box-shadow: 0 4px 14px rgba(15, 191, 72, 0.35);
 }
 
-.uno-dir.ccw svg {
-  animation: uno-dir-spin 6s linear infinite reverse;
+.uno-dir-ring.cw svg {
+  animation: uno-dir-spin 3.6s linear infinite;
 }
 
-.uno-dir.cw svg {
-  animation: uno-dir-spin 6s linear infinite;
+.uno-dir-ring.ccw svg {
+  animation: uno-dir-spin 3.6s linear infinite reverse;
+}
+
+.uno-dir-ring .uno-dir-trail {
+  stroke-dasharray: none;
 }
 
 @keyframes uno-dir-spin {
   to { transform: rotate(360deg); }
+}
+
+.uno-dir {
+  display: none;
 }
 
 .table-flip .seat .pcards > * + *,
@@ -1874,13 +1899,17 @@
   gap: 22px;
   min-height: 140px;
   width: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.table-uno .center-cards > :not(.uno-dir-ring) {
+  position: relative;
+  z-index: 2;
 }
 
 .table-uno .uno-side-mark {
-  grid-column: 3;
-  justify-self: start;
-  align-self: center;
-  padding-left: 16px;
+  display: none;
 }
 
 .table-uno .uno-plus-flag,
@@ -2317,7 +2346,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 
 .uno-bell {
   flex: 0 0 auto;
-  width: 72px;
+  width: 78px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -2329,9 +2358,10 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 }
 
 .uno-bell svg {
-  width: 64px;
-  height: 58px;
-  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.25));
+  width: 70px;
+  height: 78px;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.28));
+  transition: transform 0.12s ease, filter 0.2s ease;
 }
 
 .uno-bell span {
@@ -2344,8 +2374,20 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   animation: uno-bell-pulse 0.9s ease-in-out infinite;
 }
 
+.uno-bell.armed:not(:disabled) svg {
+  filter:
+    drop-shadow(0 4px 6px rgba(0, 0, 0, 0.28))
+    drop-shadow(0 0 10px rgba(226, 180, 40, 0.45));
+}
+
+.uno-bell:not(:disabled):active svg {
+  transform: translateY(2px) scale(0.96);
+}
+
 .uno-bell.rung svg {
-  filter: drop-shadow(0 0 8px rgba(226, 59, 59, 0.55));
+  filter:
+    drop-shadow(0 4px 6px rgba(0, 0, 0, 0.28))
+    drop-shadow(0 0 12px rgba(226, 59, 59, 0.6));
 }
 
 .uno-bell.rung span {
@@ -2354,7 +2396,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 
 .uno-bell:disabled {
   cursor: default;
-  opacity: 0.85;
+  opacity: 0.88;
 }
 
 @keyframes uno-bell-pulse {

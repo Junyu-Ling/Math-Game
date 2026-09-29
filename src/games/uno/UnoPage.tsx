@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   applyUnoAction,
@@ -42,6 +42,11 @@ function ServiceBell({
   mine: boolean;
   onRing?: () => void;
 }) {
+  const uid = useId().replace(/:/g, "");
+  const dome = `unoBellDome-${uid}`;
+  const rim = `unoBellRim-${uid}`;
+  const knob = `unoBellKnob-${uid}`;
+  const shade = `unoBellShade-${uid}`;
   return (
     <button
       className={`uno-bell ${rung ? "rung" : ""} ${armed ? "armed" : ""}`}
@@ -50,18 +55,46 @@ function ServiceBell({
       onClick={onRing}
       aria-label={rung ? "UNO called" : "Ring for UNO"}
     >
-      <svg viewBox="0 0 120 108" aria-hidden>
-        <ellipse cx="60" cy="94" rx="46" ry="10" fill="#1a1a1a" />
+      <svg viewBox="0 0 96 108" aria-hidden>
+        <defs>
+          <linearGradient id={dome} x1="18" y1="18" x2="78" y2="88" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#f7f8fa" />
+            <stop offset="28%" stopColor="#cfd5dc" />
+            <stop offset="55%" stopColor="#9aa3ad" />
+            <stop offset="78%" stopColor="#e8ebef" />
+            <stop offset="100%" stopColor="#7f8791" />
+          </linearGradient>
+          <linearGradient id={rim} x1="12" y1="78" x2="84" y2="96" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#2a2a2a" />
+            <stop offset="45%" stopColor="#111" />
+            <stop offset="100%" stopColor="#3a3a3a" />
+          </linearGradient>
+          <radialGradient id={knob} cx="50%" cy="35%" r="65%">
+            <stop offset="0%" stopColor="#fff" />
+            <stop offset="55%" stopColor="#d2d6db" />
+            <stop offset="100%" stopColor="#8b929b" />
+          </radialGradient>
+          <filter id={shade} x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="2.2" floodColor="#000" floodOpacity="0.35" />
+          </filter>
+        </defs>
+        <ellipse cx="48" cy="98" rx="30" ry="5" fill="#000" opacity="0.18" />
         <path
-          d="M16 86c2-42 24-62 44-62s42 20 44 62"
-          fill="#d8dce2"
-          stroke="#8d939b"
-          strokeWidth="1.4"
+          d="M18 86c1.2-40 14.5-62 30-62s28.8 22 30 62"
+          fill={`url(#${dome})`}
+          stroke="#6f767f"
+          strokeWidth="1.1"
+          filter={`url(#${shade})`}
         />
-        <ellipse cx="60" cy="86" rx="44" ry="8" fill="#111" />
-        <circle cx="60" cy="24" r="11" fill="#d5d8de" stroke="#8d939b" strokeWidth="1.2" />
-        <circle cx="60" cy="20" r="6.5" fill="#f4f5f7" />
-        <ellipse cx="44" cy="52" rx="10" ry="16" fill="#fff" opacity="0.28" />
+        <path d="M28 42c6-14 14-20 20-20 7 0 15 7 20 20" fill="#fff" opacity="0.34" />
+        <path d="M62 50c4 8 6 18 6.5 28" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" opacity="0.22" />
+        <ellipse cx="48" cy="86" rx="32" ry="8" fill={`url(#${rim})`} />
+        <ellipse cx="48" cy="84.5" rx="28" ry="5.2" fill="#1a1a1a" />
+        <ellipse cx="48" cy="83.2" rx="22" ry="3.4" fill="#2e2e2e" />
+        <rect x="45.2" y="16" width="5.6" height="14" rx="2.4" fill="#b8c0c6" stroke="#7d848d" strokeWidth="0.8" />
+        <circle cx="48" cy="16" r="9.2" fill={`url(#${knob})`} stroke="#6f767f" strokeWidth="1" />
+        <circle cx="45" cy="13.5" r="2.6" fill="#fff" opacity="0.55" />
+        <ellipse cx="48" cy="22.5" rx="4.2" ry="1.4" fill="#8a9199" opacity="0.55" />
       </svg>
       <span>UNO</span>
     </button>
@@ -120,15 +153,40 @@ function UnoSeat({
 
 function DirMark({ dir }: { dir: 1 | -1 }) {
   const cw = dir === -1;
+  const uid = useId().replace(/:/g, "");
+  const glow = `unoDirGlow-${uid}`;
+  const blur = `unoDirBlur-${uid}`;
   return (
-    <div className={`uno-dir ${cw ? "cw" : "ccw"}`} aria-label={cw ? "Clockwise" : "Counter-clockwise"}>
-      <svg viewBox="0 0 72 72" aria-hidden>
-        <circle cx="36" cy="36" r="26" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray="6 8" />
-        {cw ? (
-          <path d="M54 20l8 10-12 1z" fill="currentColor" />
-        ) : (
-          <path d="M18 20l-8 10 12 1z" fill="currentColor" />
-        )}
+    <div className={`uno-dir-ring ${cw ? "cw" : "ccw"}`} aria-label={cw ? "Clockwise" : "Counter-clockwise"}>
+      <svg viewBox="0 0 220 220" aria-hidden>
+        <defs>
+          <linearGradient id={glow} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#9dffb4" stopOpacity="0" />
+            <stop offset="18%" stopColor="#5dff88" stopOpacity="0.55" />
+            <stop offset="55%" stopColor="#22f266" stopOpacity="1" />
+            <stop offset="88%" stopColor="#12d94f" stopOpacity="1" />
+            <stop offset="100%" stopColor="#0bbf45" stopOpacity="1" />
+          </linearGradient>
+          <filter id={blur} x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3.2" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <circle cx="110" cy="110" r="90" fill="none" stroke="#18e85a" strokeOpacity="0.1" strokeWidth="26" />
+        <path
+          className="uno-dir-trail"
+          d="M168 38 A90 90 0 1 1 52 178"
+          fill="none"
+          stroke={`url(#${glow})`}
+          strokeWidth="20"
+          strokeLinecap="round"
+          filter={`url(#${blur})`}
+        />
+        <path className="uno-dir-head" d="M44 166l-24 32 38 0z" fill="#14e055" filter={`url(#${blur})`} />
+        <path className="uno-dir-head-core" d="M50 176l-14 18 22 0z" fill="#f2fff6" />
       </svg>
       <span>{cw ? "CW" : "CCW"}</span>
     </div>
@@ -303,6 +361,7 @@ export function UnoPage() {
               ) : null}
               <div className="center-well">
                 <div className="center-cards">
+                  <DirMark dir={state.dir} />
                   <DeckStack
                     count={state.deck.length}
                     label="Draw"
@@ -310,9 +369,6 @@ export function UnoPage() {
                     disabled={!canDraw}
                   />
                   {top ? <UnoFace card={top} /> : <div className="card-ghost" aria-hidden />}
-                </div>
-                <div className="uno-side-mark">
-                  <DirMark dir={state.dir} />
                 </div>
                 {state.pendingDraw > 0 ? <div className="uno-plus-flag">+{state.pendingDraw}</div> : null}
                 {plusFx ? <div key={plusFx.key} className="uno-plus-burst">+{plusFx.n}</div> : null}
