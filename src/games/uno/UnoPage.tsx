@@ -120,22 +120,23 @@ function DirMark({ dir }: { dir: 1 | -1 }) {
             <stop offset="100%" stopColor="#12c94c" />
           </linearGradient>
         </defs>
+        {/* Two shorter arcs, spaced like 🔄 */}
         <path
-          d="M86 34a38 38 0 0 1-48 54"
+          d="M92 40a40 40 0 0 1-52 52"
           fill="none"
           stroke="url(#unoRefresh)"
-          strokeWidth="11"
+          strokeWidth="14"
           strokeLinecap="round"
         />
-        <path d="M86 18l4 22-22-2z" fill="#18e85a" />
+        <path d="M94 22l2 26-24-6z" fill="#18e85a" />
         <path
-          d="M34 86a38 38 0 0 1 48-54"
+          d="M28 80a40 40 0 0 1 52-52"
           fill="none"
           stroke="url(#unoRefresh)"
-          strokeWidth="11"
+          strokeWidth="14"
           strokeLinecap="round"
         />
-        <path d="M34 102l-4-22 22 2z" fill="#18e85a" />
+        <path d="M26 98l-2-26 24 6z" fill="#18e85a" />
       </svg>
     </div>
   );
