@@ -13,6 +13,7 @@ import { BlackjackPage } from "./games/blackjack/BlackjackPage";
 import { Math24Page } from "./games/math24/Math24Page";
 import { HoldemPage } from "./games/holdem/HoldemPage";
 import { UnoPage } from "./games/uno/UnoPage";
+import { HalliGalliPage } from "./games/halligalli/HalliGalliPage";
 
 export function App() {
   return (
@@ -32,6 +33,7 @@ export function App() {
             <Route path="/play/24" element={<Math24Page />} />
             <Route path="/play/holdem" element={<HoldemPage />} />
             <Route path="/play/uno" element={<UnoPage />} />
+            <Route path="/play/halli" element={<HalliGalliPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Shell>

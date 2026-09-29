@@ -4,7 +4,7 @@ import type { FlipCard } from "../games/flip7/engine";
 import type { UnoCard } from "../games/uno/engine";
 import type { PokerCard } from "../lib/poker";
 
-export type LobbyGame = "coda" | "flip7" | "uno" | "bj" | "holdem" | "m24";
+export type LobbyGame = "coda" | "flip7" | "uno" | "bj" | "holdem" | "m24" | "halli";
 
 const poker = (id: string, suit: PokerCard["suit"], rank: PokerCard["rank"]): PokerCard => ({ id, suit, rank });
 
@@ -42,6 +42,14 @@ export function LobbyDecor({ game }: { game: LobbyGame }) {
           <span className="decor-card b"><UnoFace card={uno("ub", "blue", "skip")} /></span>
           <span className="decor-card c"><UnoFace card={uno("uy", "yellow", "reverse")} /></span>
           <span className="decor-card d"><UnoFace card={uno("ug", "green", "number", 2)} /></span>
+        </>
+      ) : null}
+      {game === "halli" ? (
+        <>
+          <span className="decor-card a"><span className="hg-card fruit-cherry"><span className="hg-card-inner"><span className="hg-fruit">🍒</span><span className="hg-fruit">🍒</span><span className="hg-fruit">🍒</span></span></span></span>
+          <span className="decor-card b"><span className="hg-card fruit-strawberry"><span className="hg-card-inner"><span className="hg-fruit">🍓</span><span className="hg-fruit">🍓</span></span></span></span>
+          <span className="decor-card c"><span className="hg-card fruit-banana"><span className="hg-card-inner"><span className="hg-fruit">🍌</span><span className="hg-fruit">🍌</span><span className="hg-fruit">🍌</span><span className="hg-fruit">🍌</span></span></span></span>
+          <span className="decor-card d"><span className="hg-card fruit-lemon"><span className="hg-card-inner"><span className="hg-fruit">🍋</span></span></span></span>
         </>
       ) : null}
       {game === "bj" ? (

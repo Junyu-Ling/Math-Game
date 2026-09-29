@@ -795,6 +795,8 @@ function startRoom(invite, from, to, mods) {
     state = mods.m24.startM24Duel(a, b);
   } else if (invite.game === "uno") {
     state = mods.uno.startUnoLobby([a, b]);
+  } else if (invite.game === "halli") {
+    state = mods.halli.startHalliLobby([a, b]);
   } else if (invite.game === "holdem") {
     state = mods.holdem.startHoldemDuel(a, b);
   } else {
@@ -849,6 +851,7 @@ function newLobbyState(game, people, mods, meta) {
   if (game === "uno") return mods.uno.startUnoLobby(people);
   if (game === "coda") return mods.coda.startCodaLobby(people, Boolean(meta?.useJokers));
   if (game === "flip7") return mods.flip.startFlip7Lobby(people);
+  if (game === "halli") return mods.halli.startHalliLobby(people);
   throw new Error("Unknown table game");
 }
 
@@ -856,6 +859,7 @@ function rebuildLobby(rec, joiner, mods) {
   const people = peopleFromSeats(rec, joiner);
   if (rec.game === "uno") return mods.uno.startUnoLobby(people);
   if (rec.game === "flip7") return mods.flip.startFlip7Lobby(people);
+  if (rec.game === "halli") return mods.halli.startHalliLobby(people);
   if (rec.game === "coda") {
     let state = mods.coda.startCodaLobby(people, Boolean(rec.state?.useJokers));
     for (const p of rec.state.players || []) {
@@ -895,6 +899,14 @@ function cpuIsToAct(room) {
     if (!isCpuPlayer(cur)) return false;
     if (room.game === "flip7") return s.phase === "target" || s.phase === "action";
     return true;
+  }
+  if (room.game === "halli") {
+    if (s.phase !== "play") return false;
+    if (room.mods?.halli?.ringingFruit?.(s)) {
+      return s.players.some((p) => isCpuPlayer(p) && !p.out);
+    }
+    const cur = s.players[s.turn];
+    return Boolean(isCpuPlayer(cur) && !cur.out);
   }
   return false;
 }
@@ -985,10 +997,23 @@ function playOneCpuTurn(room) {
     }
     return false;
   }
+
+  if (room.game === "halli") {
+    if (mods.halli.ringingFruit(s)) {
+      const cpu = s.players.find((p) => isCpuPlayer(p) && !p.out);
+      if (!cpu) return false;
+      room.state = mods.halli.applyHalliAction(s, cpu.id, { type: "ring" });
+      return true;
+    }
+    const cur = s.players[s.turn];
+    if (!isCpuPlayer(cur) || cur.out) return false;
+    room.state = mods.halli.applyHalliAction(s, cur.id, mods.halli.aiHalli(s));
+    return true;
+  }
   return false;
 }
 
-const OPEN_TABLES = new Set(["coda", "uno", "flip7"]);
+const OPEN_TABLES = new Set(["coda", "uno", "flip7", "halli"]);
 
 export async function applyRoomAction(user, roomId, action, mods) {
   mods = mods || (await getMods());
@@ -1012,6 +1037,8 @@ export async function applyRoomAction(user, roomId, action, mods) {
     room.state = mods.m24.applyM24Action(room.state, user.id, action);
   } else if (room.game === "uno") {
     room.state = mods.uno.applyUnoAction(room.state, user.id, action);
+  } else if (room.game === "halli") {
+    room.state = mods.halli.applyHalliAction(room.state, user.id, action);
   } else if (room.game === "holdem") {
     room.state = mods.holdem.applyHoldemAction(room.state, user.id, action);
   }
@@ -1066,6 +1093,7 @@ function publicRoom(room, viewerId) {
     if (room.game === "m24") view = mods.m24.viewM24(room.state, viewerId);
     if (room.game === "uno") view = mods.uno.viewUno(room.state, viewerId);
     if (room.game === "flip7") view = mods.flip.viewFlip7(room.state, viewerId);
+    if (room.game === "halli") view = mods.halli.viewHalli(room.state, viewerId);
     if (room.game === "holdem") view = mods.holdem.viewHoldem(room.state, viewerId);
   }
   return {

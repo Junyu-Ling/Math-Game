@@ -51,6 +51,14 @@ const games = [
     blurb: "Classic four-color ovals. Empty your hand to win.",
     preview: "uno" as const,
   },
+  {
+    to: "/play/halli",
+    idx: "07",
+    code: "HALLI",
+    name: "Halli Galli",
+    blurb: "Flip fruit cards. When five of one fruit show, ring the bell first.",
+    preview: "halli" as const,
+  },
 ];
 
 function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
@@ -97,6 +105,30 @@ function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
       </div>
     );
   }
+  if (kind === "halli") {
+    return (
+      <div className="preview-row">
+        <div className="hg-card fruit-cherry mini" aria-hidden>
+          <div className="hg-card-inner">
+            <span className="hg-fruit">🍒</span>
+            <span className="hg-fruit">🍒</span>
+            <span className="hg-fruit">🍒</span>
+          </div>
+        </div>
+        <div className="hg-card fruit-banana mini" aria-hidden>
+          <div className="hg-card-inner">
+            <span className="hg-fruit">🍌</span>
+            <span className="hg-fruit">🍌</span>
+          </div>
+        </div>
+        <div className="hg-card fruit-lemon mini" aria-hidden>
+          <div className="hg-card-inner">
+            <span className="hg-fruit">🍋</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="preview-row">
       <button className="m24-num" type="button" style={{ width: 52, height: 70, fontSize: 24 }}>
@@ -114,7 +146,7 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="kicker">Six tables · Invite play</p>
+          <p className="kicker">Seven tables · Invite play</p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
             Card art follows the physical decks. Practice against the CPU, or sign in and invite someone who is online.

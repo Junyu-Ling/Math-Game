@@ -52,6 +52,7 @@ export const GAME_LABEL: Record<string, string> = {
   m24: "Make 24",
   holdem: "Hold’em",
   uno: "UNO",
+  halli: "Halli Galli",
 };
 
 export function isCpuId(id: string) {
@@ -91,4 +92,5 @@ export const GAME_PATH: Record<string, string> = {
   m24: "/play/24",
   holdem: "/play/holdem",
   uno: "/play/uno",
+  halli: "/play/halli",
 };
