@@ -114,10 +114,38 @@ const DIR_INK: Record<UnoColor, { light: string; mid: string; deep: string }> = 
   blue: { light: "#6aa8ff", mid: "#2a6fd6", deep: "#1848b0" },
 };
 
+function dirArc(cx: number, cy: number, r: number, startDeg: number, endDeg: number) {
+  const rad = (d: number) => ((d - 90) * Math.PI) / 180;
+  const x1 = cx + r * Math.cos(rad(startDeg));
+  const y1 = cy + r * Math.sin(rad(startDeg));
+  const x2 = cx + r * Math.cos(rad(endDeg));
+  const y2 = cy + r * Math.sin(rad(endDeg));
+  return {
+    d: `M${x1.toFixed(1)} ${y1.toFixed(1)}A${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`,
+    tip: { x: x2, y: y2 },
+    // Tangent at end for clockwise arc (perpendicular to radius, +90°)
+    head: (() => {
+      const t = rad(endDeg + 90);
+      const nx = Math.cos(t);
+      const ny = Math.sin(t);
+      const px = -ny;
+      const py = nx;
+      const len = 16;
+      const w = 11;
+      const bx = x2 - nx * len;
+      const by = y2 - ny * len;
+      return `M${x2.toFixed(1)} ${y2.toFixed(1)}L${(bx + px * w).toFixed(1)} ${(by + py * w).toFixed(1)}L${(bx - px * w).toFixed(1)} ${(by - py * w).toFixed(1)}Z`;
+    })(),
+  };
+}
+
 function DirMark({ dir, color }: { dir: 1 | -1; color: UnoColor }) {
   const cw = dir === -1;
   const ink = DIR_INK[color] ?? DIR_INK.green;
   const gradId = `unoRefresh-${useId().replace(/:/g, "")}`;
+  // Two ~75° arcs with ~105° gaps — clearly separate like 🔄
+  const a = dirArc(60, 60, 44, 5, 80);
+  const b = dirArc(60, 60, 44, 185, 260);
   return (
     <div
       className={`uno-dir-ring ${cw ? "cw" : "ccw"} color-${color}`}
@@ -130,22 +158,10 @@ function DirMark({ dir, color }: { dir: 1 | -1; color: UnoColor }) {
             <stop offset="100%" stopColor={ink.deep} />
           </linearGradient>
         </defs>
-        <path
-          d="M90 30a38 38 0 0 1-18 58"
-          fill="none"
-          stroke={`url(#${gradId})`}
-          strokeWidth="16"
-          strokeLinecap="round"
-        />
-        <path d="M78 78l16 18-26 2z" fill={ink.mid} />
-        <path
-          d="M30 90a38 38 0 0 1 18-58"
-          fill="none"
-          stroke={`url(#${gradId})`}
-          strokeWidth="16"
-          strokeLinecap="round"
-        />
-        <path d="M42 42l-16-18 26-2z" fill={ink.mid} />
+        <path d={a.d} fill="none" stroke={`url(#${gradId})`} strokeWidth="12" strokeLinecap="round" />
+        <path d={a.head} fill={ink.mid} />
+        <path d={b.d} fill="none" stroke={`url(#${gradId})`} strokeWidth="12" strokeLinecap="round" />
+        <path d={b.head} fill={ink.mid} />
       </svg>
     </div>
   );
