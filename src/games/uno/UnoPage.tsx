@@ -134,18 +134,18 @@ function DirMark({ dir, color }: { dir: 1 | -1; color: UnoColor }) {
           d="M92 40a40 40 0 0 1-52 52"
           fill="none"
           stroke={`url(#${gradId})`}
-          strokeWidth="14"
+          strokeWidth="16"
           strokeLinecap="round"
         />
-        <path d="M94 22l2 26-24-6z" fill={ink.mid} />
+        <path d="M95 20l3 28-26-6z" fill={ink.mid} />
         <path
           d="M28 80a40 40 0 0 1 52-52"
           fill="none"
           stroke={`url(#${gradId})`}
-          strokeWidth="14"
+          strokeWidth="16"
           strokeLinecap="round"
         />
-        <path d="M26 98l-2-26 24 6z" fill={ink.mid} />
+        <path d="M25 100l-3-28 26 6z" fill={ink.mid} />
       </svg>
     </div>
   );
