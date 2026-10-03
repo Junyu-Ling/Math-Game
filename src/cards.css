@@ -1430,7 +1430,7 @@
 }
 
 .table-uno {
-  grid-template-rows: minmax(0, 1fr) 236px minmax(0, 1.28fr);
+  grid-template-rows: minmax(0, 1fr) minmax(300px, auto) minmax(0, 1.4fr);
 }
 
 .table-hg {
@@ -1911,15 +1911,20 @@
 .table-uno .center-well {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
   justify-items: center;
   align-items: center;
-  gap: 12px 0;
-  padding: 4px 0;
+  align-content: center;
+  gap: 10px 0;
+  padding: 8px 0 14px;
   position: relative;
+  overflow: visible;
+  z-index: 2;
 }
 
 .table-uno .center-cards {
   grid-column: 2;
+  grid-row: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1946,9 +1951,35 @@
   grid-column: 2;
 }
 
-.table-uno .uno-center-actions,
+.table-uno .uno-center-actions {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  position: relative;
+  z-index: 3;
+}
+
 .table-uno .status-line {
   grid-column: 1 / -1;
+  grid-row: 3;
+  position: relative;
+  z-index: 3;
+  margin: 0;
+  padding: 2px 12px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+}
+
+.table-uno > .seat-you {
+  position: relative;
+  z-index: 1;
+  padding-top: 8px;
+  gap: 8px;
+}
+
+.table-uno > .seat-you .seat-label {
+  position: relative;
+  z-index: 1;
 }
 
 .table-uno .seat:first-child .pcards {
@@ -1957,7 +1988,7 @@
 }
 
 .table-uno .seat:last-child .pcards {
-  padding-top: 26px;
+  padding-top: 10px;
   overflow: visible;
   min-height: 166px;
 }
