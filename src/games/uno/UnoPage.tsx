@@ -131,21 +131,21 @@ function DirMark({ dir, color }: { dir: 1 | -1; color: UnoColor }) {
           </linearGradient>
         </defs>
         <path
-          d="M92 40a40 40 0 0 1-52 52"
+          d="M90 30a38 38 0 0 1-18 58"
           fill="none"
           stroke={`url(#${gradId})`}
           strokeWidth="16"
           strokeLinecap="round"
         />
-        <path d="M95 20l3 28-26-6z" fill={ink.mid} />
+        <path d="M78 78l16 18-26 2z" fill={ink.mid} />
         <path
-          d="M28 80a40 40 0 0 1 52-52"
+          d="M30 90a38 38 0 0 1 18-58"
           fill="none"
           stroke={`url(#${gradId})`}
           strokeWidth="16"
           strokeLinecap="round"
         />
-        <path d="M25 100l-3-28 26 6z" fill={ink.mid} />
+        <path d="M42 42l-16-18 26-2z" fill={ink.mid} />
       </svg>
     </div>
   );
