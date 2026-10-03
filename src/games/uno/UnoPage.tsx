@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   applyUnoAction,
@@ -10,6 +10,7 @@ import {
   startUnoPractice,
   topCard,
   type UnoAction,
+  type UnoColor,
   type UnoPlayer,
   type UnoState,
 } from "./engine";
@@ -106,37 +107,45 @@ function UnoSeat({
   );
 }
 
-function DirMark({ dir }: { dir: 1 | -1 }) {
+const DIR_INK: Record<UnoColor, { light: string; mid: string; deep: string }> = {
+  red: { light: "#ff6b6b", mid: "#e23b3b", deep: "#c81818" },
+  yellow: { light: "#ffe066", mid: "#f0c12e", deep: "#c49000" },
+  green: { light: "#5dff88", mid: "#18e85a", deep: "#12c94c" },
+  blue: { light: "#6aa8ff", mid: "#2a6fd6", deep: "#1848b0" },
+};
+
+function DirMark({ dir, color }: { dir: 1 | -1; color: UnoColor }) {
   const cw = dir === -1;
+  const ink = DIR_INK[color] ?? DIR_INK.green;
+  const gradId = `unoRefresh-${useId().replace(/:/g, "")}`;
   return (
     <div
-      className={`uno-dir-ring ${cw ? "cw" : "ccw"}`}
+      className={`uno-dir-ring ${cw ? "cw" : "ccw"} color-${color}`}
       aria-label="Play direction"
     >
       <svg viewBox="0 0 120 120" aria-hidden>
         <defs>
-          <linearGradient id="unoRefresh" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#5dff88" />
-            <stop offset="100%" stopColor="#12c94c" />
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={ink.light} />
+            <stop offset="100%" stopColor={ink.deep} />
           </linearGradient>
         </defs>
-        {/* Two shorter arcs, spaced like 🔄 */}
         <path
           d="M92 40a40 40 0 0 1-52 52"
           fill="none"
-          stroke="url(#unoRefresh)"
+          stroke={`url(#${gradId})`}
           strokeWidth="14"
           strokeLinecap="round"
         />
-        <path d="M94 22l2 26-24-6z" fill="#18e85a" />
+        <path d="M94 22l2 26-24-6z" fill={ink.mid} />
         <path
           d="M28 80a40 40 0 0 1 52-52"
           fill="none"
-          stroke="url(#unoRefresh)"
+          stroke={`url(#${gradId})`}
           strokeWidth="14"
           strokeLinecap="round"
         />
-        <path d="M26 98l-2-26 24 6z" fill="#18e85a" />
+        <path d="M26 98l-2-26 24 6z" fill={ink.mid} />
       </svg>
     </div>
   );
@@ -310,7 +319,7 @@ export function UnoPage() {
               ) : null}
               <div className="center-well">
                 <div className="center-cards">
-                  <DirMark dir={state.dir} />
+                  <DirMark dir={state.dir} color={state.color} />
                   <DeckStack
                     count={state.deck.length}
                     label="Draw"
