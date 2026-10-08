@@ -192,7 +192,8 @@ export function hit(state: FlipState): FlipState {
   if (state.phase !== "action") return state;
   const me = currentFlip(state);
   if (me.status !== "active") return advance(state);
-  const pulled = takeCard(state);
+  // Clear prior FX so a new bust boom can mount cleanly.
+  const pulled = takeCard({ ...state, burst: null });
   const card = pulled.card;
   let next = pulled.state;
   next.lastCard = card;
@@ -269,7 +270,7 @@ export function stay(state: FlipState): FlipState {
   const me = currentFlip(state);
   if (me.pendingFlip3 > 0) return hit(state);
   const scored = areaScore(me.area).score;
-  let next = withPlayer(state, me.id, (p) => ({ ...p, area: [], status: "stayed", total: p.total + scored }));
+  let next = withPlayer({ ...state, burst: null }, me.id, (p) => ({ ...p, area: [], status: "stayed", total: p.total + scored }));
   next.discard = [...next.discard, ...me.area];
   next.log = [...next.log, { id: uid("l"), text: `${me.name} stays. Round +${scored}.`, tone: me.human ? "you" : "ai" }];
   next = checkWin(next, me.id);
@@ -355,7 +356,8 @@ function newRound(state: FlipState): FlipState {
     ...state,
     players,
     discard,
-    burst: null,
+    // Keep bust/freeze/flip7 FX so the UI can finish animating into the next round.
+    burst: state.burst,
     round: state.round + 1,
     turn: state.round % state.players.length,
     phase: "action",

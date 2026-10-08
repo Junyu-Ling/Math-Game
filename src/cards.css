@@ -1713,7 +1713,7 @@
   position: absolute;
   left: 50%;
   top: 28px;
-  z-index: 8;
+  z-index: 30;
   width: 220px;
   height: 220px;
   margin-left: -110px;

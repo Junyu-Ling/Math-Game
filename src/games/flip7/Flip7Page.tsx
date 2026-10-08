@@ -183,7 +183,13 @@ export function Flip7Page() {
     let stop = false;
     void (async () => {
       await wait(
-        local.burst?.kind === "save" ? 1550 : local.burst?.kind === "freeze" || local.burst?.kind === "flip7" ? 1650 : CPU_THINK_MS,
+        local.burst?.kind === "save"
+          ? 1550
+          : local.burst?.kind === "freeze" || local.burst?.kind === "flip7"
+            ? 1650
+            : local.burst?.kind === "bust"
+              ? 1100
+              : CPU_THINK_MS,
       );
       if (stop) return;
       setLocal((s) => {
