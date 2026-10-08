@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { aiBjAction, applyBjDuelAction, hardSoft, startBjPractice, type BjDuelAction, type BjDuelState } from "./engine";
 import { PokerFace } from "../../components/PlayingCard";
 import { GameSetup } from "../../components/GameSetup";
@@ -61,9 +60,9 @@ export function BlackjackPage() {
               RESET
             </button>
           ) : null}
-          <Link className="btn btn-ghost" to="/">
+          <button className="btn btn-ghost" type="button" onClick={() => void lobby.leaveHome()}>
             LEAVE
-          </Link>
+          </button>
         </div>
       </div>
       <div className="game-layout">

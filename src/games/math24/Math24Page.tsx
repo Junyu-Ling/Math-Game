@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { applyM24Action, startM24Practice, type M24DuelState } from "./engine";
 import { PokerFace } from "../../components/PlayingCard";
 import { GameSetup } from "../../components/GameSetup";
@@ -73,9 +72,9 @@ export function Math24Page() {
               RESET
             </button>
           ) : null}
-          <Link className="btn btn-ghost" to="/">
+          <button className="btn btn-ghost" type="button" onClick={() => void lobby.leaveHome()}>
             LEAVE
-          </Link>
+          </button>
         </div>
       </div>
       <div className="game-layout">

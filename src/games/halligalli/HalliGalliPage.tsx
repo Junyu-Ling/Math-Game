@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   aiHalli,
   applyHalliAction,
@@ -177,9 +176,9 @@ export function HalliGalliPage() {
               RESET
             </button>
           ) : null}
-          <Link className="btn btn-ghost" to="/">
+          <button className="btn btn-ghost" type="button" onClick={() => void lobby.leaveHome()}>
             LEAVE
-          </Link>
+          </button>
         </div>
       </div>
       <div className="game-layout">

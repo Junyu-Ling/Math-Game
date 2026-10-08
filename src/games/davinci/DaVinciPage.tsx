@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
 import {
   aiDrawColor,
   aiGuess,
@@ -660,9 +659,9 @@ export function DaVinciPage() {
           <button className="btn btn-ghost" type="button" onClick={() => resetTable()}>
             RESET
           </button>
-          <Link className="btn btn-ghost" to="/">
+          <button className="btn btn-ghost" type="button" onClick={() => void lobby.leaveHome()}>
             LEAVE
-          </Link>
+          </button>
         </div>
       </div>
       <div className="game-layout">
