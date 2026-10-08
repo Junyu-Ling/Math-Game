@@ -4,6 +4,7 @@ import { PokerFace } from "../../components/PlayingCard";
 import { GameSetup } from "../../components/GameSetup";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
+import { GameRules } from "../../components/GameRules";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 
@@ -133,7 +134,12 @@ export function Math24Page() {
             </>
           )}
         </div>
-        <InvitePanel game="m24" />
+        <div className="side-stack">
+          <InvitePanel game="m24" />
+          <aside className="side">
+            <GameRules game="m24" />
+          </aside>
+        </div>
       </div>
     </div>
   );

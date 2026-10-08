@@ -37,6 +37,7 @@ import { measureFit } from "../../components/FitCards";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { InvitePanel } from "../../components/InvitePanel";
+import { GameRules } from "../../components/GameRules";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 
@@ -1057,17 +1058,7 @@ export function DaVinciPage() {
               </div>
             </div>
           ) : null}
-          <div>
-            <h3>RULE</h3>
-            <ul>
-              <li>2–4 players. Each player picks their own black/white opening mix, then ready. The deal waits until everyone is ready.</li>
-              <li>On your draw, pick black or white. You cannot draw a color that is gone.</li>
-              <li>Each color has 0–11 plus one dash. The dash is shuffled in with the numbers, so it is not guaranteed in the opening 4.</li>
-              <li>The veil is opening-only. Inserts wait the full 5 seconds even after you pick a slot.</li>
-              <li>After the opening 4, two players play rock-paper-scissors and the loser guesses first. With 3 or 4, a random player draws first.</li>
-              <li>When the deck is empty, play continues. Skip the draw and guess. A hit lets you guess again or end the turn. A miss knocks down one of your own hidden tiles.</li>
-            </ul>
-          </div>
+          <GameRules game="coda" />
           <div>
             <h3>LOG</h3>
             <div className="log">

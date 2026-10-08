@@ -17,6 +17,7 @@ import {
   type HalliState,
 } from "./engine";
 import { InvitePanel } from "../../components/InvitePanel";
+import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
@@ -273,6 +274,7 @@ export function HalliGalliPage() {
         <div className="side-stack">
           <InvitePanel game="halli" />
           <aside className="side">
+            <GameRules game="halli" />
             <div>
               <h3>LOG</h3>
               <div className="log">

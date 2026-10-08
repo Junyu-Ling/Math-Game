@@ -16,6 +16,7 @@ import {
 import { DeckStack, UnoColorPick, UnoFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
 import { InvitePanel } from "../../components/InvitePanel";
+import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
@@ -396,7 +397,12 @@ export function UnoPage() {
             </>
           )}
         </div>
-        <InvitePanel game="uno" />
+        <div className="side-stack">
+          <InvitePanel game="uno" />
+          <aside className="side">
+            <GameRules game="uno" />
+          </aside>
+        </div>
       </div>
     </div>
   );

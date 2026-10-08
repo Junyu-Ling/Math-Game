@@ -14,6 +14,7 @@ import {
 import { DeckStack, FlipFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
 import { InvitePanel } from "../../components/InvitePanel";
+import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
@@ -368,7 +369,12 @@ export function Flip7Page() {
             </>
           ) : null}
         </div>
-        <InvitePanel game="flip7" />
+        <div className="side-stack">
+          <InvitePanel game="flip7" />
+          <aside className="side">
+            <GameRules game="flip7" />
+          </aside>
+        </div>
       </div>
     </div>
   );

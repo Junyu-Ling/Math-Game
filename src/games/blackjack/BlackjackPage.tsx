@@ -4,6 +4,7 @@ import { PokerFace } from "../../components/PlayingCard";
 import { GameSetup } from "../../components/GameSetup";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
+import { GameRules } from "../../components/GameRules";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
@@ -119,7 +120,12 @@ export function BlackjackPage() {
             </>
           )}
         </div>
-        <InvitePanel game="bj" />
+        <div className="side-stack">
+          <InvitePanel game="bj" />
+          <aside className="side">
+            <GameRules game="bj" />
+          </aside>
+        </div>
       </div>
     </div>
   );

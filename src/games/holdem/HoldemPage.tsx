@@ -10,6 +10,7 @@ import { PokerFace } from "../../components/PlayingCard";
 import { GameSetup } from "../../components/GameSetup";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
+import { GameRules } from "../../components/GameRules";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
@@ -183,7 +184,12 @@ export function HoldemPage() {
             </>
           )}
         </div>
-        <InvitePanel game="holdem" />
+        <div className="side-stack">
+          <InvitePanel game="holdem" />
+          <aside className="side">
+            <GameRules game="holdem" />
+          </aside>
+        </div>
       </div>
     </div>
   );
