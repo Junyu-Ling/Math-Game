@@ -102,16 +102,26 @@ export function Flip7Page() {
     const id = burst.id;
     setFx({ id, boom: true, spin: false });
     const timers: number[] = [];
+    let audio: HTMLAudioElement | null = null;
     if (burst.kind === "save") {
       timers.push(window.setTimeout(() => setFx({ id, boom: true, spin: true }), 360));
       timers.push(window.setTimeout(() => setFx({ id, boom: false, spin: true }), 720));
       timers.push(window.setTimeout(() => setFx(null), 1480));
     } else if (burst.kind === "freeze") {
+      audio = new Audio("/flip7-freeze.mp3");
+      audio.volume = 0.85;
+      void audio.play().catch(() => {});
       timers.push(window.setTimeout(() => setFx(null), 1600));
     } else {
       timers.push(window.setTimeout(() => setFx(null), 1000));
     }
-    return () => timers.forEach((t) => window.clearTimeout(t));
+    return () => {
+      timers.forEach((t) => window.clearTimeout(t));
+      if (audio) {
+        audio.pause();
+        audio.src = "";
+      }
+    };
   }, [burst?.id, burst?.kind]);
 
   const freezeFx = Boolean(burst?.kind === "freeze" && fx?.id === burst.id);
