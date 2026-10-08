@@ -1849,6 +1849,95 @@
 .table-flip.flip-solo > .center-well { grid-row: 1; }
 .table-flip.flip-solo > .seat-you { grid-row: 2; }
 
+.table-flip.flip-ring {
+  --flip-card-scale: 0.85;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(520px, 1fr) auto;
+  height: auto;
+  min-height: 720px;
+  max-height: none;
+  overflow: visible;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.table-flip.flip-ring > .flip-ring-arena {
+  position: relative;
+  min-height: 520px;
+  width: 100%;
+  overflow: visible;
+}
+
+.table-flip.flip-ring > .flip-ring-arena > .center-well {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: min(280px, 42%);
+}
+
+.table-flip.flip-ring .seat-ring-slot {
+  position: absolute;
+  left: calc(50% + var(--x, 0%));
+  top: calc(50% + var(--y, 0%));
+  transform: translate(-50%, -50%);
+  width: min(168px, 22%);
+  z-index: 1;
+}
+
+.table-flip.flip-ring .seat-ring {
+  width: 100%;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.table-flip.flip-ring .seat-ring .seat-label {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-flip.flip-ring .seat-ring .cards-fit,
+.table-flip.flip-ring .seat-ring .pcards {
+  transform: scale(var(--flip-card-scale, 0.85));
+  transform-origin: center center;
+}
+
+.table-flip.flip-ring .seat.is-turn,
+.table-flip.flip-ring .seat-ring.is-turn {
+  outline: 2px solid #111;
+  outline-offset: 2px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.table-flip.flip-ring > .seat-you {
+  grid-row: 2;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .table-flip.flip-ring {
+    min-height: 640px;
+    grid-template-rows: minmax(440px, 1fr) auto;
+  }
+  .table-flip.flip-ring > .flip-ring-arena {
+    min-height: 440px;
+  }
+  .table-flip.flip-ring .seat-ring-slot {
+    width: min(128px, 28%);
+  }
+  .table-flip.flip-ring > .flip-ring-arena > .center-well {
+    width: min(220px, 48%);
+  }
+}
+
 .uno-dir-ring {
   position: absolute;
   left: 50%;

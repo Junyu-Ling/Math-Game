@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   aiDecide,
   aiTarget,
@@ -32,6 +32,26 @@ function aroundYou<T extends { id: string }>(players: T[], youId: string) {
   return { rival: null as T | null, left: at(1), partner: at(2), right: at(3), extras };
 }
 
+/** Opponents on an ellipse; bottom ~80° arc reserved for you. Angles: 0 = top, clockwise. */
+function ringOpponents<T extends { id: string }>(players: T[], youId: string) {
+  const i = Math.max(0, players.findIndex((p) => p.id === youId));
+  const others: T[] = [];
+  for (let d = 1; d < players.length; d++) others.push(players[(i + d) % players.length]!);
+  const startDeg = -145;
+  const endDeg = 145;
+  const rx = 42;
+  const ry = 36;
+  return others.map((player, idx) => {
+    const deg = startDeg + ((endDeg - startDeg) * (idx + 0.5)) / others.length;
+    const rad = (deg * Math.PI) / 180;
+    return {
+      player,
+      xPct: Math.sin(rad) * rx,
+      yPct: -Math.cos(rad) * ry,
+    };
+  });
+}
+
 function FlipSeat({
   player,
   className,
@@ -52,7 +72,7 @@ function FlipSeat({
   mine?: boolean;
 }) {
   return (
-    <div className={`seat ${className}${vertical ? " seat-side" : ""}`}>
+    <div className={`seat ${className}${vertical ? " seat-side" : ""}${turn ? " is-turn" : ""}`}>
       {burst?.playerId === player.id && fx?.id === burst.id && fx.boom ? <FlipBoom key={`${burst.id}-boom`} /> : null}
       {burst?.playerId === player.id && burst.kind === "save" && burst.saveCard && fx?.id === burst.id && fx.spin ? (
         <div className="flip-chance-hero" key={`${burst.id}-chance`}>
@@ -84,7 +104,10 @@ export function Flip7Page() {
   const youId = practice ? "you" : user?.id;
   const waiting = Boolean(state && state.phase === "lobby");
   const me = state ? state.players.find((p) => p.id === youId) ?? (waiting ? state.players[0] : currentFlip(state)) : null;
-  const seated = state && me ? aroundYou(state.players, me.id) : null;
+  const playerN = state?.players.length ?? 0;
+  const useRing = Boolean(state && me && !waiting && playerN >= 5);
+  const seated = state && me && !useRing ? aroundYou(state.players, me.id) : null;
+  const ring = state && me && useRing ? ringOpponents(state.players, me.id) : null;
   const cur = state && state.phase !== "lobby" ? currentFlip(state) : null;
   const myTurn = Boolean(state && me && cur?.id === me.id && state.phase !== "over" && state.phase !== "lobby");
   const host = Boolean(me && state?.players[0]?.id === me.id);
@@ -158,8 +181,66 @@ export function Flip7Page() {
   }
 
   const playing = Boolean(state && me && !waiting);
-  const multi = Boolean(playing && state && state.players.length > 2);
-  const solo = Boolean(playing && state && state.players.length === 1);
+  const multi = Boolean(playing && !useRing && playerN > 2);
+  const solo = Boolean(playing && playerN === 1);
+  const cardScale = useRing ? Math.max(0.5, Math.min(0.95, 1.15 - 0.04 * playerN)) : 1;
+  const ready = Boolean(playing && state && me && (useRing ? ring : seated));
+
+  const statusText = (() => {
+    if (!state || !me) return "";
+    if (state.phase === "over") {
+      return state.winnerId
+        ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+        : state.log.at(-1)?.text || "Game over";
+    }
+    if (freezeFx) return "Frozen!";
+    if (savePlaying) return "Second Chance!";
+    if (myTurn) {
+      if (state.phase === "target") {
+        return `Choose who gets ${state.pendingAction === "freeze" ? "Freeze" : "Flip Three"} — yourself included.`;
+      }
+      if (me.pendingFlip3 > 0) return `Flip Three: ${me.pendingFlip3} flip${me.pendingFlip3 === 1 ? "" : "s"} left.`;
+      return "Flip one card, then the next player. Stay to bank this round.";
+    }
+    return `${cur?.name} is acting`;
+  })();
+
+  const centerWell = state && me ? (
+    <div className="center-well">
+      <div className="flip-center-row">
+        <DeckStack count={state.deck.length} />
+        <div className="status-line">{statusText}</div>
+      </div>
+      <div className="target-slot">
+        {myTurn && state.phase === "target" && !savePlaying
+          ? activePlayers(state).map((p) => (
+              <button key={p.id} className="btn" type="button" onClick={() => act({ type: "target", targetId: p.id })}>
+                {p.id === me.id ? `Use on yourself` : `Use on ${p.name}`}
+              </button>
+            ))
+          : null}
+      </div>
+    </div>
+  ) : null;
+
+  const youSeat = me ? (
+    <div className="seat seat-you">
+      <FlipSeat player={me} className="seat-you-inner" turn={myTurn} burst={burst} fx={fx} lockSize={!useRing && Boolean(seated?.left)} mine />
+      <div className="row-actions">
+        <button className="btn btn-go" type="button" disabled={!myTurn || state?.phase !== "action" || savePlaying} onClick={() => act({ type: "hit" })}>
+          HIT
+        </button>
+        <button
+          className="btn btn-gold"
+          type="button"
+          disabled={!myTurn || state?.phase !== "action" || savePlaying || me.pendingFlip3 > 0}
+          onClick={() => act({ type: "stay" })}
+        >
+          STAY
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <div className="page-wide">
@@ -180,52 +261,80 @@ export function Flip7Page() {
         </div>
       </div>
       <div className="game-layout">
-        <div className={`table table-flip ${multi ? "flip-multi" : ""} ${solo ? "flip-solo" : ""}`}>
-          {!playing || !state || !me || !seated ? (
+        <div
+          className={`table table-flip ${multi ? "flip-multi" : ""} ${solo ? "flip-solo" : ""} ${useRing ? "flip-ring" : ""}`}
+          style={useRing ? ({ ["--flip-card-scale"]: String(cardScale) } as CSSProperties) : undefined}
+        >
+          {!ready || !state || !me ? (
             <>
-            <LobbyDecor game="flip7" />
-            <div className="coda-deal">
-              <p className="kicker">{waiting ? "TABLE" : "FLIP 7"}</p>
-              <h2>{waiting ? `Table ${state?.players.length ?? 0}` : "First to 200"}</h2>
-              <p>
-                {waiting
-                  ? "Open a table, add CPUs or invite people, then start with 2 or more. No fixed seat count."
-                  : "Hit or stay. Freeze and Flip Three can target any active player, including you."}
-              </p>
-              {waiting && state ? (
-                <ul className="lobby-roster">
-                  {state.players.map((p, i) => (
-                    <li key={p.id}>
-                      <b>{p.name}</b>
-                      <span>{seatTag(p, i, state.players[0]?.id)}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              <MixedCpuBar game="flip7" />
-              <div className="row-actions" style={{ justifyContent: "center" }}>
-                {waiting ? (
-                  host && (state?.players.length ?? 0) >= 2 ? (
-                    <button className="btn" type="button" onClick={() => act({ type: "start" })}>
-                      Start {state?.players.length}P
-                    </button>
+              <LobbyDecor game="flip7" />
+              <div className="coda-deal">
+                <p className="kicker">{waiting ? "TABLE" : "FLIP 7"}</p>
+                <h2>{waiting ? `Table ${state?.players.length ?? 0}` : "First to 200"}</h2>
+                <p>
+                  {waiting
+                    ? "Open a table, add CPUs or invite people, then start with 2 or more. No fixed seat count."
+                    : "Hit or stay. Freeze and Flip Three can target any active player, including you."}
+                </p>
+                {waiting && state ? (
+                  <ul className="lobby-roster">
+                    {state.players.map((p, i) => (
+                      <li key={p.id}>
+                        <b>{p.name}</b>
+                        <span>{seatTag(p, i, state.players[0]?.id)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <MixedCpuBar game="flip7" />
+                <div className="row-actions" style={{ justifyContent: "center" }}>
+                  {waiting ? (
+                    host && (state?.players.length ?? 0) >= 2 ? (
+                      <button className="btn" type="button" onClick={() => act({ type: "start" })}>
+                        Start {state?.players.length}P
+                      </button>
+                    ) : (
+                      <p>{host ? "Need at least 2 players to start." : "Waiting for the host to start."}</p>
+                    )
                   ) : (
-                    <p>{host ? "Need at least 2 players to start." : "Waiting for the host to start."}</p>
-                  )
-                ) : (
-                  <>
-                    <button className="btn btn-ghost" type="button" onClick={() => setLocal(startFlip7(1))}>
-                      Practice solo
-                    </button>
-                    <button className="btn" type="button" onClick={() => setLocal(startFlip7(2))}>
-                      Practice vs CPU
-                    </button>
-                  </>
-                )}
+                    <>
+                      <button className="btn btn-ghost" type="button" onClick={() => setLocal(startFlip7(1))}>
+                        Practice solo
+                      </button>
+                      <button className="btn" type="button" onClick={() => setLocal(startFlip7(2))}>
+                        Practice vs CPU
+                      </button>
+                      <button className="btn btn-ghost" type="button" onClick={() => setLocal(startFlip7(5))}>
+                        Practice 5P
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
             </>
-          ) : (
+          ) : useRing && ring ? (
+            <>
+              {freezeFx ? (
+                <div className="flip-freeze-overlay" aria-live="polite">
+                  <img src="/flip7-ice.jpg" alt="Freeze" />
+                  <b>FREEZE</b>
+                </div>
+              ) : null}
+              <div className="flip-ring-arena">
+                {centerWell}
+                {ring.map(({ player, xPct, yPct }) => (
+                  <div
+                    key={player.id}
+                    className="seat-ring-slot"
+                    style={{ ["--x"]: `${xPct}%`, ["--y"]: `${yPct}%` } as CSSProperties}
+                  >
+                    <FlipSeat player={player} className="seat-ring" turn={cur?.id === player.id} burst={burst} fx={fx} lockSize />
+                  </div>
+                ))}
+              </div>
+              {youSeat}
+            </>
+          ) : seated ? (
             <>
               {freezeFx ? (
                 <div className="flip-freeze-overlay" aria-live="polite">
@@ -251,63 +360,13 @@ export function Flip7Page() {
               {seated.left ? (
                 <FlipSeat player={seated.left} className="seat-left" vertical turn={cur?.id === seated.left.id} burst={burst} fx={fx} lockSize={Boolean(seated.left)} />
               ) : null}
-              <div className="center-well">
-                <div className="flip-center-row">
-                  <DeckStack count={state.deck.length} />
-                  <div className="status-line">
-                    {state.phase === "over"
-                      ? state.winnerId
-                        ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
-                        : state.log.at(-1)?.text || "Game over"
-                      : freezeFx
-                        ? "Frozen!"
-                      : savePlaying
-                        ? "Second Chance!"
-                        : myTurn
-                        ? state.phase === "target"
-                          ? `Choose who gets ${state.pendingAction === "freeze" ? "Freeze" : "Flip Three"} — yourself included.`
-                          : me.pendingFlip3 > 0
-                            ? `Flip Three: ${me.pendingFlip3} flip${me.pendingFlip3 === 1 ? "" : "s"} left.`
-                            : "Flip one card, then the next player. Stay to bank this round."
-                        : `${cur?.name} is acting`}
-                  </div>
-                </div>
-                <div className="target-slot">
-                  {myTurn && state.phase === "target" && !savePlaying
-                    ? activePlayers(state).map((p) => (
-                        <button key={p.id} className="btn" type="button" onClick={() => act({ type: "target", targetId: p.id })}>
-                          {p.id === me.id ? `Use on yourself` : `Use on ${p.name}`}
-                        </button>
-                      ))
-                    : null}
-                </div>
-              </div>
+              {centerWell}
               {seated.right ? (
                 <FlipSeat player={seated.right} className="seat-right" vertical turn={cur?.id === seated.right.id} burst={burst} fx={fx} lockSize={Boolean(seated.left)} />
               ) : null}
-              <div className="seat seat-you">
-                <FlipSeat player={me} className="seat-you-inner" turn={myTurn} burst={burst} fx={fx} lockSize={Boolean(seated.left)} mine />
-                <div className="row-actions">
-                  <button
-                    className="btn btn-go"
-                    type="button"
-                    disabled={!myTurn || state.phase !== "action" || savePlaying}
-                    onClick={() => act({ type: "hit" })}
-                  >
-                    HIT
-                  </button>
-                  <button
-                    className="btn btn-gold"
-                    type="button"
-                    disabled={!myTurn || state.phase !== "action" || savePlaying || me.pendingFlip3 > 0}
-                    onClick={() => act({ type: "stay" })}
-                  >
-                    STAY
-                  </button>
-                </div>
-              </div>
+              {youSeat}
             </>
-          )}
+          ) : null}
         </div>
         <InvitePanel game="flip7" />
       </div>
