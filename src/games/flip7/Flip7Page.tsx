@@ -108,7 +108,7 @@ export function Flip7Page() {
       timers.push(window.setTimeout(() => setFx({ id, boom: false, spin: true }), 720));
       timers.push(window.setTimeout(() => setFx(null), 1480));
     } else if (burst.kind === "freeze") {
-      audio = new Audio("/flip7-freeze.mp3");
+      audio = new Audio("/flip7-freeze.mp3?v=bing");
       audio.volume = 0.85;
       void audio.play().catch(() => {});
       timers.push(window.setTimeout(() => setFx(null), 1600));
