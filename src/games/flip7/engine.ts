@@ -35,8 +35,10 @@ export type FlipState = {
   winnerId: string | null;
   log: FlipLog[];
   goal: number;
-  burst: { playerId: string; id: string; kind: "bust" | "save"; saveCard?: FlipCard } | null;
+  burst: { playerId: string; id: string; kind: "bust" | "save" | "freeze"; saveCard?: FlipCard } | null;
 };
+
+export const FLIP_MAX = 16;
 
 function deckBuild(): FlipCard[] {
   const cards: FlipCard[] = [];
@@ -90,7 +92,7 @@ function emptySeat(p: { id: string; name: string; human?: boolean }): FlipPlayer
 }
 
 export function startFlip7Lobby(people: Array<{ id: string; name: string; human?: boolean }>): FlipState {
-  const players = people.slice(0, 4).map(emptySeat);
+  const players = people.slice(0, FLIP_MAX).map(emptySeat);
   return {
     players,
     deck: [],
@@ -103,12 +105,12 @@ export function startFlip7Lobby(people: Array<{ id: string; name: string; human?
     winnerId: null,
     goal: 200,
     burst: null,
-    log: [{ id: uid("l"), text: `Table ${players.length}/4. Host starts at 1–4 players.` }],
+    log: [{ id: uid("l"), text: `Table ${players.length}. Add CPUs or invite, then start with 2+ players.` }],
   };
 }
 
 export function startFlip7Table(people: Array<{ id: string; name: string; human?: boolean }>): FlipState {
-  const seated = people.slice(0, 4);
+  const seated = people.slice(0, FLIP_MAX);
   if (!seated.length) return startFlip7Lobby(seated);
   const players = seated.map(emptySeat);
   return {
@@ -131,10 +133,10 @@ export function startFlip7Duel(a: { id: string; name: string }, b: { id: string;
   return startFlip7Table([a, b]);
 }
 
-const CPU_NAMES = ["CPU", "CPU 2", "CPU 3"];
+const CPU_NAMES = ["CPU", "CPU 2", "CPU 3", "CPU 4", "CPU 5", "CPU 6", "CPU 7", "CPU 8", "CPU 9", "CPU 10", "CPU 11", "CPU 12", "CPU 13", "CPU 14", "CPU 15"];
 
-export function startFlip7(seats = 1): FlipState {
-  const n = Math.max(1, Math.min(4, Math.floor(seats) || 1));
+export function startFlip7(seats = 2): FlipState {
+  const n = Math.max(1, Math.min(FLIP_MAX, Math.floor(seats) || 2));
   return startFlip7Table(
     Array.from({ length: n }, (_, i) => ({
       id: i === 0 ? "you" : `cpu-${i}`,
@@ -286,6 +288,7 @@ export function applyTarget(state: FlipState, targetId: string): FlipState {
       area: [],
     }));
     next.discard = [...next.discard, ...target.area];
+    next.burst = { playerId: target.id, id: uid("boom"), kind: "freeze" };
     next.log = [
       ...next.log,
       {
@@ -395,7 +398,7 @@ export type FlipAction =
 export function applyFlipAction(state: FlipState, actorId: string, action: FlipAction): FlipState {
   if (!state.players.some((p) => p.id === actorId)) return state;
   if (state.phase === "lobby") {
-    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 1) {
+    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 2) {
       return startFlip7Table(state.players);
     }
     return state;

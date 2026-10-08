@@ -1,6 +1,6 @@
 import { useAuth } from "../context/AuthContext";
 import { useLobby } from "../context/LobbyContext";
-import { isCpuId } from "../lib/lobby";
+import { isCpuId, tableMax } from "../lib/lobby";
 
 export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string, unknown> }) {
   const { user } = useAuth();
@@ -9,15 +9,21 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
   const host = Boolean(user && (!here || room?.seats[0] === user.id));
   const seats = here ? room?.seats || [] : [];
   const cpuN = seats.filter(isCpuId).length;
-  const full = seats.length >= 4;
+  const max = tableMax(game);
+  const full = seats.length >= max;
   const waiting = Boolean(here && (room?.view as { phase?: string } | undefined)?.phase === "lobby");
   const canEdit = Boolean(user && host && (!here || waiting));
+  const unlimited = game === "flip7";
 
   if (!user) return null;
 
   return (
     <div className="cpu-bar">
-      <p>A new table starts with you. Add CPUs only when you want them. 2–4 players can sit.</p>
+      <p>
+        {unlimited
+          ? "Open a table with yourself, add as many CPUs as you want, invite humans, then start with 2+."
+          : `Open a table with yourself. Add CPUs or invite humans, then start with 2–${max}.`}
+      </p>
       <div className="row-actions" style={{ justifyContent: "center" }}>
         {!here ? (
           <button
@@ -43,7 +49,7 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
           disabled={!here || !canEdit || full}
           onClick={() => void adjustCpu(game, "fill", meta).catch((ex) => alert(ex.message))}
         >
-          Fill with CPU
+          {unlimited ? "Add 3 CPUs" : "Fill with CPU"}
         </button>
         <button
           className="btn btn-ghost"

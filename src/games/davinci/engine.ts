@@ -30,7 +30,12 @@ export type RpsThrow = "rock" | "paper" | "scissors";
 
 export const ARRANGE_MS = 5000;
 export const RPS_REVEAL_MS = 3400;
+/** Default opening hand size for 2–3 players. Four players get 3 each. */
 export const OPENING = 4;
+
+export function openingCount(playerN: number) {
+  return playerN >= 4 ? 3 : OPENING;
+}
 
 export type RpsReveal = {
   aId: string;
@@ -180,10 +185,16 @@ function instantInsert(state: CodaState, pending: CodaTile | null, resume: "draw
   return afterOpening(next);
 }
 
-function openingSplit(black: number, white: number): { black: number; white: number } {
-  const b = Math.max(0, Math.min(OPENING, Math.floor(black)));
-  const w = b + Math.max(0, Math.floor(white)) === OPENING ? Math.max(0, Math.floor(white)) : OPENING - b;
+function openingSplit(black: number, white: number, total = OPENING): { black: number; white: number } {
+  const t = Math.max(1, Math.floor(total) || OPENING);
+  const b = Math.max(0, Math.min(t, Math.floor(black)));
+  const w = b + Math.max(0, Math.floor(white)) === t ? Math.max(0, Math.floor(white)) : t - b;
   return { black: b, white: w };
+}
+
+function defaultMix(total: number): { black: number; white: number } {
+  const black = Math.floor(total / 2);
+  return { black, white: total - black };
 }
 
 function pullOpeningJoker(player: CodaPlayer): CodaPlayer {
@@ -241,7 +252,10 @@ export function startCodaLobby(
   people: Array<{ id: string; name: string; human?: boolean }>,
   useJokers: boolean,
 ): CodaState {
-  const players = people.slice(0, 4).map(emptyCodaPlayer);
+  const seated = people.slice(0, 4);
+  const open = openingCount(seated.length);
+  const mix = defaultMix(open);
+  const players = seated.map((p) => ({ ...emptyCodaPlayer(p), black: mix.black, white: mix.white }));
   return {
     players,
     deck: [],
@@ -265,7 +279,7 @@ export function startCodaLobby(
     log: [
       {
         id: uid("l"),
-        text: `Table ${players.length}/4. Each player picks black and white (4 total), then ready.`,
+        text: `Table ${players.length}/4. Each player picks black and white (${open} total), then ready.`,
       },
     ],
   };
@@ -274,7 +288,8 @@ export function startCodaLobby(
 export function pickCodaMix(state: CodaState, actorId: string, black: number, white: number): CodaState {
   if (state.phase !== "lobby") return state;
   if (!state.players.some((p) => p.id === actorId)) return state;
-  const split = openingSplit(black, white);
+  const open = openingCount(state.players.length);
+  const split = openingSplit(black, white, open);
   return {
     ...state,
     players: state.players.map((p) =>
@@ -299,9 +314,10 @@ export function readyCoda(state: CodaState, actorId: string): CodaState {
 export function dealCodaTable(state: CodaState): CodaState {
   const seated = state.players.slice(0, 4);
   if (seated.length < 2) return state;
+  const open = openingCount(seated.length);
   const deck = makeDeck(state.useJokers);
   const players = seated.map((p) => {
-    const split = openingSplit(p.black ?? 2, p.white ?? 2);
+    const split = openingSplit(p.black ?? Math.floor(open / 2), p.white ?? open - Math.floor(open / 2), open);
     const dealtTiles = sortOpening([
       ...takeByColor(deck, "black", split.black),
       ...takeByColor(deck, "white", split.white),
@@ -379,10 +395,12 @@ export function startCoda(useJokers = true, youBlack = 2, youWhite = 2, seats = 
     name: i === 0 ? "YOU" : CPU_NAMES[i - 1]!,
     human: i === 0,
   }));
+  const open = openingCount(n);
+  const cpuMix = defaultMix(open);
   let lobby = startCodaLobby(people, useJokers);
   lobby = pickCodaMix(lobby, "you", youBlack, youWhite);
   for (const p of lobby.players) {
-    if (p.id !== "you") lobby = pickCodaMix(lobby, p.id, 2, 2);
+    if (p.id !== "you") lobby = pickCodaMix(lobby, p.id, cpuMix.black, cpuMix.white);
   }
   lobby = { ...lobby, players: lobby.players.map((p) => ({ ...p, ready: true })) };
   return dealCodaTable(lobby);

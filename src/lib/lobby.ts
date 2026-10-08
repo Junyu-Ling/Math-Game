@@ -55,6 +55,16 @@ export const GAME_LABEL: Record<string, string> = {
   halli: "Halli Galli",
 };
 
+/** Soft seat cap for open tables. Flip 7 is effectively unlimited. */
+export function tableMax(game: string) {
+  if (game === "flip7") return 16;
+  return 4;
+}
+
+export function minStart(_game?: string) {
+  return 2;
+}
+
 export function isCpuId(id: string) {
   return /^(cpu|bot|ai)/i.test(id);
 }

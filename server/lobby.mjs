@@ -16,7 +16,11 @@ function uid(prefix) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
 }
 
-const CPU_NAMES = ["CPU", "CPU 2", "CPU 3"];
+const CPU_NAMES = ["CPU", "CPU 2", "CPU 3", "CPU 4", "CPU 5", "CPU 6", "CPU 7", "CPU 8", "CPU 9", "CPU 10", "CPU 11", "CPU 12", "CPU 13", "CPU 14", "CPU 15"];
+
+function tableMax(game) {
+  return game === "flip7" ? 16 : 4;
+}
 
 function isCpuId(id) {
   return /^(cpu|bot|ai)/i.test(String(id || ""));
@@ -732,7 +736,7 @@ export async function createInvite(from, toId, game, meta = {}) {
     const lobby = rec && OPEN_TABLES.has(rec.game) && rec.state?.phase === "lobby";
     if (!lobby) throw new Error("Someone is already in a game");
     if (rec.seats[0] !== fromId) throw new Error("Only the host can invite");
-    if (rec.seats.length >= 4) throw new Error("The table is full");
+    if (rec.seats.length >= tableMax(rec.game)) throw new Error("The table is full");
     if (rec.seats.includes(toId)) throw new Error("They are already seated");
     if (game !== rec.game) throw new Error(`This table is ${rec.game}`);
   }
@@ -823,7 +827,7 @@ async function joinOpenTable(user, invite, mods) {
   if (!host) throw new Error("They went offline");
   if (rec && rec.game === game && rec.state?.phase === "lobby") {
     if (rec.seats.includes(joiner.id)) throw new Error("Already seated");
-    if (rec.seats.length >= 4) throw new Error("The table is full");
+    if (rec.seats.length >= tableMax(game)) throw new Error("The table is full");
     rec.seats = [...rec.seats, joiner.id];
     rec.state = rebuildLobby(rec, joiner, mods);
     rec.seq = (rec.seq || 0) + 1;
@@ -1147,7 +1151,12 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
   if (rec.seats[0] !== userId) throw new Error("Only the host can add CPUs");
 
   if (add) {
-    const target = fill ? 4 : Math.min(4, rec.seats.length + 1);
+    const max = tableMax(game);
+    const target = fill
+      ? game === "flip7"
+        ? Math.min(max, rec.seats.length + 3)
+        : max
+      : Math.min(max, rec.seats.length + 1);
     while (rec.seats.length < target) {
       const cpu = nextCpu(rec.seats);
       rec.seats = [...rec.seats, cpu.id];

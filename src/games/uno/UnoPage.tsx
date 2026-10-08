@@ -172,7 +172,6 @@ export function UnoPage() {
   const lobby = useLobby();
   const room = lobby.room?.game === "uno" ? lobby.room : null;
   const [local, setLocal] = useState<UnoState | null>(null);
-  const [seats, setSeats] = useState(2);
   const [plusFx, setPlusFx] = useState<{ n: number; key: string } | null>(null);
   const state = (room?.view as UnoState | undefined) ?? local;
   const practice = Boolean(local && !room);
@@ -257,10 +256,10 @@ export function UnoPage() {
             <LobbyDecor game="uno" />
             <div className="coda-deal">
               <p className="kicker">{waiting ? "TABLE" : "UNO"}</p>
-              <h2>{waiting ? `Table ${state?.players.length ?? 0}/4` : "Empty your hand"}</h2>
+              <h2>{waiting ? `Table ${state?.players.length ?? 0}` : "Empty your hand"}</h2>
               <p>
                 {waiting
-                  ? "2–4 players. Mix humans and CPUs. Host starts the deal when at least two are seated."
+                  ? "Open a table, add CPUs or invite, then start with 2–4. No need to pick a seat count first."
                   : "Match color, number, or action. Tap UNO before you go down to one card. Miss it and draw two."}
               </p>
               {waiting && state ? (
@@ -273,15 +272,6 @@ export function UnoPage() {
                   ))}
                 </ul>
               ) : null}
-              {!waiting ? (
-                <div className="deal-seats" role="group" aria-label="Players">
-                  {[2, 3, 4].map((n) => (
-                    <button key={n} className={`btn ${seats === n ? "" : "btn-ghost"}`} type="button" onClick={() => setSeats(n)}>
-                      {n}P
-                    </button>
-                  ))}
-                </div>
-              ) : null}
               <MixedCpuBar game="uno" />
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {waiting ? (
@@ -290,10 +280,10 @@ export function UnoPage() {
                       Start {state?.players.length}P
                     </button>
                   ) : (
-                    <p>Waiting for the host to start.</p>
+                    <p>{host ? "Need at least 2 players to start." : "Waiting for the host to start."}</p>
                   )
                 ) : (
-                  <button className="btn" type="button" onClick={() => setLocal(startUnoPractice(seats))}>
+                  <button className="btn" type="button" onClick={() => setLocal(startUnoPractice(2))}>
                     Practice vs CPU
                   </button>
                 )}

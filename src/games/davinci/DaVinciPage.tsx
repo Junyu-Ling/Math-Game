@@ -22,7 +22,7 @@ import {
   startCoda,
   stay,
   applyAction,
-  OPENING,
+  openingCount,
   RPS_REVEAL_MS,
   type CodaAction,
   type CodaState,
@@ -397,6 +397,7 @@ export function DaVinciPage() {
 
   const waiting = Boolean(state?.phase === "lobby");
   const playing = state !== null && !waiting;
+  const openN = openingCount(waiting && state ? state.players.length : seats);
   const you = state && (playing || waiting)
     ? (youId ? state.players.find((p) => p.id === youId) : state.players[0]) ?? state.players[0]
     : null;
@@ -578,18 +579,27 @@ export function DaVinciPage() {
   const rpsLocked = Boolean(myRpsThrow || rpsReveal);
 
   function setBlack(n: number) {
-    const black = Math.max(0, Math.min(OPENING, n));
+    const black = Math.max(0, Math.min(openN, n));
     setBlackN(black);
-    setWhiteN(OPENING - black);
-    if (waiting && you) dispatch({ type: "pick", black, white: OPENING - black });
+    setWhiteN(openN - black);
+    if (waiting && you) dispatch({ type: "pick", black, white: openN - black });
   }
 
   function setWhite(n: number) {
-    const white = Math.max(0, Math.min(OPENING, n));
+    const white = Math.max(0, Math.min(openN, n));
     setWhiteN(white);
-    setBlackN(OPENING - white);
-    if (waiting && you) dispatch({ type: "pick", black: OPENING - white, white });
+    setBlackN(openN - white);
+    if (waiting && you) dispatch({ type: "pick", black: openN - white, white });
   }
+
+  useEffect(() => {
+    if (blackN + whiteN === openN) return;
+    const black = Math.min(blackN, openN);
+    const white = openN - black;
+    setBlackN(black);
+    setWhiteN(white);
+    if (waiting && you) dispatch({ type: "pick", black, white });
+  }, [openN]);
 
   function resetTable() {
     setFlash(null);
@@ -667,10 +677,10 @@ export function DaVinciPage() {
               <h2>{waiting ? `Table ${state?.players.length ?? 0}/4` : matching ? "Invite pending" : "Opening draw"}</h2>
               <p>
                 {waiting
-                  ? "Each player picks black and white (4 total), then ready. Add CPUs for empty seats; humans and CPUs can sit together."
+                  ? `Each player picks black and white (${openN} total${state && state.players.length >= 4 ? " · 4 players" : ""}), then ready. Add CPUs or invite, then start at 2+.`
                   : matching
                     ? "Waiting for them to accept."
-                    : `2–4 players. Mix invited humans with CPUs. Start with ${OPENING} tiles.`}
+                    : `Open a table, add CPUs or invite. 2–4 players. 4 players start with 3 tiles; otherwise ${openN}.`}
               </p>
               {waiting && state ? (
                 <ul className="lobby-roster">
@@ -697,7 +707,7 @@ export function DaVinciPage() {
                           −
                         </button>
                         <b>{blackN}</b>
-                        <button type="button" disabled={blackN >= OPENING} onClick={() => setBlack(blackN + 1)}>
+                        <button type="button" disabled={blackN >= openN} onClick={() => setBlack(blackN + 1)}>
                           +
                         </button>
                       </div>
@@ -709,7 +719,7 @@ export function DaVinciPage() {
                           −
                         </button>
                         <b>{whiteN}</b>
-                        <button type="button" disabled={whiteN >= OPENING} onClick={() => setWhite(whiteN + 1)}>
+                        <button type="button" disabled={whiteN >= openN} onClick={() => setWhite(whiteN + 1)}>
                           +
                         </button>
                       </div>
@@ -730,9 +740,15 @@ export function DaVinciPage() {
                           key={n}
                           className={`btn ${seats === n ? "" : "btn-ghost"}`}
                           type="button"
-                          onClick={() => setSeats(n)}
+                          onClick={() => {
+                            setSeats(n);
+                            const next = openingCount(n);
+                            const black = Math.min(blackN, next);
+                            setBlackN(black);
+                            setWhiteN(next - black);
+                          }}
                         >
-                          {n}P
+                          {n}P{n === 4 ? " · 3 tiles" : ""}
                         </button>
                       ))}
                     </div>

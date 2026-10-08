@@ -95,7 +95,6 @@ export function HalliGalliPage() {
   const lobby = useLobby();
   const room = lobby.room?.game === "halli" ? lobby.room : null;
   const [local, setLocal] = useState<HalliState | null>(null);
-  const [seats, setSeats] = useState(2);
   const state = (room?.view as HalliState | undefined) ?? local;
   const practice = Boolean(local && !room);
   const youId = practice ? "you" : user?.id;
@@ -190,10 +189,10 @@ export function HalliGalliPage() {
               <LobbyDecor game="halli" />
               <div className="coda-deal">
                 <p className="kicker">{waiting ? "TABLE" : "HALLI GALLI"}</p>
-                <h2>{waiting ? `Table ${state?.players.length ?? 0}/4` : "Ring on five"}</h2>
+                <h2>{waiting ? `Table ${state?.players.length ?? 0}` : "Ring on five"}</h2>
                 <p>
                   {waiting
-                    ? "2–4 players. Mix humans and CPUs. Host starts when at least two are seated."
+                    ? "Open a table, add CPUs or invite people, then start with 2–4. No need to pick a seat count first."
                     : "Flip fruit cards. When the open tops add up to five of one fruit, ring the bell first."}
                 </p>
                 {waiting && state ? (
@@ -206,15 +205,6 @@ export function HalliGalliPage() {
                     ))}
                   </ul>
                 ) : null}
-                {!waiting ? (
-                  <div className="deal-seats" role="group" aria-label="Players">
-                    {[2, 3, 4].map((n) => (
-                      <button key={n} className={`btn ${seats === n ? "" : "btn-ghost"}`} type="button" onClick={() => setSeats(n)}>
-                        {n}P
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
                 <MixedCpuBar game="halli" />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
                   {waiting ? (
@@ -223,10 +213,10 @@ export function HalliGalliPage() {
                         Start {state?.players.length}P
                       </button>
                     ) : (
-                      <p>Waiting for the host to start.</p>
+                      <p>{host ? "Need at least 2 players to start." : "Waiting for the host to start."}</p>
                     )
                   ) : (
-                    <button className="btn" type="button" onClick={() => setLocal(startHalliPractice(seats))}>
+                    <button className="btn" type="button" onClick={() => setLocal(startHalliPractice(2))}>
                       Practice vs CPU
                     </button>
                   )}

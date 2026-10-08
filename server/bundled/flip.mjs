@@ -16,6 +16,7 @@ function uid(prefix = "id") {
 }
 
 // src/games/flip7/engine.ts
+var FLIP_MAX = 16;
 function deckBuild() {
   const cards = [];
   cards.push({ id: uid("f"), kind: "number", value: 0 });
@@ -64,7 +65,7 @@ function emptySeat(p) {
   };
 }
 function startFlip7Lobby(people) {
-  const players = people.slice(0, 4).map(emptySeat);
+  const players = people.slice(0, FLIP_MAX).map(emptySeat);
   return {
     players,
     deck: [],
@@ -77,11 +78,11 @@ function startFlip7Lobby(people) {
     winnerId: null,
     goal: 200,
     burst: null,
-    log: [{ id: uid("l"), text: `Table ${players.length}/4. Host starts at 1\u20134 players.` }]
+    log: [{ id: uid("l"), text: `Table ${players.length}. Add CPUs or invite, then start with 2+ players.` }]
   };
 }
 function startFlip7Table(people) {
-  const seated = people.slice(0, 4);
+  const seated = people.slice(0, FLIP_MAX);
   if (!seated.length) return startFlip7Lobby(seated);
   const players = seated.map(emptySeat);
   return {
@@ -102,9 +103,9 @@ function startFlip7Table(people) {
 function startFlip7Duel(a, b) {
   return startFlip7Table([a, b]);
 }
-var CPU_NAMES = ["CPU", "CPU 2", "CPU 3"];
-function startFlip7(seats = 1) {
-  const n = Math.max(1, Math.min(4, Math.floor(seats) || 1));
+var CPU_NAMES = ["CPU", "CPU 2", "CPU 3", "CPU 4", "CPU 5", "CPU 6", "CPU 7", "CPU 8", "CPU 9", "CPU 10", "CPU 11", "CPU 12", "CPU 13", "CPU 14", "CPU 15"];
+function startFlip7(seats = 2) {
+  const n = Math.max(1, Math.min(FLIP_MAX, Math.floor(seats) || 2));
   return startFlip7Table(
     Array.from({ length: n }, (_, i) => ({
       id: i === 0 ? "you" : `cpu-${i}`,
@@ -242,6 +243,7 @@ function applyTarget(state, targetId) {
       area: []
     }));
     next.discard = [...next.discard, ...target.area];
+    next.burst = { playerId: target.id, id: uid("boom"), kind: "freeze" };
     next.log = [
       ...next.log,
       {
@@ -337,7 +339,7 @@ function aiDecide(state) {
 function applyFlipAction(state, actorId, action) {
   if (!state.players.some((p) => p.id === actorId)) return state;
   if (state.phase === "lobby") {
-    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 1) {
+    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 2) {
       return startFlip7Table(state.players);
     }
     return state;
@@ -365,6 +367,7 @@ function aiTarget(state) {
   return others[0]?.id ?? me.id;
 }
 export {
+  FLIP_MAX,
   activePlayers,
   advance,
   aiDecide,

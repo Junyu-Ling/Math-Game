@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLobby } from "../context/LobbyContext";
-import { GAME_LABEL } from "../lib/lobby";
+import { GAME_LABEL, tableMax } from "../lib/lobby";
 import { Avatar } from "./Avatar";
 
 export function InviteList({ game, meta }: { game: string; meta?: Record<string, unknown> }) {
@@ -13,7 +13,8 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
   const seated = new Set(room?.seats || []);
   const cooling = inviteCooldownMs > 0;
   const waitSec = Math.ceil(inviteCooldownMs / 1000);
-  const canInviteMore = (!room || (tableWait && host && seated.size < 4)) && !cooling;
+  const max = tableMax(game);
+  const canInviteMore = (!room || (tableWait && host && seated.size < max)) && !cooling;
 
   if (!user) {
     return (
@@ -31,11 +32,11 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       {store === "memory" ? (
         <p>Lobby is in-memory. Set REDIS_URL in production so accounts can see each other.</p>
       ) : null}
-      {game === "coda" ? <p>Da Vinci Code is 2–4. Mix humans and CPUs, everyone picks black/white, then ready.</p> : null}
-      {game === "uno" ? <p>UNO is 2–4. Mix humans and CPUs, then the host starts.</p> : null}
-      {game === "flip7" ? <p>Flip 7 is 1–4. Mix humans and CPUs, then the host starts.</p> : null}
-      {game === "halli" ? <p>Halli Galli is 2–4. Mix humans and CPUs, then the host starts. Ring the bell on five.</p> : null}
-      {tableWait ? <p>Seated {seated.size}/4.</p> : null}
+      {game === "coda" ? <p>Da Vinci Code is 2–4. Mix humans and CPUs, everyone picks black/white, then ready. 4 players start with 3 tiles.</p> : null}
+      {game === "uno" ? <p>UNO is 2–4. Open a table, add CPUs or invite, then the host starts at 2+.</p> : null}
+      {game === "flip7" ? <p>Flip 7 has no fixed seat count. Add CPUs or invite, then start with 2+.</p> : null}
+      {game === "halli" ? <p>Halli Galli is 2–4. Open a table, add CPUs or invite, then start. Ring on five.</p> : null}
+      {tableWait ? <p>Seated {seated.size}{max < 16 ? `/${max}` : ""}.</p> : null}
       {online.length === 0 ? (
         <p>No other accounts yet. Anyone who registers or logs in will appear here, even when they are offline.</p>
       ) : (

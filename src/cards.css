@@ -1553,6 +1553,65 @@
   display: block;
 }
 
+.flip-freeze-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  background: rgba(236, 248, 255, 0.55);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+  animation: flip-freeze-in 1.55s ease-out forwards;
+}
+
+.flip-freeze-overlay img {
+  width: min(280px, 56vw);
+  height: auto;
+  filter: drop-shadow(0 18px 28px rgba(40, 90, 140, 0.28));
+}
+
+.flip-freeze-overlay b {
+  font-family: Nunito, "Arial Black", sans-serif;
+  font-size: clamp(22px, 4vw, 34px);
+  letter-spacing: 0.28em;
+  color: #1a6a9a;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
+}
+
+@keyframes flip-freeze-in {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.flip-extras {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 4px 8px;
+}
+
+.flip-extras span {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid #e5e7eb;
+}
+
+.flip-extras span.on {
+  color: #111;
+  border-color: #111;
+}
+
 @keyframes flip-chance-hero {
   0% {
     transform: translateY(30px) scale(0.72) rotateY(0deg);

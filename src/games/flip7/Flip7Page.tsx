@@ -25,10 +25,12 @@ function aroundYou<T extends { id: string }>(players: T[], youId: string) {
   const i = Math.max(0, players.findIndex((p) => p.id === youId));
   const n = players.length;
   const at = (d: number) => players[(i + d) % n] ?? null;
-  if (n <= 1) return { rival: null as T | null, left: null as T | null, right: null as T | null, partner: null as T | null };
-  if (n === 2) return { rival: at(1), left: null as T | null, right: null as T | null, partner: null as T | null };
-  if (n === 3) return { rival: null as T | null, left: at(1), partner: null as T | null, right: at(2) };
-  return { rival: null as T | null, left: at(1), partner: at(2), right: at(3) };
+  if (n <= 1) return { rival: null as T | null, left: null as T | null, right: null as T | null, partner: null as T | null, extras: [] as T[] };
+  if (n === 2) return { rival: at(1), left: null as T | null, right: null as T | null, partner: null as T | null, extras: [] as T[] };
+  if (n === 3) return { rival: null as T | null, left: at(1), partner: null as T | null, right: at(2), extras: [] as T[] };
+  const shown = new Set([youId, at(1)?.id, at(2)?.id, at(3)?.id].filter(Boolean));
+  const extras = players.filter((p) => !shown.has(p.id));
+  return { rival: null as T | null, left: at(1), partner: at(2), right: at(3), extras };
 }
 
 function FlipSeat({
@@ -78,7 +80,6 @@ export function Flip7Page() {
   const lobby = useLobby();
   const room = lobby.room?.game === "flip7" ? lobby.room : null;
   const [local, setLocal] = useState<FlipState | null>(null);
-  const [seats, setSeats] = useState(1);
   const state = (room?.view as FlipState | undefined) ?? local;
   const practice = Boolean(local && !room);
   const youId = practice ? "you" : user?.id;
@@ -106,11 +107,15 @@ export function Flip7Page() {
       timers.push(window.setTimeout(() => setFx({ id, boom: true, spin: true }), 360));
       timers.push(window.setTimeout(() => setFx({ id, boom: false, spin: true }), 720));
       timers.push(window.setTimeout(() => setFx(null), 1480));
+    } else if (burst.kind === "freeze") {
+      timers.push(window.setTimeout(() => setFx(null), 1600));
     } else {
       timers.push(window.setTimeout(() => setFx(null), 1000));
     }
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, [burst?.id, burst?.kind]);
+
+  const freezeFx = Boolean(burst?.kind === "freeze" && fx?.id === burst.id);
 
   useEffect(() => {
     if (!practice || !local || local.phase === "over" || local.phase === "lobby") return;
@@ -118,7 +123,7 @@ export function Flip7Page() {
     if (actor.human) return;
     let stop = false;
     void (async () => {
-      await wait(local.burst?.kind === "save" ? 1550 : CPU_THINK_MS);
+      await wait(local.burst?.kind === "save" ? 1550 : local.burst?.kind === "freeze" ? 1650 : CPU_THINK_MS);
       if (stop) return;
       setLocal((s) => {
         if (!s || s.phase === "lobby" || currentFlip(s).human) return s;
@@ -151,7 +156,7 @@ export function Flip7Page() {
     <div className="page-wide">
       <div className="game-head">
         <div>
-          <p className="kicker">02 / FLIP7 · 1–4</p>
+          <p className="kicker">02 / FLIP7 · 2+</p>
           <h1>Flip 7</h1>
         </div>
         <div className="row-actions">
@@ -172,11 +177,11 @@ export function Flip7Page() {
             <LobbyDecor game="flip7" />
             <div className="coda-deal">
               <p className="kicker">{waiting ? "TABLE" : "FLIP 7"}</p>
-              <h2>{waiting ? `Table ${state?.players.length ?? 0}/4` : "First to 200"}</h2>
+              <h2>{waiting ? `Table ${state?.players.length ?? 0}` : "First to 200"}</h2>
               <p>
                 {waiting
-                  ? "1–4 players. Mix humans and CPUs. Host starts when everyone is seated."
-                  : "Hit or stay. Freeze and Flip Three can target any active player, including you. Practice solo or with CPUs."}
+                  ? "Open a table, add CPUs or invite people, then start with 2 or more. No fixed seat count."
+                  : "Hit or stay. Freeze and Flip Three can target any active player, including you."}
               </p>
               {waiting && state ? (
                 <ul className="lobby-roster">
@@ -188,35 +193,46 @@ export function Flip7Page() {
                   ))}
                 </ul>
               ) : null}
-              {!waiting ? (
-                <div className="deal-seats" role="group" aria-label="Players">
-                  {[1, 2, 3, 4].map((n) => (
-                    <button key={n} className={`btn ${seats === n ? "" : "btn-ghost"}`} type="button" onClick={() => setSeats(n)}>
-                      {n}P
-                    </button>
-                  ))}
-                </div>
-              ) : null}
               <MixedCpuBar game="flip7" />
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {waiting ? (
-                  host && (state?.players.length ?? 0) >= 1 ? (
+                  host && (state?.players.length ?? 0) >= 2 ? (
                     <button className="btn" type="button" onClick={() => act({ type: "start" })}>
                       Start {state?.players.length}P
                     </button>
                   ) : (
-                    <p>Waiting for the host to start.</p>
+                    <p>{host ? "Need at least 2 players to start." : "Waiting for the host to start."}</p>
                   )
                 ) : (
-                  <button className="btn" type="button" onClick={() => setLocal(startFlip7(seats))}>
-                    {seats === 1 ? "Practice solo" : "Practice vs CPU"}
-                  </button>
+                  <>
+                    <button className="btn btn-ghost" type="button" onClick={() => setLocal(startFlip7(1))}>
+                      Practice solo
+                    </button>
+                    <button className="btn" type="button" onClick={() => setLocal(startFlip7(2))}>
+                      Practice vs CPU
+                    </button>
+                  </>
                 )}
               </div>
             </div>
             </>
           ) : (
             <>
+              {freezeFx ? (
+                <div className="flip-freeze-overlay" aria-live="polite">
+                  <img src="/flip7-ice.jpg" alt="Freeze" />
+                  <b>FREEZE</b>
+                </div>
+              ) : null}
+              {seated.extras.length ? (
+                <div className="flip-extras" aria-label="Other players">
+                  {seated.extras.map((p) => (
+                    <span key={p.id} className={cur?.id === p.id ? "on" : ""}>
+                      {p.name} · {p.total}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               {seated.partner ? (
                 <FlipSeat player={seated.partner} className="seat-partner" turn={cur?.id === seated.partner.id} burst={burst} fx={fx} lockSize={Boolean(seated.left)} />
               ) : null}
@@ -232,6 +248,8 @@ export function Flip7Page() {
                   <div className="status-line">
                     {state.phase === "over"
                       ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+                      : freezeFx
+                        ? "Frozen!"
                       : savePlaying
                         ? "Second Chance!"
                         : myTurn
