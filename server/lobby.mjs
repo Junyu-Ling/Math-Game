@@ -1052,6 +1052,30 @@ export async function applyRoomAction(user, roomId, action, mods) {
   return publicRoom(room, user.id);
 }
 
+function endStateForLeave(state) {
+  const msg = "A player left — game over.";
+  const next = {
+    ...state,
+    phase: "over",
+    winnerId: null,
+    winnerTeam: null,
+    message: msg,
+  };
+  if (Array.isArray(state?.log)) {
+    next.log = [...state.log, { id: `leave-${Date.now()}`, text: msg }];
+  }
+  return next;
+}
+
+async function humansStillSeated(roomId, seats, exceptId) {
+  const out = [];
+  for (const id of humanSeatIds(seats)) {
+    if (id === exceptId) continue;
+    if ((await getSeat(id)) === roomId) out.push(id);
+  }
+  return out;
+}
+
 export async function leaveRoom(userId) {
   const rid = await getSeat(userId);
   if (!rid) return snapshot(userId);
@@ -1071,18 +1095,19 @@ export async function leaveRoom(userId) {
     await saveRoom(rec);
     return snapshot(userId);
   }
+
+  // Any leave during a match ends it for everyone. Keep the over room briefly for survivors.
   if (rec && rec.state?.phase !== "over") {
-    rec.state = {
-      ...rec.state,
-      phase: "over",
-      winnerId: rec.seats.find((id) => id !== userId) || null,
-      winnerTeam: null,
-      message: "A player left.",
-    };
+    rec.state = endStateForLeave(rec.state);
+  }
+  await kvDel(`axiom:seat:${userId}`);
+  const remain = await humansStillSeated(rid, rec?.seats || [], userId);
+  if (!remain.length) {
+    for (const id of humanSeatIds(rec?.seats || [])) await kvDel(`axiom:seat:${id}`);
+    await kvDel(`axiom:room:${rid}`);
+  } else if (rec) {
     await saveRoom(rec);
   }
-  for (const id of rec?.seats || [userId]) await kvDel(`axiom:seat:${id}`);
-  await kvDel(`axiom:room:${rid}`);
   await wakeUsers(rec?.seats || [userId]);
   return snapshot(userId);
 }

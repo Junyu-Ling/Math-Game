@@ -93,6 +93,19 @@ export const lobbyApi = {
   leave(token: string) {
     return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "leave" }) });
   },
+  /** Best-effort leave when the tab closes (does not await a JSON body). */
+  leaveKeepalive(token: string) {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+    void fetch(`${apiBase}/api/lobby`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ op: "leave" }),
+      keepalive: true,
+    });
+  },
 };
 
 export const GAME_PATH: Record<string, string> = {

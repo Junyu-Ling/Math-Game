@@ -251,7 +251,9 @@ export function HalliGalliPage() {
                 </button>
                 <div className="status-line">
                   {state.phase === "over"
-                    ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+                    ? state.winnerId
+                      ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+                      : state.log.at(-1)?.text || "Game over"
                     : hot
                       ? `Five ${HALLI_LABEL[hot].toLowerCase()} — ring now!`
                       : myTurn

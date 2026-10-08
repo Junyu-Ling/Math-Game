@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { GAME_PATH, lobbyApi, type Invite, type LobbySnap, type OnlinePlayer, type RoomSnap } from "../lib/lobby";
 
@@ -20,9 +20,15 @@ type LobbyCtx = {
 const Ctx = createContext<LobbyCtx | null>(null);
 const COOLDOWN = 5000;
 
+function roomPhase(room: RoomSnap | null | undefined) {
+  const view = room?.view as { phase?: string } | undefined;
+  return view?.phase || "";
+}
+
 export function LobbyProvider({ children }: { children: ReactNode }) {
   const { token, user } = useAuth();
   const nav = useNavigate();
+  const loc = useLocation();
   const [snap, setSnap] = useState<LobbySnap>({ online: [], invites: [], room: null, store: "memory" });
   const [error, setError] = useState("");
   const [inviteUntil, setInviteUntil] = useState(0);
@@ -31,12 +37,10 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   const roomSeq = useRef(0);
   const snapRef = useRef(snap);
   snapRef.current = snap;
+  const leavingRef = useRef(false);
 
   function takeRoom(next: RoomSnap | null | undefined, prev: RoomSnap | null) {
-    if (!next) {
-      if (!prev) return null;
-      return prev;
-    }
+    if (!next) return null;
     const seq = next.seq ?? 0;
     if (seq && seq < roomSeq.current) return prev;
     if (seq) roomSeq.current = seq;
@@ -58,15 +62,12 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     let stop = false;
     let timer = 0;
     let abort: AbortController | null = null;
-    const applySnap = (next: LobbySnap, prevFallback: boolean) => {
+    const applySnap = (next: LobbySnap) => {
       setSnap((prev) => {
         const light = Boolean(next.light);
-        const room = next.room
-          ? takeRoom(next.room, prev.room)
-          : light && prevFallback
-            ? prev.room
-            : next.room ?? (light ? prev.room : null);
-        if (!room) roomSeq.current = light ? roomSeq.current : 0;
+        // Server always sends `room` (object or null). Null means left / table closed.
+        const room = next.room ? takeRoom(next.room, prev.room) : null;
+        if (!room) roomSeq.current = 0;
         return {
           online: light && !next.online.length ? prev.online : next.online,
           invites: next.invites,
@@ -80,18 +81,19 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         if (path && window.location.pathname !== path) nav(path);
       }
       if (next.room) roomGame.current = next.room.game;
-      else if (!next.light) roomGame.current = null;
+      else roomGame.current = null;
     };
     let lastFull = 0;
     const tick = async () => {
       try {
         abort?.abort();
         abort = new AbortController();
-        if (document.hidden) {
+        const inRoom = Boolean(snapRef.current.room);
+        // Keep heartbeats while seated even if the tab is hidden, so leave detection stays honest.
+        if (document.hidden && !inRoom) {
           if (!stop) timer = window.setTimeout(tick, 20000);
           return;
         }
-        const inRoom = Boolean(snapRef.current.room);
         const needRoster = !inRoom && Date.now() - lastFull > 20000;
         const next = needRoster
           ? await lobbyApi.sync(token, window.location.pathname, false)
@@ -104,8 +106,8 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
             );
         if (stop) return;
         if (!next.light) lastFull = Date.now();
-        applySnap(next, inRoom || Boolean(next.light));
-        if (!stop) timer = window.setTimeout(tick, 0);
+        applySnap(next);
+        if (!stop) timer = window.setTimeout(tick, document.hidden && inRoom ? 4000 : 0);
       } catch (ex) {
         if (stop) return;
         if (ex instanceof Error && ex.name === "AbortError") return;
@@ -120,6 +122,45 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(timer);
     };
   }, [token, user, nav]);
+
+  // Leaving the game route mid-match (or closing the tab) ends the table for everyone.
+  useEffect(() => {
+    if (!token) return;
+    const room = snap.room;
+    const phase = roomPhase(room);
+    const path = room?.game ? GAME_PATH[room.game] : "";
+    const active = Boolean(room && phase && phase !== "lobby");
+    if (active && path && loc.pathname !== path && !leavingRef.current) {
+      leavingRef.current = true;
+      roomSeq.current = 0;
+      void lobbyApi
+        .leave(token)
+        .then((next) => {
+          setSnap(next);
+          roomGame.current = null;
+        })
+        .catch(() => {})
+        .finally(() => {
+          leavingRef.current = false;
+        });
+    }
+  }, [loc.pathname, token, snap.room]);
+
+  useEffect(() => {
+    if (!token) return;
+    const onHide = (ev: PageTransitionEvent) => {
+      if (ev.persisted) return;
+      const room = snapRef.current.room;
+      const phase = roomPhase(room);
+      if (!room || !phase || phase === "lobby" || phase === "over") return;
+      lobbyApi.leaveKeepalive(token);
+      roomSeq.current = 0;
+      setSnap((prev) => ({ ...prev, room: null }));
+      roomGame.current = null;
+    };
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, [token]);
 
   const value = useMemo<LobbyCtx>(
     () => ({

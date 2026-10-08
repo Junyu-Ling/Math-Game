@@ -347,7 +347,9 @@ export function UnoPage() {
                 </div>
                 <div className="status-line">
                   {state.phase === "over"
-                    ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+                    ? state.winnerId
+                      ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+                      : state.log.at(-1)?.text || "Game over"
                     : state.pendingDraw > 0
                       ? state.stackKind === "wild4"
                         ? `+${state.pendingDraw} · stack ${state.color} +2 or +4`

@@ -247,7 +247,9 @@ export function Flip7Page() {
                   <DeckStack count={state.deck.length} />
                   <div className="status-line">
                     {state.phase === "over"
-                      ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+                      ? state.winnerId
+                        ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+                        : state.log.at(-1)?.text || "Game over"
                       : freezeFx
                         ? "Frozen!"
                       : savePlaying
