@@ -76,8 +76,10 @@ function FlipSeat({
   mine?: boolean;
 }) {
   const scored = areaScore(player.area);
-  const showFlip7 = scored.flip7 || (burst?.playerId === player.id && burst.kind === "flip7" && fx?.id === burst.id);
-  const showBoom = Boolean(burst?.playerId === player.id && fx?.id === burst.id && fx.boom && burst.kind !== "freeze" && burst.kind !== "flip7");
+  const onBurst = Boolean(burst && burst.playerId === player.id && fx?.id === burst.id);
+  const showFlip7 = scored.flip7 || (onBurst && burst?.kind === "flip7");
+  // Boom is only for bust (and the save intro flash) — freeze / flip7 never use it.
+  const showBoom = Boolean(onBurst && fx?.boom && (burst?.kind === "bust" || burst?.kind === "save"));
   return (
     <div className={`seat ${className}${vertical ? " seat-side" : ""}${turn ? " is-turn" : ""}${lead ? " is-lead" : ""}`}>
       {showBoom ? <FlipBoom key={`${burst!.id}-boom`} /> : null}
@@ -139,13 +141,15 @@ export function Flip7Page() {
     const id = burst.id;
     const timers: number[] = [];
     let audio: HTMLAudioElement | null = null;
-    if (burst.kind === "save") {
+    if (burst.kind === "bust") {
+      setFx({ id, boom: true, spin: false });
+      timers.push(window.setTimeout(() => setFx(null), 1000));
+    } else if (burst.kind === "save") {
       setFx({ id, boom: true, spin: false });
       timers.push(window.setTimeout(() => setFx({ id, boom: true, spin: true }), 360));
       timers.push(window.setTimeout(() => setFx({ id, boom: false, spin: true }), 720));
       timers.push(window.setTimeout(() => setFx(null), 1480));
     } else if (burst.kind === "freeze") {
-      // Freeze is ice only — never the bust boom.
       setFx({ id, boom: false, spin: false });
       audio = new Audio("/flip7-freeze.mp3?v=bing");
       audio.volume = 0.85;
@@ -155,8 +159,7 @@ export function Flip7Page() {
       setFx({ id, boom: false, spin: false });
       timers.push(window.setTimeout(() => setFx(null), 1600));
     } else {
-      setFx({ id, boom: true, spin: false });
-      timers.push(window.setTimeout(() => setFx(null), 1000));
+      setFx(null);
     }
     return () => {
       timers.forEach((t) => window.clearTimeout(t));
