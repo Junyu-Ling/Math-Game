@@ -35,7 +35,7 @@ export type FlipState = {
   winnerId: string | null;
   log: FlipLog[];
   goal: number;
-  burst: { playerId: string; id: string; kind: "bust" | "save" | "freeze"; saveCard?: FlipCard } | null;
+  burst: { playerId: string; id: string; kind: "bust" | "save" | "freeze" | "flip7"; saveCard?: FlipCard } | null;
 };
 
 export const FLIP_MAX = 16;
@@ -76,6 +76,16 @@ export function areaScore(area: FlipCard[]): { score: number; numbers: number; f
   const flip7 = new Set(numbers.map((c) => c.value)).size >= 7;
   if (flip7) score += 15;
   return { score, numbers: numbers.length, flip7 };
+}
+
+/** Standing + unbanked round score for active players. */
+export function liveTotal(p: FlipPlayer): number {
+  if (p.status === "active") return p.total + areaScore(p.area).score;
+  return p.total;
+}
+
+export function numberPower(area: FlipCard[]): number {
+  return area.filter((c) => c.kind === "number").reduce((s, c) => s + (c.value ?? 0), 0);
 }
 
 function emptySeat(p: { id: string; name: string; human?: boolean }): FlipPlayer {
@@ -243,7 +253,8 @@ function afterHit(state: FlipState, playerId: string): FlipState {
       area: [],
     }));
     next.discard = [...next.discard, ...me.area];
-    next.log = [...next.log, { id: uid("l"), text: `${me.name} Flip 7! +${scored.score} (includes +15).`, tone: "you" }];
+    next.burst = { playerId: me.id, id: uid("boom"), kind: "flip7" };
+    next.log = [...next.log, { id: uid("l"), text: `${me.name} Flip 7! +${scored.score} (includes +15 bonus).`, tone: "you" }];
     next = checkWin(next, me.id);
     if (next.phase === "over") return next;
     return advance({ ...next, turn: idx });
@@ -332,6 +343,7 @@ function allSettled(state: FlipState) {
 
 function newRound(state: FlipState): FlipState {
   const discard = [...state.discard, ...state.players.flatMap((p) => p.area)];
+  const totals = state.players.map((p) => `${p.name} ${p.total}`).join(" · ");
   const players = state.players.map((p) => ({
     ...p,
     area: [],
@@ -343,11 +355,16 @@ function newRound(state: FlipState): FlipState {
     ...state,
     players,
     discard,
+    burst: null,
     round: state.round + 1,
-    turn: (state.round) % state.players.length,
+    turn: state.round % state.players.length,
     phase: "action",
     lastCard: null,
-    log: [...state.log, { id: uid("l"), text: `Round ${state.round + 1} starts.` }],
+    log: [
+      ...state.log,
+      { id: uid("l"), text: `Round complete. Scores kept: ${totals}.` },
+      { id: uid("l"), text: `Round ${state.round + 1} starts.` },
+    ],
   };
 }
 
@@ -419,10 +436,18 @@ export function aiTarget(state: FlipState): string {
   const mine = areaScore(me.area);
   const others = live.filter((p) => p.id !== me.id);
   if (state.pendingAction === "freeze") {
-    if (mine.score >= 16 || mine.numbers >= 5) return me.id;
-    const threat = [...others].sort((a, b) => areaScore(b.area).score - areaScore(a.area).score)[0];
+    // Bank yourself only when the round is already rich; otherwise freeze the leader / Second Chance.
+    if (mine.score >= 20 || mine.numbers >= 6) return me.id;
+    const threat = [...others].sort((a, b) => {
+      const sa = liveTotal(a) + (hasSecondChance(a.area) ? 40 : 0);
+      const sb = liveTotal(b) + (hasSecondChance(b.area) ? 40 : 0);
+      return sb - sa || areaScore(b.area).score - areaScore(a.area).score;
+    })[0];
     return threat?.id ?? me.id;
   }
-  if (mine.numbers >= 4 && mine.numbers < 7) return me.id;
-  return others[0]?.id ?? me.id;
+  // Flip Three: self when your opening numbers are small; else hit the fattest number row.
+  if (mine.numbers <= 2 && mine.score <= 10) return me.id;
+  const fat = [...others].sort((a, b) => numberPower(b.area) - numberPower(a.area) || areaScore(b.area).numbers - areaScore(a.area).numbers)[0];
+  if (!fat || (numberPower(fat.area) < 8 && mine.numbers < 5)) return me.id;
+  return fat.id;
 }

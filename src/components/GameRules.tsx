@@ -10,7 +10,7 @@ const RULES: Record<string, string[]> = {
   flip7: [
     "2+ players. On your turn flip one card or stay to bank the round. First to 200 wins.",
     "Duplicate number busts you unless you hold Second Chance (passive — discards with the duplicate; one per player).",
-    "Seven different numbers in your area scores the Flip 7 bonus.",
+    "Seven different numbers in your area is Flip 7: bank immediately with an extra +15.",
     "Freeze and Flip Three can target any active player, including yourself. Last active player must use them on themselves.",
     "Freeze banks that player’s round score. Flip Three forces three flips on the target.",
   ],

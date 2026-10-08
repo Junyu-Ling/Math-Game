@@ -6,6 +6,7 @@ import {
   areaScore,
   activePlayers,
   currentFlip,
+  liveTotal,
   startFlip7,
   type FlipAction,
   type FlipPlayer,
@@ -59,6 +60,7 @@ function FlipSeat({
   vertical,
   lockSize,
   turn,
+  lead,
   burst,
   fx,
   mine,
@@ -68,22 +70,33 @@ function FlipSeat({
   vertical?: boolean;
   lockSize?: boolean;
   turn: boolean;
+  lead?: boolean;
   burst: FlipState["burst"];
   fx: { id: string; boom: boolean; spin: boolean } | null;
   mine?: boolean;
 }) {
+  const scored = areaScore(player.area);
+  const showFlip7 = scored.flip7 || (burst?.playerId === player.id && burst.kind === "flip7" && fx?.id === burst.id);
+  const showBoom = Boolean(burst?.playerId === player.id && fx?.id === burst.id && fx.boom && burst.kind !== "freeze" && burst.kind !== "flip7");
   return (
-    <div className={`seat ${className}${vertical ? " seat-side" : ""}${turn ? " is-turn" : ""}`}>
-      {burst?.playerId === player.id && fx?.id === burst.id && fx.boom ? <FlipBoom key={`${burst.id}-boom`} /> : null}
+    <div className={`seat ${className}${vertical ? " seat-side" : ""}${turn ? " is-turn" : ""}${lead ? " is-lead" : ""}`}>
+      {showBoom ? <FlipBoom key={`${burst!.id}-boom`} /> : null}
       {burst?.playerId === player.id && burst.kind === "save" && burst.saveCard && fx?.id === burst.id && fx.spin ? (
         <div className="flip-chance-hero" key={`${burst.id}-chance`}>
           <FlipFace card={burst.saveCard} />
         </div>
       ) : null}
-      <div className="seat-label">
-        {player.name} · {mine ? `round ${areaScore(player.area).score} · total ${player.total}` : `${player.total} PTS · ${player.status.toUpperCase()}`}
+      {showFlip7 ? (
+        <div className="flip7-mark" aria-label="Flip 7">
+          <b>FLIP 7</b>
+          <span>+15</span>
+        </div>
+      ) : null}
+      <div className={`seat-label${lead ? " is-lead" : ""}`}>
+        {player.name} · {mine ? `round ${scored.score} · total ${player.total}` : `${player.total} PTS · ${player.status.toUpperCase()}`}
         {player.area.some((c) => c.kind === "chance") ? " · 2ND CHANCE" : ""}
         {turn ? " · TURN" : ""}
+        {lead ? " · LEAD" : ""}
       </div>
       <FitCards vertical={vertical} lockSize={lockSize}>
         {player.area.map((c) => {
@@ -124,19 +137,25 @@ export function Flip7Page() {
   useEffect(() => {
     if (!burst) return;
     const id = burst.id;
-    setFx({ id, boom: true, spin: false });
     const timers: number[] = [];
     let audio: HTMLAudioElement | null = null;
     if (burst.kind === "save") {
+      setFx({ id, boom: true, spin: false });
       timers.push(window.setTimeout(() => setFx({ id, boom: true, spin: true }), 360));
       timers.push(window.setTimeout(() => setFx({ id, boom: false, spin: true }), 720));
       timers.push(window.setTimeout(() => setFx(null), 1480));
     } else if (burst.kind === "freeze") {
+      // Freeze is ice only — never the bust boom.
+      setFx({ id, boom: false, spin: false });
       audio = new Audio("/flip7-freeze.mp3?v=bing");
       audio.volume = 0.85;
       void audio.play().catch(() => {});
       timers.push(window.setTimeout(() => setFx(null), 1600));
+    } else if (burst.kind === "flip7") {
+      setFx({ id, boom: false, spin: false });
+      timers.push(window.setTimeout(() => setFx(null), 1600));
     } else {
+      setFx({ id, boom: true, spin: false });
       timers.push(window.setTimeout(() => setFx(null), 1000));
     }
     return () => {
@@ -149,6 +168,10 @@ export function Flip7Page() {
   }, [burst?.id, burst?.kind]);
 
   const freezeFx = Boolean(burst?.kind === "freeze" && fx?.id === burst.id);
+  const flip7Fx = Boolean(burst?.kind === "flip7" && fx?.id === burst.id);
+  const leadId = state && !waiting
+    ? [...state.players].sort((a, b) => liveTotal(b) - liveTotal(a) || a.name.localeCompare(b.name))[0]?.id ?? null
+    : null;
 
   useEffect(() => {
     if (!practice || !local || local.phase === "over" || local.phase === "lobby") return;
@@ -156,7 +179,9 @@ export function Flip7Page() {
     if (actor.human) return;
     let stop = false;
     void (async () => {
-      await wait(local.burst?.kind === "save" ? 1550 : local.burst?.kind === "freeze" ? 1650 : CPU_THINK_MS);
+      await wait(
+        local.burst?.kind === "save" ? 1550 : local.burst?.kind === "freeze" || local.burst?.kind === "flip7" ? 1650 : CPU_THINK_MS,
+      );
       if (stop) return;
       setLocal((s) => {
         if (!s || s.phase === "lobby" || currentFlip(s).human) return s;
@@ -195,6 +220,7 @@ export function Flip7Page() {
         : state.log.at(-1)?.text || "Game over";
     }
     if (freezeFx) return "Frozen!";
+    if (flip7Fx) return "Flip 7! +15";
     if (savePlaying) return "Second Chance!";
     if (myTurn) {
       if (state.phase === "target") {
@@ -226,7 +252,16 @@ export function Flip7Page() {
 
   const youSeat = me ? (
     <div className="seat seat-you">
-      <FlipSeat player={me} className="seat-you-inner" turn={myTurn} burst={burst} fx={fx} lockSize={!useRing && Boolean(seated?.left)} mine />
+      <FlipSeat
+        player={me}
+        className="seat-you-inner"
+        turn={myTurn}
+        lead={leadId === me.id}
+        burst={burst}
+        fx={fx}
+        lockSize={!useRing && Boolean(seated?.left)}
+        mine
+      />
       <div className="row-actions">
         <button className="btn btn-go" type="button" disabled={!myTurn || state?.phase !== "action" || savePlaying} onClick={() => act({ type: "hit" })}>
           HIT
@@ -321,6 +356,12 @@ export function Flip7Page() {
                   <b>FREEZE</b>
                 </div>
               ) : null}
+              {flip7Fx ? (
+                <div className="flip7-overlay" aria-live="polite">
+                  <b>FLIP 7</b>
+                  <span>+15</span>
+                </div>
+              ) : null}
               <div className="flip-ring-arena">
                 {centerWell}
                 {ring.map(({ player, xPct, yPct }) => (
@@ -329,7 +370,15 @@ export function Flip7Page() {
                     className="seat-ring-slot"
                     style={{ ["--x"]: `${xPct}%`, ["--y"]: `${yPct}%` } as CSSProperties}
                   >
-                    <FlipSeat player={player} className="seat-ring" turn={cur?.id === player.id} burst={burst} fx={fx} lockSize />
+                    <FlipSeat
+                      player={player}
+                      className="seat-ring"
+                      turn={cur?.id === player.id}
+                      lead={leadId === player.id}
+                      burst={burst}
+                      fx={fx}
+                      lockSize
+                    />
                   </div>
                 ))}
               </div>
@@ -343,27 +392,67 @@ export function Flip7Page() {
                   <b>FREEZE</b>
                 </div>
               ) : null}
+              {flip7Fx ? (
+                <div className="flip7-overlay" aria-live="polite">
+                  <b>FLIP 7</b>
+                  <span>+15</span>
+                </div>
+              ) : null}
               {seated.extras.length ? (
                 <div className="flip-extras" aria-label="Other players">
                   {seated.extras.map((p) => (
-                    <span key={p.id} className={cur?.id === p.id ? "on" : ""}>
+                    <span key={p.id} className={`${cur?.id === p.id ? "on" : ""}${leadId === p.id ? " lead" : ""}`}>
                       {p.name} · {p.total}
                     </span>
                   ))}
                 </div>
               ) : null}
               {seated.partner ? (
-                <FlipSeat player={seated.partner} className="seat-partner" turn={cur?.id === seated.partner.id} burst={burst} fx={fx} lockSize={Boolean(seated.left)} />
+                <FlipSeat
+                  player={seated.partner}
+                  className="seat-partner"
+                  turn={cur?.id === seated.partner.id}
+                  lead={leadId === seated.partner.id}
+                  burst={burst}
+                  fx={fx}
+                  lockSize={Boolean(seated.left)}
+                />
               ) : null}
               {seated.rival ? (
-                <FlipSeat player={seated.rival} className="seat-rival" turn={cur?.id === seated.rival.id} burst={burst} fx={fx} lockSize={Boolean(seated.left)} />
+                <FlipSeat
+                  player={seated.rival}
+                  className="seat-rival"
+                  turn={cur?.id === seated.rival.id}
+                  lead={leadId === seated.rival.id}
+                  burst={burst}
+                  fx={fx}
+                  lockSize={Boolean(seated.left)}
+                />
               ) : null}
               {seated.left ? (
-                <FlipSeat player={seated.left} className="seat-left" vertical turn={cur?.id === seated.left.id} burst={burst} fx={fx} lockSize={Boolean(seated.left)} />
+                <FlipSeat
+                  player={seated.left}
+                  className="seat-left"
+                  vertical
+                  turn={cur?.id === seated.left.id}
+                  lead={leadId === seated.left.id}
+                  burst={burst}
+                  fx={fx}
+                  lockSize={Boolean(seated.left)}
+                />
               ) : null}
               {centerWell}
               {seated.right ? (
-                <FlipSeat player={seated.right} className="seat-right" vertical turn={cur?.id === seated.right.id} burst={burst} fx={fx} lockSize={Boolean(seated.left)} />
+                <FlipSeat
+                  player={seated.right}
+                  className="seat-right"
+                  vertical
+                  turn={cur?.id === seated.right.id}
+                  lead={leadId === seated.right.id}
+                  burst={burst}
+                  fx={fx}
+                  lockSize={Boolean(seated.left)}
+                />
               ) : null}
               {youSeat}
             </>
