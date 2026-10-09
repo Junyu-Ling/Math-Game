@@ -43,7 +43,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
         online.map((p) => {
           const live = p.online !== false;
           const inGame = live && Boolean(p.roomId);
-          const status = !live ? "Offline" : inGame ? "游戏中" : "Online";
+          const status = !live ? "Offline" : inGame ? "In game" : "Online";
           const statusClass = !live ? "off" : inGame ? "busy" : "on";
           return (
           <div key={p.id} className="person-row">
@@ -58,7 +58,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
               disabled={!canInviteMore || !live || inGame || seated.has(p.id)}
               onClick={() => void invite(p.id, game, meta).catch((ex) => alert(ex.message))}
             >
-              {!live ? "Offline" : inGame ? "游戏中" : cooling ? `Invite (${waitSec})` : "Invite"}
+              {!live ? "Offline" : inGame ? "In game" : cooling ? `Invite (${waitSec})` : "Invite"}
             </button>
           </div>
           );
