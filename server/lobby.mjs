@@ -562,7 +562,10 @@ async function listRoster(viewerId) {
       roomId: liveP?.roomId || null,
     });
   }
-  out.sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
+  out.sort((a, b) => {
+    const rank = (p) => (p.online ? (p.roomId ? 1 : 2) : 0);
+    return rank(b) - rank(a) || a.name.localeCompare(b.name);
+  });
   return out;
 }
 

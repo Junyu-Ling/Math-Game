@@ -231,6 +231,7 @@ button:disabled {
 }
 
 .presence.on { color: #2f6b3a; }
+.presence.busy { color: #9a5b12; text-transform: none; letter-spacing: 0.02em; }
 .presence.off { color: var(--faint); }
 
 .btn-icon {
