@@ -1058,7 +1058,6 @@ export function DaVinciPage() {
               </div>
             </div>
           ) : null}
-          <GameRules game="coda" />
           <div>
             <h3>LOG</h3>
             <div className="log">
@@ -1071,6 +1070,7 @@ export function DaVinciPage() {
                 : null}
             </div>
           </div>
+          <GameRules game="coda" />
         </aside>
         </div>
       </div>
