@@ -136,7 +136,13 @@ export function Flip7Page() {
     if (room) setLocal(null);
   }, [room]);
 
+  const gameOver = state?.phase === "over";
+
   useEffect(() => {
+    if (gameOver) {
+      setFx(null);
+      return;
+    }
     if (!burst) return;
     const id = burst.id;
     const timers: number[] = [];
@@ -168,10 +174,10 @@ export function Flip7Page() {
         audio.src = "";
       }
     };
-  }, [burst?.id, burst?.kind]);
+  }, [burst?.id, burst?.kind, gameOver]);
 
-  const freezeFx = Boolean(burst?.kind === "freeze" && fx?.id === burst.id);
-  const flip7Fx = Boolean(burst?.kind === "flip7" && fx?.id === burst.id);
+  const freezeFx = Boolean(!gameOver && burst?.kind === "freeze" && fx?.id === burst.id);
+  const flip7Fx = Boolean(!gameOver && burst?.kind === "flip7" && fx?.id === burst.id);
   const leadId = state && !waiting
     ? [...state.players].sort((a, b) => liveTotal(b) - liveTotal(a) || a.name.localeCompare(b.name))[0]?.id ?? null
     : null;
@@ -193,7 +199,7 @@ export function Flip7Page() {
       );
       if (stop) return;
       setLocal((s) => {
-        if (!s || s.phase === "lobby" || currentFlip(s).human) return s;
+        if (!s || s.phase === "lobby" || s.phase === "over" || currentFlip(s).human) return s;
         if (s.phase === "target") return applyFlipAction(s, currentFlip(s).id, { type: "target", targetId: aiTarget(s) });
         return applyFlipAction(s, currentFlip(s).id, { type: aiDecide(s) });
       });

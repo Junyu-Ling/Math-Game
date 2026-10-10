@@ -259,16 +259,20 @@ function applyTarget(state, targetId) {
         text: `${onSelf ? `${me.name} freezes themselves and banks +${scored}.` : `${me.name} freezes ${target.name} \xB7 +${scored}.`}${hadChance ? " Second Chance cannot block Freeze." : ""}`
       }
     ];
-  } else {
-    next = withPlayer(next, target.id, (p) => ({ ...p, pendingFlip3: p.pendingFlip3 + 3 }));
-    next.log = [
-      ...next.log,
-      {
-        id: uid("l"),
-        text: onSelf ? `${me.name} uses Flip Three on themselves.` : `${me.name} uses Flip Three on ${target.name}.`
-      }
-    ];
+    next.pendingAction = null;
+    next.phase = "action";
+    next = checkWin(next, target.id);
+    if (next.phase === "over") return next;
+    return afterHit(next, me.id);
   }
+  next = withPlayer(next, target.id, (p) => ({ ...p, pendingFlip3: p.pendingFlip3 + 3 }));
+  next.log = [
+    ...next.log,
+    {
+      id: uid("l"),
+      text: onSelf ? `${me.name} uses Flip Three on themselves.` : `${me.name} uses Flip Three on ${target.name}.`
+    }
+  ];
   next.pendingAction = null;
   next.phase = "action";
   return afterHit(next, me.id);
