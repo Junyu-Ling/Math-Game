@@ -320,17 +320,20 @@ function continueAfterReveal(state) {
   };
 }
 function viewEcard(state, viewerId) {
+  const throws = state.rpsThrows || {};
+  const id = String(viewerId || "");
   return {
     ...state,
-    rpsThrows: state.rpsReveal ? { [state.rpsReveal.aId]: state.rpsReveal.a, [state.rpsReveal.bId]: state.rpsReveal.b } : state.rpsThrows[viewerId] ? { [viewerId]: state.rpsThrows[viewerId] } : {},
-    rpsReveal: state.rpsReveal,
-    players: state.players.map((p) => {
-      if (p.id === viewerId || state.phase === "reveal" || state.phase === "over" || state.phase === "rps" || state.phase === "role") {
+    rpsThrows: state.rpsReveal ? { [state.rpsReveal.aId]: state.rpsReveal.a, [state.rpsReveal.bId]: state.rpsReveal.b } : throws[id] ? { [id]: throws[id] } : {},
+    rpsReveal: state.rpsReveal ?? null,
+    score: state.score || {},
+    players: (state.players || []).map((p) => {
+      if (p.id === id || state.phase === "reveal" || state.phase === "over" || state.phase === "rps" || state.phase === "role") {
         return p;
       }
       return {
         ...p,
-        hand: p.hand.map((c) => ({ id: c.id, kind: "citizen" })),
+        hand: (p.hand || []).map((c) => ({ id: c.id, kind: "citizen" })),
         selectedId: p.locked ? "ready" : null
       };
     })

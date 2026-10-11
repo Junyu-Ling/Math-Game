@@ -1122,18 +1122,25 @@ function publicRoom(room, viewerId) {
   let view = room.state;
   const mods = room.mods;
   if (mods) {
-    if (room.game === "coda") view = mods.coda.viewFor(room.state, viewerId);
-    if (room.game === "bj") view = mods.bj.viewBjDuel(room.state, viewerId);
-    if (room.game === "m24") view = mods.m24.viewM24(room.state, viewerId);
-    if (room.game === "uno") view = mods.uno.viewUno(room.state, viewerId);
-    if (room.game === "flip7") view = mods.flip.viewFlip7(room.state, viewerId);
-    if (room.game === "halli") view = mods.halli.viewHalli(room.state, viewerId);
-    if (room.game === "holdem") view = mods.holdem.viewHoldem(room.state, viewerId);
-    if (room.game === "ecard") view = mods.ecard.viewEcard(room.state, viewerId);
-    if (room.game === "gomoku") view = mods.gomoku.viewGomoku(room.state, viewerId);
-    if (room.game === "ludo") view = mods.ludo.viewLudo(room.state, viewerId);
-    if (room.game === "animal") view = mods.animal.viewAnimal(room.state, viewerId);
-    if (room.game === "army") view = mods.army.viewArmy(room.state, viewerId);
+    try {
+      if (room.game === "coda") view = mods.coda.viewFor(room.state, viewerId);
+      else if (room.game === "bj") view = mods.bj.viewBjDuel(room.state, viewerId);
+      else if (room.game === "m24") view = mods.m24.viewM24(room.state, viewerId);
+      else if (room.game === "uno") view = mods.uno.viewUno(room.state, viewerId);
+      else if (room.game === "flip7") view = mods.flip.viewFlip7(room.state, viewerId);
+      else if (room.game === "halli") view = mods.halli.viewHalli(room.state, viewerId);
+      else if (room.game === "holdem") view = mods.holdem.viewHoldem(room.state, viewerId);
+      else if (room.game === "ecard") view = mods.ecard.viewEcard(room.state, viewerId);
+      else if (room.game === "gomoku") {
+        const st = typeof mods.gomoku.normalizeGomoku === "function" ? mods.gomoku.normalizeGomoku(room.state) : room.state;
+        view = mods.gomoku.viewGomoku(st, viewerId);
+      } else if (room.game === "ludo") view = mods.ludo.viewLudo(room.state, viewerId);
+      else if (room.game === "animal") view = mods.animal.viewAnimal(room.state, viewerId);
+      else if (room.game === "army") view = mods.army.viewArmy(room.state, viewerId);
+    } catch (err) {
+      console.error(`publicRoom view failed (${room.game}):`, err?.message || err);
+      view = room.state;
+    }
   }
   return {
     id: room.id,

@@ -136,6 +136,7 @@ function assignBlack(state: GState, blackId: string, note: string): GState {
 }
 
 export function finishGomokuRps(state: GState): GState {
+  state = normalizeGomoku(state);
   if (state.phase !== "rps" || !state.rpsReveal) return state;
   const { aId, a, bId, b } = state.rpsReveal;
   if (a === b) {
@@ -157,25 +158,56 @@ export function finishGomokuRps(state: GState): GState {
   );
 }
 
+/** Fill fields missing from older persisted rooms. */
+export function normalizeGomoku(state: GState): GState {
+  if (!state) return state;
+  const players = (state.players || []).map((p) => ({
+    ...p,
+    stone: p.stone === 1 || p.stone === 2 ? p.stone : null,
+  }));
+  const hasColors = players.every((p) => p.stone === 1 || p.stone === 2);
+  let phase = state.phase;
+  if (phase !== "rps" && phase !== "play" && phase !== "over") {
+    phase = hasColors ? "play" : "rps";
+  } else if (phase === "play" && !hasColors) {
+    phase = "rps";
+  }
+  return {
+    ...state,
+    players,
+    phase,
+    rpsThrows: state.rpsThrows || {},
+    rpsReveal: state.rpsReveal ?? null,
+    foul: state.foul ?? null,
+    last: state.last ?? null,
+    winnerId: state.winnerId ?? null,
+    board: state.board || emptyBoard(),
+    log: state.log || [],
+    turn: Number.isFinite(state.turn) ? state.turn : 0,
+  };
+}
+
 function playRps(state: GState, actorId: string, you: RpsThrow): GState {
+  state = normalizeGomoku(state);
   if (state.phase !== "rps" || state.rpsReveal) return state;
   const me = state.players.find((p) => p.id === actorId);
   const foe = state.players.find((p) => p.id !== actorId);
   if (!me || !foe) return state;
-  if (state.rpsThrows[me.id]) return state;
+  const throws = state.rpsThrows || {};
+  if (throws[me.id]) return state;
   if (!foe.human) {
     const ai = (["rock", "paper", "scissors"] as const)[Math.floor(Math.random() * 3)]!;
     return beginRpsReveal(state, me.id, you, foe.id, ai);
   }
-  const theirs = state.rpsThrows[foe.id];
+  const theirs = throws[foe.id];
   if (!theirs) {
     return {
       ...state,
-      rpsThrows: { ...state.rpsThrows, [me.id]: you },
+      rpsThrows: { ...throws, [me.id]: you },
       log: [...state.log, { id: uid("l"), text: `${me.name} is ready. Waiting for the other hand.` }],
     };
   }
-  return beginRpsReveal({ ...state, rpsThrows: { ...state.rpsThrows, [me.id]: you } }, me.id, you, foe.id, theirs);
+  return beginRpsReveal({ ...state, rpsThrows: { ...throws, [me.id]: you } }, me.id, you, foe.id, theirs);
 }
 
 function lineLen(board: Stone[][], r: number, c: number, dr: number, dc: number, stone: Stone) {
@@ -337,6 +369,7 @@ export function blackFoulAt(board: Stone[][], r: number, c: number): FoulKind | 
 }
 
 export function applyGomokuAction(state: GState, actorId: string, action: GAction): GState {
+  state = normalizeGomoku(state);
   if (state.phase === "over") return state;
 
   if (state.phase === "rps") {
@@ -409,14 +442,17 @@ export function applyGomokuAction(state: GState, actorId: string, action: GActio
 }
 
 export function viewGomoku(state: GState, viewerId: string): GState {
+  const s = normalizeGomoku(state);
+  const throws = s.rpsThrows || {};
+  const id = String(viewerId || "");
   return {
-    ...state,
-    rpsThrows: state.rpsReveal
-      ? { [state.rpsReveal.aId]: state.rpsReveal.a, [state.rpsReveal.bId]: state.rpsReveal.b }
-      : state.rpsThrows[viewerId]
-        ? { [viewerId]: state.rpsThrows[viewerId] }
+    ...s,
+    rpsThrows: s.rpsReveal
+      ? { [s.rpsReveal.aId]: s.rpsReveal.a, [s.rpsReveal.bId]: s.rpsReveal.b }
+      : throws[id]
+        ? { [id]: throws[id] }
         : {},
-    rpsReveal: state.rpsReveal,
+    rpsReveal: s.rpsReveal,
   };
 }
 

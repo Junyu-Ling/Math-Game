@@ -128,7 +128,7 @@ export function GomokuPage() {
     if (!practice || !local || local.phase === "over") return;
     const cpu = local.players.find((p) => !p.human);
     if (!cpu) return;
-    if (local.phase === "rps" && (local.rpsReveal || local.rpsThrows[cpu.id])) return;
+    if (local.phase === "rps" && (local.rpsReveal || local.rpsThrows?.[cpu.id])) return;
     if (local.phase === "play") {
       const actor = local.players[local.turn];
       if (!actor || actor.human) return;
@@ -143,7 +143,7 @@ export function GomokuPage() {
         if (!s || s.phase === "over") return s;
         if (s.phase === "rps") {
           const bot = s.players.find((p) => !p.human);
-          if (!bot || s.rpsReveal || s.rpsThrows[bot.id]) return s;
+          if (!bot || s.rpsReveal || s.rpsThrows?.[bot.id]) return s;
           return applyGomokuAction(s, bot.id, aiGomoku(s));
         }
         const bot = s.players[s.turn];
@@ -165,7 +165,7 @@ export function GomokuPage() {
   }
 
   const rpsReveal = state?.rpsReveal ?? null;
-  const myRpsThrow = me ? state?.rpsThrows[me.id] : undefined;
+  const myRpsThrow = me ? state?.rpsThrows?.[me.id] : undefined;
   const rpsShown = rpsBeat >= 4 && Boolean(rpsReveal);
   const rpsPumping = rpsBeat >= 1 && rpsBeat <= 3 && Boolean(rpsReveal);
   const rpsPose = rpsPumping ? "pump" : rpsShown ? "show" : "idle";

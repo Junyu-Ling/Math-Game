@@ -424,21 +424,24 @@ function continueAfterReveal(state: EState): EState {
 }
 
 export function viewEcard(state: EState, viewerId: string): EState {
+  const throws = state.rpsThrows || {};
+  const id = String(viewerId || "");
   return {
     ...state,
     rpsThrows: state.rpsReveal
       ? { [state.rpsReveal.aId]: state.rpsReveal.a, [state.rpsReveal.bId]: state.rpsReveal.b }
-      : state.rpsThrows[viewerId]
-        ? { [viewerId]: state.rpsThrows[viewerId] }
+      : throws[id]
+        ? { [id]: throws[id] }
         : {},
-    rpsReveal: state.rpsReveal,
-    players: state.players.map((p) => {
-      if (p.id === viewerId || state.phase === "reveal" || state.phase === "over" || state.phase === "rps" || state.phase === "role") {
+    rpsReveal: state.rpsReveal ?? null,
+    score: state.score || {},
+    players: (state.players || []).map((p) => {
+      if (p.id === id || state.phase === "reveal" || state.phase === "over" || state.phase === "rps" || state.phase === "role") {
         return p;
       }
       return {
         ...p,
-        hand: p.hand.map((c) => ({ id: c.id, kind: "citizen" as const })),
+        hand: (p.hand || []).map((c) => ({ id: c.id, kind: "citizen" as const })),
         selectedId: p.locked ? "ready" : null,
       };
     }),
