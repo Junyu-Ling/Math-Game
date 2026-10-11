@@ -3,6 +3,7 @@ import {
   SIZE,
   aiGomoku,
   applyGomokuAction,
+  foulLabel,
   startGomokuPractice,
   type GAction,
   type GState,
@@ -81,7 +82,7 @@ export function GomokuPage() {
             <GameSetup
               kicker="GOMOKU"
               title="Five in a row"
-              blurb="15×15. Black opens. First continuous five wins."
+              blurb="15×15. Black opens. Five wins. Black fouls: 三三 / 四四 / 长连 → lose."
               game="gomoku"
               onPractice={() => setLocal(startGomokuPractice())}
             />
@@ -89,11 +90,20 @@ export function GomokuPage() {
             <div className="kaiji-board-wrap">
               <p className="status-line">
                 {state.phase === "over"
-                  ? state.winnerId
-                    ? `${state.players.find((p) => p.id === state.winnerId)?.name} wins`
-                    : "Draw"
+                  ? state.foul
+                    ? `黑方${foulLabel(state.foul.kind)}，${state.players.find((p) => p.id === state.winnerId)?.name || "白方"}获胜`
+                    : state.winnerId
+                      ? `${state.players.find((p) => p.id === state.winnerId)?.name} wins`
+                      : "Draw"
                   : `${state.players[state.turn]?.name}'s turn · you are ${me.stone === 1 ? "black" : "white"}`}
               </p>
+              {state.foul ? (
+                <p className="gomoku-foul-tip" role="alert">
+                  禁手判负：黑方在 ({state.foul.r + 1},{state.foul.c + 1}) 触发
+                  <strong>{foulLabel(state.foul.kind)}</strong>
+                  （先手黑子禁三三、四四、长连）
+                </p>
+              ) : null}
               <div className="gomoku-board" role="grid" aria-label="15 by 15 goban">
                 {Array.from({ length: SIZE }, (_, r) =>
                   Array.from({ length: SIZE }, (_, c) => {
@@ -104,11 +114,12 @@ export function GomokuPage() {
                       (r === 11 && (c === 3 || c === 11)) ||
                       (r === 7 && c === 7);
                     const last = state.last?.r === r && state.last?.c === c;
+                    const foulCell = state.foul?.r === r && state.foul?.c === c;
                     return (
                       <button
                         key={`${r}-${c}`}
                         type="button"
-                        className={`gomoku-cell${hoshi ? " star" : ""}${v ? " filled" : ""}${last ? " last" : ""}`}
+                        className={`gomoku-cell${hoshi ? " star" : ""}${v ? " filled" : ""}${last ? " last" : ""}${foulCell ? " foul" : ""}`}
                         disabled={!myTurn || Boolean(v) || state.phase !== "play"}
                         onClick={() => act({ type: "place", r, c })}
                       >
