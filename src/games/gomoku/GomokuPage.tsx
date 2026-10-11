@@ -94,18 +94,25 @@ export function GomokuPage() {
                     : "Draw"
                   : `${state.players[state.turn]?.name}'s turn · you are ${me.stone === 1 ? "black" : "white"}`}
               </p>
-              <div className="gomoku-board" role="grid">
+              <div className="gomoku-board" role="grid" aria-label="15 by 15 goban">
                 {Array.from({ length: SIZE }, (_, r) =>
                   Array.from({ length: SIZE }, (_, c) => {
                     const v = state.board[r]![c]!;
+                    // 15×15 hoshi: corners + tengen (1-based 4/8/12 → 0-based 3/7/11)
+                    const hoshi =
+                      (r === 3 && (c === 3 || c === 11)) ||
+                      (r === 11 && (c === 3 || c === 11)) ||
+                      (r === 7 && c === 7);
+                    const last = state.last?.r === r && state.last?.c === c;
                     return (
                       <button
                         key={`${r}-${c}`}
                         type="button"
-                        className="gomoku-cell"
+                        className={`gomoku-cell${hoshi ? " star" : ""}${v ? " filled" : ""}${last ? " last" : ""}`}
                         disabled={!myTurn || Boolean(v) || state.phase !== "play"}
                         onClick={() => act({ type: "place", r, c })}
                       >
+                        {hoshi && !v ? <span className="gomoku-hoshi" /> : null}
                         {v ? <span className={`gomoku-stone ${v === 1 ? "black" : "white"}`} /> : null}
                       </button>
                     );
