@@ -106,12 +106,13 @@ export function cardArt(kind: EKind) {
   return "/ecard-citizen.png";
 }
 
-/** Returns who wins the clash: "a" | "b" | "draw". Match-ending if E or S loses. */
+/** Returns who wins the clash. Any non-citizen-vs-citizen result ends the match. */
 export function clash(a: EKind, b: EKind): { result: "a" | "b" | "draw"; matchEnd: boolean } {
-  if (a === b && a === "citizen") return { result: "draw", matchEnd: false };
+  if (a === "citizen" && b === "citizen") return { result: "draw", matchEnd: false };
   if (a === b) return { result: "draw", matchEnd: false };
-  if (a === "emperor" && b === "citizen") return { result: "a", matchEnd: false };
-  if (a === "citizen" && b === "emperor") return { result: "b", matchEnd: false };
+  // Emperor vs Citizen → Emperor wins the match immediately.
+  if (a === "emperor" && b === "citizen") return { result: "a", matchEnd: true };
+  if (a === "citizen" && b === "emperor") return { result: "b", matchEnd: true };
   if (a === "citizen" && b === "slave") return { result: "a", matchEnd: true };
   if (a === "slave" && b === "citizen") return { result: "b", matchEnd: true };
   if (a === "slave" && b === "emperor") return { result: "a", matchEnd: true };
@@ -303,37 +304,29 @@ function reveal(state: EState): EState {
     },
   ];
 
-  // Original Kaiji: winner's card returns (Emperor after beating Citizen, Citizen after… only on non-match wins).
-  // Citizen vs Citizen: both discarded. Match-ending clashes discard both and refill next match.
+  // Citizen vs Citizen: both discarded, match continues. Any other clash ends the match.
   const players = state.players.map((p) => {
     const mine = p.id === a.id ? ca : cb;
-    const myResult =
-      result === "draw" ? "draw" : (result === "a" && p.id === a.id) || (result === "b" && p.id === b.id) ? "win" : "lose";
-    let hand = p.hand.filter((c) => c.id !== mine.id);
-    if (!matchEnd && myResult === "win") {
-      hand = [...hand, mine];
-    }
+    const hand = p.hand.filter((c) => c.id !== mine.id);
     return { ...p, hand, selectedId: null, locked: false };
   });
 
   if (result === "draw") {
     log = [...log, { id: uid("l"), text: "Citizens cancel. Both discarded." }];
-  } else if (!matchEnd) {
+  } else {
     const winner = result === "a" ? a : b;
     const winCard = result === "a" ? ca.kind : cb.kind;
+    const loseCard = result === "a" ? cb.kind : ca.kind;
     log = [
       ...log,
       {
         id: uid("l"),
         text:
-          winCard === "emperor"
-            ? `${winner.name} wins — Emperor returns to hand.`
-            : `${winner.name} wins the clash — card returns.`,
+          winCard === "emperor" && loseCard === "citizen"
+            ? `${winner.name}'s Emperor beats Citizen — match point!`
+            : `${winner.name} wins the clash.`,
       },
     ];
-  } else {
-    const winner = result === "a" ? a : b;
-    log = [...log, { id: uid("l"), text: `${winner.name} wins the clash.` }];
   }
 
   let wins = { ...state.wins };
@@ -421,12 +414,8 @@ export function viewEcard(state: EState, viewerId: string): EState {
 }
 
 /**
- * Psychological / game-theory AI for E-Card.
- *
- * Mid-match invariant (Kaiji rules): each side still holds its special until the match ends.
- * Hand size h ⇒ 1 special + (h−1) citizens. So forced plays are readable:
- *   h=1 → must play the special.
- * Emperor wants Citizen when rival h=1 (catch Slave). Slave wants Slave when rival h=1 (catch Emperor).
+ * Psychological AI. House rule: Emperor vs Citizen ends the match (Emperor wins).
+ * Mid-match: each side still holds its special until played. Hand size h ⇒ 1 special + (h−1) citizens.
  */
 function pickWeighted(weights: Array<{ card: ECard; w: number }>): ECard {
   const floor = weights.map((x) => ({ card: x.card, w: Math.max(0.01, x.w) }));
@@ -447,96 +436,64 @@ function seriesPressure(state: EState, meId: string, rivalId: string) {
   return { mine, theirs, need, theyNeed, behind: mine < theirs, matchPoint: need === 1, rivalMatchPoint: theyNeed === 1 };
 }
 
-function aiPickEmperor(me: EPlayer, rivalHandSize: number, pressure: ReturnType<typeof seriesPressure>, last: EState["last"]): ECard {
+function aiPickEmperor(me: EPlayer, rivalHandSize: number, pressure: ReturnType<typeof seriesPressure>, _last: EState["last"]): ECard {
   const citizens = me.hand.filter((c) => c.kind === "citizen");
   const special = me.hand.find((c) => c.kind === "emperor")!;
-  // Rival must play Slave — Citizen wins the match.
+  // Rival must play Slave — only Citizen wins.
   if (rivalHandSize <= 1 && citizens[0]) return citizens[0];
   if (!citizens.length) return special;
 
-  const pSlave = 1 / Math.max(1, rivalHandSize); // rival still holds Slave
-  // EV sketch: Citizen can steal the match; Emperor risks instant loss to Slave.
-  let wCitizen = 1.15 + pSlave * 3.2 + citizens.length * 0.15;
-  let wEmperor = 0.55 + (1 - pSlave) * 1.8 - pSlave * 4.5;
+  const pSlave = 1 / Math.max(1, rivalHandSize);
+  // Emperor vs Citizen = instant match win; Emperor vs Slave = instant loss.
+  let wCitizen = 0.9 + pSlave * 3.4 + citizens.length * 0.1;
+  let wEmperor = 0.7 + (1 - pSlave) * 3.6 - pSlave * 4.2;
 
-  // Early match: probe with citizens (burn / fish for Slave).
-  if (me.hand.length >= 4) {
-    wCitizen += 0.9;
-    wEmperor -= 0.5;
-  }
-  // Late: Slave is denser — hide Emperor unless a soft read suggests otherwise.
+  // Early: Slave diluted — press Emperor more often.
+  if (rivalHandSize >= 4) wEmperor += 0.9;
+  // Late: Slave denser — fish with Citizen.
   if (rivalHandSize <= 2) {
-    wEmperor -= 1.6;
-    wCitizen += 1.1;
+    wEmperor -= 1.8;
+    wCitizen += 1.3;
   }
-  // After we just showed Emperor and won, humans often expect a safe Citizen next — sometimes double-bluff Emperor.
-  if (last && last.result !== "match") {
-    const iPlayedE =
-      (last.aId === me.id && last.a === "emperor") || (last.bId === me.id && last.b === "emperor");
-    if (iPlayedE && last.result !== "draw") {
-      wEmperor += 0.7; // rare double press
-      wCitizen += 0.35;
-    }
-  }
-  // Score psychology: behind → more Citizen traps; match point → tighter, less Emperor gambling.
-  if (pressure.behind) wCitizen += 0.55;
+  if (pressure.behind) wEmperor += 0.45;
   if (pressure.matchPoint) {
-    wEmperor -= 0.8;
-    wCitizen += 0.5;
+    // Prefer the higher-EV line: Emperor when Slave is thin, else Citizen trap.
+    if (rivalHandSize >= 3) wEmperor += 0.6;
+    else wCitizen += 0.7;
   }
-  if (pressure.rivalMatchPoint) {
-    // Must not gift the match — avoid Emperor unless Slave is diluted.
-    wEmperor -= 1.2;
-  }
+  if (pressure.rivalMatchPoint) wEmperor -= 0.5;
 
-  // Mix: never pure — keeps reads fuzzy.
   wCitizen *= 0.85 + Math.random() * 0.3;
   wEmperor *= 0.85 + Math.random() * 0.3;
 
-  const choice = pickWeighted([
+  return pickWeighted([
     ...citizens.map((c) => ({ card: c, w: wCitizen / citizens.length })),
     { card: special, w: wEmperor },
   ]);
-  return choice;
 }
 
-function aiPickSlave(me: EPlayer, rivalHandSize: number, pressure: ReturnType<typeof seriesPressure>, last: EState["last"]): ECard {
+function aiPickSlave(me: EPlayer, rivalHandSize: number, pressure: ReturnType<typeof seriesPressure>, _last: EState["last"]): ECard {
   const citizens = me.hand.filter((c) => c.kind === "citizen");
   const special = me.hand.find((c) => c.kind === "slave")!;
-  // Rival must play Emperor — Slave wins the match.
+  // Rival must play Emperor — Slave wins.
   if (rivalHandSize <= 1) return special;
   if (!citizens.length) return special;
 
   const pEmperor = 1 / Math.max(1, rivalHandSize);
-  // Citizen vs Emperor continues (soft loss of a citizen); Slave vs Citizen ends the match in loss.
-  let wCitizen = 1.2 + (1 - pEmperor) * 1.4 + citizens.length * 0.12;
-  let wSlave = 0.35 + pEmperor * 4.2 - (1 - pEmperor) * 3.8;
+  // Citizen vs Emperor = instant loss; Slave vs Citizen = instant loss; Slave vs Emperor = win.
+  let wCitizen = 1.0 + (1 - pEmperor) * 0.8 + citizens.length * 0.1;
+  let wSlave = 0.45 + pEmperor * 4.5 - (1 - pEmperor) * 3.6;
 
   if (me.hand.length >= 4) {
-    wCitizen += 1.0;
-    wSlave -= 0.8; // bank the dagger
+    wCitizen += 0.7;
+    wSlave -= 0.5;
   }
   if (rivalHandSize <= 2) {
-    wSlave += 1.8; // Emperor denser — spring the trap
-    wCitizen -= 0.4;
+    wSlave += 2.0;
+    wCitizen -= 0.5;
   }
-  // If Emperor just pressed E successfully, they often "take a breath" with Citizen — hold Slave one more beat.
-  if (last && last.result !== "match") {
-    const theyPlayedE =
-      (last.aId !== me.id && last.a === "emperor") || (last.bId !== me.id && last.b === "emperor");
-    if (theyPlayedE) {
-      wSlave -= 0.6;
-      wCitizen += 0.5;
-    }
-  }
-  if (pressure.behind || pressure.matchPoint) {
-    // Need an upset — raise Slave frequency when Emperor is still diluted enough.
-    wSlave += rivalHandSize >= 3 ? 0.9 : 1.4;
-  }
-  if (pressure.rivalMatchPoint) {
-    // Desperate steal attempts.
-    wSlave += 0.7;
-  }
+  if (pressure.behind || pressure.matchPoint) wSlave += rivalHandSize >= 3 ? 0.8 : 1.3;
+  if (pressure.rivalMatchPoint) wSlave += 0.6;
 
   wCitizen *= 0.85 + Math.random() * 0.3;
   wSlave *= 0.85 + Math.random() * 0.3;

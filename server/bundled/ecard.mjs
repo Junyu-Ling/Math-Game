@@ -59,10 +59,10 @@ function cardArt(kind) {
   return "/ecard-citizen.png";
 }
 function clash(a, b) {
-  if (a === b && a === "citizen") return { result: "draw", matchEnd: false };
+  if (a === "citizen" && b === "citizen") return { result: "draw", matchEnd: false };
   if (a === b) return { result: "draw", matchEnd: false };
-  if (a === "emperor" && b === "citizen") return { result: "a", matchEnd: false };
-  if (a === "citizen" && b === "emperor") return { result: "b", matchEnd: false };
+  if (a === "emperor" && b === "citizen") return { result: "a", matchEnd: true };
+  if (a === "citizen" && b === "emperor") return { result: "b", matchEnd: true };
   if (a === "citizen" && b === "slave") return { result: "a", matchEnd: true };
   if (a === "slave" && b === "citizen") return { result: "b", matchEnd: true };
   if (a === "slave" && b === "emperor") return { result: "a", matchEnd: true };
@@ -227,28 +227,22 @@ function reveal(state) {
   ];
   const players = state.players.map((p) => {
     const mine = p.id === a.id ? ca : cb;
-    const myResult = result === "draw" ? "draw" : result === "a" && p.id === a.id || result === "b" && p.id === b.id ? "win" : "lose";
-    let hand = p.hand.filter((c) => c.id !== mine.id);
-    if (!matchEnd && myResult === "win") {
-      hand = [...hand, mine];
-    }
+    const hand = p.hand.filter((c) => c.id !== mine.id);
     return { ...p, hand, selectedId: null, locked: false };
   });
   if (result === "draw") {
     log = [...log, { id: uid("l"), text: "Citizens cancel. Both discarded." }];
-  } else if (!matchEnd) {
+  } else {
     const winner = result === "a" ? a : b;
     const winCard = result === "a" ? ca.kind : cb.kind;
+    const loseCard = result === "a" ? cb.kind : ca.kind;
     log = [
       ...log,
       {
         id: uid("l"),
-        text: winCard === "emperor" ? `${winner.name} wins \u2014 Emperor returns to hand.` : `${winner.name} wins the clash \u2014 card returns.`
+        text: winCard === "emperor" && loseCard === "citizen" ? `${winner.name}'s Emperor beats Citizen \u2014 match point!` : `${winner.name} wins the clash.`
       }
     ];
-  } else {
-    const winner = result === "a" ? a : b;
-    log = [...log, { id: uid("l"), text: `${winner.name} wins the clash.` }];
   }
   let wins = { ...state.wins };
   let winnerId = null;
@@ -340,74 +334,50 @@ function seriesPressure(state, meId, rivalId) {
   const theyNeed = state.goal - theirs;
   return { mine, theirs, need, theyNeed, behind: mine < theirs, matchPoint: need === 1, rivalMatchPoint: theyNeed === 1 };
 }
-function aiPickEmperor(me, rivalHandSize, pressure, last) {
+function aiPickEmperor(me, rivalHandSize, pressure, _last) {
   const citizens = me.hand.filter((c) => c.kind === "citizen");
   const special = me.hand.find((c) => c.kind === "emperor");
   if (rivalHandSize <= 1 && citizens[0]) return citizens[0];
   if (!citizens.length) return special;
   const pSlave = 1 / Math.max(1, rivalHandSize);
-  let wCitizen = 1.15 + pSlave * 3.2 + citizens.length * 0.15;
-  let wEmperor = 0.55 + (1 - pSlave) * 1.8 - pSlave * 4.5;
-  if (me.hand.length >= 4) {
-    wCitizen += 0.9;
-    wEmperor -= 0.5;
-  }
+  let wCitizen = 0.9 + pSlave * 3.4 + citizens.length * 0.1;
+  let wEmperor = 0.7 + (1 - pSlave) * 3.6 - pSlave * 4.2;
+  if (rivalHandSize >= 4) wEmperor += 0.9;
   if (rivalHandSize <= 2) {
-    wEmperor -= 1.6;
-    wCitizen += 1.1;
+    wEmperor -= 1.8;
+    wCitizen += 1.3;
   }
-  if (last && last.result !== "match") {
-    const iPlayedE = last.aId === me.id && last.a === "emperor" || last.bId === me.id && last.b === "emperor";
-    if (iPlayedE && last.result !== "draw") {
-      wEmperor += 0.7;
-      wCitizen += 0.35;
-    }
-  }
-  if (pressure.behind) wCitizen += 0.55;
+  if (pressure.behind) wEmperor += 0.45;
   if (pressure.matchPoint) {
-    wEmperor -= 0.8;
-    wCitizen += 0.5;
+    if (rivalHandSize >= 3) wEmperor += 0.6;
+    else wCitizen += 0.7;
   }
-  if (pressure.rivalMatchPoint) {
-    wEmperor -= 1.2;
-  }
+  if (pressure.rivalMatchPoint) wEmperor -= 0.5;
   wCitizen *= 0.85 + Math.random() * 0.3;
   wEmperor *= 0.85 + Math.random() * 0.3;
-  const choice = pickWeighted([
+  return pickWeighted([
     ...citizens.map((c) => ({ card: c, w: wCitizen / citizens.length })),
     { card: special, w: wEmperor }
   ]);
-  return choice;
 }
-function aiPickSlave(me, rivalHandSize, pressure, last) {
+function aiPickSlave(me, rivalHandSize, pressure, _last) {
   const citizens = me.hand.filter((c) => c.kind === "citizen");
   const special = me.hand.find((c) => c.kind === "slave");
   if (rivalHandSize <= 1) return special;
   if (!citizens.length) return special;
   const pEmperor = 1 / Math.max(1, rivalHandSize);
-  let wCitizen = 1.2 + (1 - pEmperor) * 1.4 + citizens.length * 0.12;
-  let wSlave = 0.35 + pEmperor * 4.2 - (1 - pEmperor) * 3.8;
+  let wCitizen = 1 + (1 - pEmperor) * 0.8 + citizens.length * 0.1;
+  let wSlave = 0.45 + pEmperor * 4.5 - (1 - pEmperor) * 3.6;
   if (me.hand.length >= 4) {
-    wCitizen += 1;
-    wSlave -= 0.8;
+    wCitizen += 0.7;
+    wSlave -= 0.5;
   }
   if (rivalHandSize <= 2) {
-    wSlave += 1.8;
-    wCitizen -= 0.4;
+    wSlave += 2;
+    wCitizen -= 0.5;
   }
-  if (last && last.result !== "match") {
-    const theyPlayedE = last.aId !== me.id && last.a === "emperor" || last.bId !== me.id && last.b === "emperor";
-    if (theyPlayedE) {
-      wSlave -= 0.6;
-      wCitizen += 0.5;
-    }
-  }
-  if (pressure.behind || pressure.matchPoint) {
-    wSlave += rivalHandSize >= 3 ? 0.9 : 1.4;
-  }
-  if (pressure.rivalMatchPoint) {
-    wSlave += 0.7;
-  }
+  if (pressure.behind || pressure.matchPoint) wSlave += rivalHandSize >= 3 ? 0.8 : 1.3;
+  if (pressure.rivalMatchPoint) wSlave += 0.6;
   wCitizen *= 0.85 + Math.random() * 0.3;
   wSlave *= 0.85 + Math.random() * 0.3;
   return pickWeighted([
