@@ -2,6 +2,10 @@ import { uid } from "../../lib/shuffle";
 
 export type EKind = "emperor" | "slave" | "citizen";
 export type ERole = "emperor" | "slave";
+export type RpsThrow = "rock" | "paper" | "scissors";
+export type RpsReveal = { aId: string; a: RpsThrow; bId: string; b: RpsThrow };
+
+export const RPS_REVEAL_MS = 2800;
 
 export type ECard = { id: string; kind: EKind };
 
@@ -10,14 +14,12 @@ export type EPlayer = {
   name: string;
   human: boolean;
   role: ERole | null;
-  rolePick: ERole | null;
-  roleReady: boolean;
   hand: ECard[];
   selectedId: string | null;
   locked: boolean;
 };
 
-export type EPhase = "role" | "pick" | "reveal" | "over";
+export type EPhase = "rps" | "role" | "pick" | "reveal" | "over";
 
 export type EState = {
   players: EPlayer[];
@@ -25,6 +27,9 @@ export type EState = {
   round: number;
   set: number;
   tricksInSet: number;
+  rpsThrows: Partial<Record<string, RpsThrow>>;
+  rpsReveal: RpsReveal | null;
+  roleChooserId: string | null;
   last: {
     aId: string;
     a: EKind;
@@ -53,8 +58,6 @@ function seat(p: { id: string; name: string; human?: boolean }): EPlayer {
     name: p.name,
     human: p.human !== false,
     role: null,
-    rolePick: null,
-    roleReady: false,
     hand: [],
     selectedId: null,
     locked: false,
@@ -67,10 +70,13 @@ export function startEcardDuel(
 ): EState {
   return {
     players: [seat(a), seat(b)],
-    phase: "role",
+    phase: "rps",
     round: 1,
     set: 1,
     tricksInSet: 0,
+    rpsThrows: {},
+    rpsReveal: null,
+    roleChooserId: null,
     last: null,
     winnerId: null,
     wins: { [a.id]: 0, [b.id]: 0 },
@@ -78,7 +84,7 @@ export function startEcardDuel(
     log: [
       {
         id: uid("l"),
-        text: "Choose Emperor or Slave. First to 3 match wins. Match winner plays Emperor next; loser plays Slave.",
+        text: "Rock-paper-scissors. Winner picks Emperor or Slave. First to 3 match wins.",
       },
     ],
   };
@@ -119,41 +125,16 @@ function dealWithRoles(state: EState, r0: ERole, r1: ERole, note: string): EStat
   return {
     ...state,
     players: [
-      { ...p0, role: r0, rolePick: r0, roleReady: true, hand: handFor(r0), selectedId: null, locked: false },
-      { ...p1, role: r1, rolePick: r1, roleReady: true, hand: handFor(r1), selectedId: null, locked: false },
+      { ...p0, role: r0, hand: handFor(r0), selectedId: null, locked: false },
+      { ...p1, role: r1, hand: handFor(r1), selectedId: null, locked: false },
     ],
     phase: "pick",
+    roleChooserId: null,
+    rpsThrows: {},
+    rpsReveal: null,
     last: null,
     log: [...state.log, { id: uid("l"), text: note }],
   };
-}
-
-function resolveRoles(state: EState): EState {
-  const p0 = state.players[0]!;
-  const p1 = state.players[1]!;
-  const a = p0.rolePick;
-  const b = p1.rolePick;
-  if (!a || !b) return state;
-
-  if (a !== b) {
-    return dealWithRoles(
-      state,
-      a,
-      b,
-      `${p0.name} is ${a.toUpperCase()} · ${p1.name} is ${b.toUpperCase()}.`,
-    );
-  }
-
-  // Same pick — coin flip who keeps it.
-  const keepFirst = Math.random() < 0.5;
-  const r0: ERole = keepFirst ? a : a === "emperor" ? "slave" : "emperor";
-  const r1: ERole = r0 === "emperor" ? "slave" : "emperor";
-  return dealWithRoles(
-    state,
-    r0,
-    r1,
-    `Both wanted ${a}. Coin flip → ${p0.name} ${r0.toUpperCase()} · ${p1.name} ${r1.toUpperCase()}.`,
-  );
 }
 
 /** Winner of the match becomes Emperor; loser becomes Slave. */
@@ -169,17 +150,85 @@ function refillRoles(state: EState, matchWinnerId: string | null): EState {
   return {
     ...state,
     players: [
-      { ...p0, role: r0, rolePick: r0, roleReady: true, hand: handFor(r0), selectedId: null, locked: false },
-      { ...p1, role: r1, rolePick: r1, roleReady: true, hand: handFor(r1), selectedId: null, locked: false },
+      { ...p0, role: r0, hand: handFor(r0), selectedId: null, locked: false },
+      { ...p1, role: r1, hand: handFor(r1), selectedId: null, locked: false },
     ],
     phase: "pick",
     last: null,
   };
 }
 
+const RPS_LABEL: Record<RpsThrow, string> = { rock: "rock", paper: "paper", scissors: "scissors" };
+
+function rpsWins(a: RpsThrow, b: RpsThrow): boolean {
+  return (
+    (a === "rock" && b === "scissors") ||
+    (a === "paper" && b === "rock") ||
+    (a === "scissors" && b === "paper")
+  );
+}
+
+function beginRpsReveal(state: EState, aId: string, a: RpsThrow, bId: string, b: RpsThrow): EState {
+  return {
+    ...state,
+    rpsThrows: { [aId]: a, [bId]: b },
+    rpsReveal: { aId, a, bId, b },
+  };
+}
+
+export function finishEcardRps(state: EState): EState {
+  if (state.phase !== "rps" || !state.rpsReveal) return state;
+  const { aId, a, bId, b } = state.rpsReveal;
+  if (a === b) {
+    return {
+      ...state,
+      rpsThrows: {},
+      rpsReveal: null,
+      log: [...state.log, { id: uid("l"), text: `Tie, both ${RPS_LABEL[a]}. Throw again.` }],
+    };
+  }
+  const winnerId = rpsWins(a, b) ? aId : bId;
+  const winner = state.players.find((p) => p.id === winnerId);
+  return {
+    ...state,
+    phase: "role",
+    roleChooserId: winnerId,
+    rpsThrows: {},
+    rpsReveal: null,
+    log: [
+      ...state.log,
+      {
+        id: uid("l"),
+        text: `${state.players.find((p) => p.id === aId)?.name} ${RPS_LABEL[a]} vs ${state.players.find((p) => p.id === bId)?.name} ${RPS_LABEL[b]}. ${winner?.name || "Winner"} picks Emperor or Slave.`,
+      },
+    ],
+  };
+}
+
+function playRps(state: EState, actorId: string, you: RpsThrow): EState {
+  if (state.phase !== "rps" || state.rpsReveal) return state;
+  const me = state.players.find((p) => p.id === actorId);
+  const foe = state.players.find((p) => p.id !== actorId);
+  if (!me || !foe) return state;
+  if (state.rpsThrows[me.id]) return state;
+  if (!foe.human) {
+    const ai = (["rock", "paper", "scissors"] as const)[Math.floor(Math.random() * 3)]!;
+    return beginRpsReveal(state, me.id, you, foe.id, ai);
+  }
+  const theirs = state.rpsThrows[foe.id];
+  if (!theirs) {
+    return {
+      ...state,
+      rpsThrows: { ...state.rpsThrows, [me.id]: you },
+      log: [...state.log, { id: uid("l"), text: `${me.name} is ready. Waiting for the other hand.` }],
+    };
+  }
+  return beginRpsReveal({ ...state, rpsThrows: { ...state.rpsThrows, [me.id]: you } }, me.id, you, foe.id, theirs);
+}
+
 export type EAction =
+  | { type: "rps"; throw: RpsThrow }
   | { type: "role"; role: ERole }
-  | { type: "confirmRole" }
   | { type: "select"; cardId: string }
   | { type: "lock" }
   | { type: "next" };
@@ -189,25 +238,26 @@ export function applyEcardAction(state: EState, actorId: string, action: EAction
   const me = state.players.find((p) => p.id === actorId);
   if (!me) return state;
 
-  if (state.phase === "role") {
-    if (action.type === "role") {
-      if (me.roleReady) return state;
-      return {
-        ...state,
-        players: state.players.map((p) => (p.id === actorId ? { ...p, rolePick: action.role } : p)),
-      };
-    }
-    if (action.type === "confirmRole") {
-      if (!me.rolePick || me.roleReady) return state;
-      const next: EState = {
-        ...state,
-        players: state.players.map((p) => (p.id === actorId ? { ...p, roleReady: true } : p)),
-        log: [...state.log, { id: uid("l"), text: `${me.name} locks in ${me.rolePick}.` }],
-      };
-      if (next.players.every((p) => p.roleReady && p.rolePick)) return resolveRoles(next);
-      return next;
-    }
+  if (state.phase === "rps") {
+    if (action.type === "rps") return playRps(state, actorId, action.throw);
     return state;
+  }
+
+  if (state.phase === "role") {
+    if (action.type !== "role") return state;
+    if (state.roleChooserId !== actorId) return state;
+    const other = state.players.find((p) => p.id !== actorId);
+    if (!other) return state;
+    const mine = action.role;
+    const theirs: ERole = mine === "emperor" ? "slave" : "emperor";
+    const r0 = state.players[0]!.id === actorId ? mine : theirs;
+    const r1 = state.players[1]!.id === actorId ? mine : theirs;
+    return dealWithRoles(
+      state,
+      r0,
+      r1,
+      `${me.name} chooses ${mine.toUpperCase()} · ${other.name} is ${theirs.toUpperCase()}.`,
+    );
   }
 
   if (state.phase === "reveal" && action.type === "next") {
@@ -351,16 +401,19 @@ function continueAfterReveal(state: EState): EState {
 export function viewEcard(state: EState, viewerId: string): EState {
   return {
     ...state,
+    rpsThrows: state.rpsReveal
+      ? { [state.rpsReveal.aId]: state.rpsReveal.a, [state.rpsReveal.bId]: state.rpsReveal.b }
+      : state.rpsThrows[viewerId]
+        ? { [viewerId]: state.rpsThrows[viewerId] }
+        : {},
+    rpsReveal: state.rpsReveal,
     players: state.players.map((p) => {
-      if (state.phase === "role") {
-        if (p.id !== viewerId) return { ...p, rolePick: p.roleReady ? p.rolePick : null };
+      if (p.id === viewerId || state.phase === "reveal" || state.phase === "over" || state.phase === "rps" || state.phase === "role") {
         return p;
       }
-      if (p.id === viewerId || state.phase === "reveal" || state.phase === "over") return p;
       return {
         ...p,
         hand: p.hand.map((c) => ({ id: c.id, kind: "citizen" as const })),
-        // Hide which card until locked; only show that they locked.
         selectedId: p.locked ? "ready" : null,
       };
     }),
@@ -499,17 +552,17 @@ export function aiEcard(state: EState, cpuId: string): EAction {
   if (!me) return { type: "lock" };
   const rival = state.players.find((p) => p.id !== cpuId);
 
+  if (state.phase === "rps") {
+    if (state.rpsReveal || state.rpsThrows[cpuId]) return { type: "rps", throw: "rock" };
+    const hand = (["rock", "paper", "scissors"] as const)[Math.floor(Math.random() * 3)]!;
+    return { type: "rps", throw: hand };
+  }
+
   if (state.phase === "role") {
-    if (!me.rolePick) {
-      if (rival?.rolePick === "emperor") return { type: "role", role: "slave" };
-      if (rival?.rolePick === "slave") return { type: "role", role: "emperor" };
-      // Prefer Slave slightly (counter-punch); lean Emperor when already ahead in a rematch series.
-      const ahead = (state.wins[cpuId] || 0) > (state.wins[rival?.id || ""] || 0);
-      const role: ERole = Math.random() < (ahead ? 0.58 : 0.42) ? "emperor" : "slave";
-      return { type: "role", role };
-    }
-    if (!me.roleReady) return { type: "confirmRole" };
-    return { type: "confirmRole" };
+    if (state.roleChooserId !== cpuId) return { type: "role", role: "emperor" };
+    const ahead = (state.wins[cpuId] || 0) > (state.wins[rival?.id || ""] || 0);
+    const role: ERole = Math.random() < (ahead ? 0.58 : 0.42) ? "emperor" : "slave";
+    return { type: "role", role };
   }
 
   if (state.phase === "reveal") return { type: "next" };

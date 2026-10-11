@@ -703,17 +703,23 @@ export async function snapshot(userId, light = false) {
 }
 
 async function expireArrange(room) {
-  if (room.game !== "coda" || !room.endsAt || Date.now() < room.endsAt) return;
-  if (room.state.phase === "arrange") {
-    const before = room.state.arrangeId;
-    room.state = room.mods.coda.finishArrange(room.state);
-    if (room.state.phase === "arrange" && room.state.arrangeId !== before) {
-      room.endsAt = Date.now() + (room.mods.coda.ARRANGE_MS || 5000);
-      await saveRoom(room);
-      return;
+  if (!room.endsAt || Date.now() < room.endsAt) return;
+  if (room.game === "coda") {
+    if (room.state.phase === "arrange") {
+      const before = room.state.arrangeId;
+      room.state = room.mods.coda.finishArrange(room.state);
+      if (room.state.phase === "arrange" && room.state.arrangeId !== before) {
+        room.endsAt = Date.now() + (room.mods.coda.ARRANGE_MS || 5000);
+        await saveRoom(room);
+        return;
+      }
+    } else if (room.state.rpsReveal && room.mods.coda.finishRps) {
+      room.state = room.mods.coda.finishRps(room.state);
     }
-  } else if (room.state.rpsReveal && room.mods.coda.finishRps) {
-    room.state = room.mods.coda.finishRps(room.state);
+  } else if (room.game === "ecard" && room.state.rpsReveal && room.mods.ecard.finishEcardRps) {
+    room.state = room.mods.ecard.finishEcardRps(room.state);
+  } else {
+    return;
   }
   room.endsAt = null;
   armCpuThink(room);
@@ -1060,6 +1066,9 @@ export async function applyRoomAction(user, roomId, action, mods) {
     room.state = mods.holdem.applyHoldemAction(room.state, user.id, action);
   } else if (room.game === "ecard") {
     room.state = mods.ecard.applyEcardAction(room.state, user.id, action);
+    if (room.state.rpsReveal && !before.rpsReveal) {
+      room.endsAt = Date.now() + (mods.ecard.RPS_REVEAL_MS || 2800);
+    }
   } else if (room.game === "gomoku") {
     room.state = mods.gomoku.applyGomokuAction(room.state, user.id, action);
   } else if (room.game === "ludo") {

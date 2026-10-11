@@ -38,7 +38,7 @@ const RULES: Record<string, string[]> = {
     "Best five-card hand using hole cards and the board wins the pot.",
   ],
   ecard: [
-    "Heads-up Kaiji E-Card. Both players choose Emperor or Slave at the start (coin flip if both pick the same).",
+    "Invite-only 1v1. Rock-paper-scissors first — winner picks Emperor or Slave; loser takes the other side.",
     "Emperor side: E + 4 Citizens. Slave side: S + 4 Citizens. E beats C, C beats S, S beats E. Citizens cancel each other.",
     "When Emperor beats Citizen, Emperor returns to hand. A match ends when Emperor or Slave loses. Match winner plays Emperor next; loser plays Slave. First to 3 match wins.",
   ],
