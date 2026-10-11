@@ -1,4 +1,5 @@
 import { uid } from "../../lib/shuffle";
+import { computeGomokuMove } from "./ai";
 
 export const SIZE = 15;
 export const RPS_REVEAL_MS = 2800;
@@ -419,60 +420,10 @@ export function viewGomoku(state: GState, viewerId: string): GState {
   };
 }
 
-function scoreCell(board: Stone[][], r: number, c: number, stone: Stone): number {
-  let score = 0;
-  for (const [dr, dc] of DIRS) {
-    const n = axisLen(board, r, c, dr, dc, stone);
-    if (n >= 5) score += 10000;
-    else if (n === 4) score += 800;
-    else if (n === 3) score += 120;
-    else if (n === 2) score += 20;
-  }
-  return score;
-}
-
 export function aiGomoku(state: GState): GAction {
   if (state.phase === "rps") {
     const hand = (["rock", "paper", "scissors"] as const)[Math.floor(Math.random() * 3)]!;
     return { type: "rps", throw: hand };
   }
-
-  const me = state.players[state.turn]!;
-  const myStone = me.stone ?? 1;
-  const oppStone = (myStone === 1 ? 2 : 1) as Stone;
-  let best: { r: number; c: number; score: number } | null = null;
-
-  for (let r = 0; r < SIZE; r++) {
-    for (let c = 0; c < SIZE; c++) {
-      if (state.board[r]![c]) continue;
-      let near = 0;
-      for (let dr = -2; dr <= 2; dr++) {
-        for (let dc = -2; dc <= 2; dc++) {
-          const rr = r + dr;
-          const cc = c + dc;
-          if (inBoard(rr, cc) && state.board[rr]![cc]) near += 1;
-        }
-      }
-      if (!near && state.last) continue;
-
-      const trial = state.board.map((row) => row.slice()) as Stone[][];
-      trial[r]![c] = myStone;
-
-      if (myStone === 1 && blackFoulAt(trial, r, c)) continue;
-      if (winsAt(trial, r, c)) return { type: "place", r, c };
-
-      trial[r]![c] = oppStone;
-      const block = winsAt(trial, r, c) ? 5000 : 0;
-
-      trial[r]![c] = myStone;
-      const attack = scoreCell(trial, r, c, myStone);
-      trial[r]![c] = oppStone;
-      const defend = scoreCell(trial, r, c, oppStone) * 0.9;
-      const center = 7 - Math.abs(r - 7) - Math.abs(c - 7);
-      const score = block + attack + defend + near * 3 + center;
-      if (!best || score > best.score) best = { r, c, score };
-    }
-  }
-  if (best) return { type: "place", r: best.r, c: best.c };
-  return { type: "place", r: 7, c: 7 };
+  return computeGomokuMove(state);
 }

@@ -3,10 +3,218 @@ function uid(prefix = "id") {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+// src/games/gomoku/ai.ts
+var DIRS = [
+  [0, 1],
+  [1, 0],
+  [1, 1],
+  [1, -1]
+];
+var SCORE = {
+  five: 5e5,
+  liveFour: 5e4,
+  rushFour: 1e4,
+  liveThree: 5e3,
+  sleepThree: 500,
+  liveTwo: 200,
+  sleepTwo: 40,
+  liveOne: 10
+};
+var WIN = 1e7;
+var SEARCH_DEPTH = 3;
+var CANDIDATE_LIMIT = 14;
+var NEAR = 2;
+function inBoard(r, c) {
+  return r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+}
+function cloneBoard(board) {
+  return board.map((row) => row.slice());
+}
+function isLegal(board, r, c, stone) {
+  if (!inBoard(r, c) || board[r][c]) return false;
+  if (stone !== 1) return true;
+  board[r][c] = 1;
+  const foul = blackFoulAt(board, r, c);
+  board[r][c] = 0;
+  return !foul;
+}
+function ray(board, r, c, dr, dc, stone) {
+  let n = 0;
+  let rr = r + dr;
+  let cc = c + dc;
+  while (inBoard(rr, cc) && board[rr][cc] === stone) {
+    n += 1;
+    rr += dr;
+    cc += dc;
+  }
+  const open = inBoard(rr, cc) && board[rr][cc] === 0;
+  return { n, open };
+}
+function scoreAxis(board, r, c, dr, dc, stone) {
+  const a = ray(board, r, c, dr, dc, stone);
+  const b = ray(board, r, c, -dr, -dc, stone);
+  const len = a.n + b.n + 1;
+  const opens = (a.open ? 1 : 0) + (b.open ? 1 : 0);
+  let score = 0;
+  if (len >= 5) score = SCORE.five;
+  else if (len === 4) score = opens === 2 ? SCORE.liveFour : opens === 1 ? SCORE.rushFour : 0;
+  else if (len === 3) score = opens === 2 ? SCORE.liveThree : opens === 1 ? SCORE.sleepThree : 0;
+  else if (len === 2) score = opens === 2 ? SCORE.liveTwo : opens === 1 ? SCORE.sleepTwo : 0;
+  else if (len === 1) score = opens === 2 ? SCORE.liveOne : 0;
+  score += scoreGap(board, r, c, dr, dc, stone);
+  return score;
+}
+function scoreGap(board, r, c, dr, dc, stone) {
+  let best = 0;
+  for (const sign of [1, -1]) {
+    const sdr = dr * sign;
+    const sdc = dc * sign;
+    const eR = r + sdr;
+    const eC = c + sdc;
+    if (!inBoard(eR, eC) || board[eR][eC] !== 0) continue;
+    let run = 0;
+    let rr = eR + sdr;
+    let cc = eC + sdc;
+    while (inBoard(rr, cc) && board[rr][cc] === stone) {
+      run += 1;
+      rr += sdr;
+      cc += sdc;
+    }
+    if (run === 0) continue;
+    const farOpen = inBoard(rr, cc) && board[rr][cc] === 0;
+    const back = ray(board, r, c, -sdr, -sdc, stone);
+    const total = back.n + 1 + run;
+    if (total >= 4 && (back.open || farOpen)) best = Math.max(best, SCORE.rushFour * 0.85);
+    else if (total === 3 && back.open && farOpen) best = Math.max(best, SCORE.liveThree * 0.8);
+    else if (total === 3 && (back.open || farOpen)) best = Math.max(best, SCORE.sleepThree * 0.8);
+  }
+  return best;
+}
+function scorePoint(board, r, c, stone) {
+  let s = 0;
+  for (const [dr, dc] of DIRS) s += scoreAxis(board, r, c, dr, dc, stone);
+  return s;
+}
+function hasNeighbor(board, r, c, dist) {
+  for (let dr = -dist; dr <= dist; dr++) {
+    for (let dc = -dist; dc <= dist; dc++) {
+      if (!dr && !dc) continue;
+      const rr = r + dr;
+      const cc = c + dc;
+      if (inBoard(rr, cc) && board[rr][cc]) return true;
+    }
+  }
+  return false;
+}
+function candidates(board, me, opp, limit) {
+  const empty = !board.some((row) => row.some((x) => x !== 0));
+  if (empty) return [{ r: 7, c: 7, h: 1 }];
+  const list = [];
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (board[r][c] || !hasNeighbor(board, r, c, NEAR)) continue;
+      if (!isLegal(board, r, c, me)) continue;
+      board[r][c] = me;
+      if (winsAt(board, r, c)) {
+        board[r][c] = 0;
+        return [{ r, c, h: WIN }];
+      }
+      const attack = scorePoint(board, r, c, me);
+      board[r][c] = 0;
+      let oppWin = false;
+      let defend = 0;
+      if (isLegal(board, r, c, opp)) {
+        board[r][c] = opp;
+        oppWin = winsAt(board, r, c);
+        defend = scorePoint(board, r, c, opp);
+        board[r][c] = 0;
+      }
+      const center = 8 - Math.abs(r - 7) - Math.abs(c - 7);
+      const h = (oppWin ? WIN * 0.9 : 0) + attack + defend * 1.05 + center;
+      list.push({ r, c, h });
+    }
+  }
+  list.sort((a, b) => b.h - a.h);
+  return list.slice(0, limit);
+}
+function evaluateBoard(board, me, opp) {
+  let mine = 0;
+  let theirs = 0;
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (board[r][c] || !hasNeighbor(board, r, c, NEAR)) continue;
+      board[r][c] = me;
+      mine += scorePoint(board, r, c, me);
+      board[r][c] = opp;
+      theirs += scorePoint(board, r, c, opp);
+      board[r][c] = 0;
+    }
+  }
+  return mine - theirs * 1.1;
+}
+function alphabeta(board, depth, alpha, beta, me, opp, maximizing) {
+  if (depth === 0) return evaluateBoard(board, me, opp);
+  const stone = maximizing ? me : opp;
+  const other = maximizing ? opp : me;
+  const moves = candidates(board, stone, other, CANDIDATE_LIMIT);
+  if (!moves.length) return evaluateBoard(board, me, opp);
+  if (maximizing) {
+    let best2 = -Infinity;
+    for (const m of moves) {
+      board[m.r][m.c] = stone;
+      let val;
+      if (winsAt(board, m.r, m.c)) val = WIN + depth;
+      else val = alphabeta(board, depth - 1, alpha, beta, me, opp, false);
+      board[m.r][m.c] = 0;
+      if (val > best2) best2 = val;
+      if (best2 > alpha) alpha = best2;
+      if (alpha >= beta) break;
+    }
+    return best2;
+  }
+  let best = Infinity;
+  for (const m of moves) {
+    if (stone === 1 && !isLegal(board, m.r, m.c, 1)) continue;
+    board[m.r][m.c] = stone;
+    let val;
+    if (winsAt(board, m.r, m.c)) val = -WIN - depth;
+    else val = alphabeta(board, depth - 1, alpha, beta, me, opp, true);
+    board[m.r][m.c] = 0;
+    if (val < best) best = val;
+    if (best < beta) beta = best;
+    if (alpha >= beta) break;
+  }
+  return best === Infinity ? evaluateBoard(board, me, opp) : best;
+}
+function computeGomokuMove(state) {
+  const me = state.players[state.turn];
+  const myStone = me.stone ?? 1;
+  const oppStone = myStone === 1 ? 2 : 1;
+  const board = cloneBoard(state.board);
+  const root = candidates(board, myStone, oppStone, CANDIDATE_LIMIT);
+  if (!root.length) return { type: "place", r: 7, c: 7 };
+  if (root[0].h >= WIN * 0.85) return { type: "place", r: root[0].r, c: root[0].c };
+  let bestMove = root[0];
+  let bestScore = -Infinity;
+  for (const m of root) {
+    board[m.r][m.c] = myStone;
+    let score;
+    if (winsAt(board, m.r, m.c)) score = WIN;
+    else score = alphabeta(board, SEARCH_DEPTH - 1, -Infinity, Infinity, myStone, oppStone, false);
+    board[m.r][m.c] = 0;
+    score += Math.random() * 3;
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = m;
+    }
+  }
+  return { type: "place", r: bestMove.r, c: bestMove.c };
+}
+
 // src/games/gomoku/engine.ts
 var SIZE = 15;
 var RPS_REVEAL_MS = 2800;
-var DIRS = [
+var DIRS2 = [
   [0, 1],
   [1, 0],
   [1, 1],
@@ -24,7 +232,7 @@ function foulLabel(kind) {
 function emptyBoard() {
   return Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => 0));
 }
-function inBoard(r, c) {
+function inBoard2(r, c) {
   return r >= 0 && r < SIZE && c >= 0 && c < SIZE;
 }
 function seat(p) {
@@ -132,7 +340,7 @@ function lineLen(board, r, c, dr, dc, stone) {
   let n = 0;
   let rr = r + dr;
   let cc = c + dc;
-  while (inBoard(rr, cc) && board[rr][cc] === stone) {
+  while (inBoard2(rr, cc) && board[rr][cc] === stone) {
     n += 1;
     rr += dr;
     cc += dc;
@@ -145,7 +353,7 @@ function axisLen(board, r, c, dr, dc, stone) {
 function winsAt(board, r, c) {
   const stone = board[r][c];
   if (!stone) return false;
-  return DIRS.some(([dr, dc]) => {
+  return DIRS2.some(([dr, dc]) => {
     const n = axisLen(board, r, c, dr, dc, stone);
     return stone === 1 ? n === 5 : n >= 5;
   });
@@ -153,7 +361,7 @@ function winsAt(board, r, c) {
 function isOverline(board, r, c) {
   const stone = board[r][c];
   if (stone !== 1) return false;
-  return DIRS.some(([dr, dc]) => axisLen(board, r, c, dr, dc, stone) >= 6);
+  return DIRS2.some(([dr, dc]) => axisLen(board, r, c, dr, dc, stone) >= 6);
 }
 function fivePointsOnAxis(board, r, c, dr, dc, stone) {
   let ways = 0;
@@ -161,7 +369,7 @@ function fivePointsOnAxis(board, r, c, dr, dc, stone) {
     if (i === 0) continue;
     const rr = r + i * dr;
     const cc = c + i * dc;
-    if (!inBoard(rr, cc) || board[rr][cc] !== 0) continue;
+    if (!inBoard2(rr, cc) || board[rr][cc] !== 0) continue;
     board[rr][cc] = stone;
     const n = axisLen(board, rr, cc, dr, dc, stone);
     const hits = n === 5 && onSameSegment(board, r, c, rr, cc, dr, dc, stone);
@@ -173,7 +381,7 @@ function fivePointsOnAxis(board, r, c, dr, dc, stone) {
 function onSameSegment(board, r, c, rr, cc, dr, dc, stone) {
   let a = rr;
   let b = cc;
-  while (inBoard(a - dr, b - dc) && board[a - dr][b - dc] === stone) {
+  while (inBoard2(a - dr, b - dc) && board[a - dr][b - dc] === stone) {
     a -= dr;
     b -= dc;
   }
@@ -181,7 +389,7 @@ function onSameSegment(board, r, c, rr, cc, dr, dc, stone) {
   let found = false;
   let tr = a;
   let tc = b;
-  while (inBoard(tr, tc) && board[tr][tc] === stone) {
+  while (inBoard2(tr, tc) && board[tr][tc] === stone) {
     if (tr === r && tc === c) found = true;
     len += 1;
     tr += dr;
@@ -201,7 +409,7 @@ function isOpenThreeOnAxis(board, r, c, dr, dc, stone) {
     if (i === 0) continue;
     const rr = r + i * dr;
     const cc = c + i * dc;
-    if (!inBoard(rr, cc) || board[rr][cc] !== 0) continue;
+    if (!inBoard2(rr, cc) || board[rr][cc] !== 0) continue;
     board[rr][cc] = stone;
     const becameOpenFour = isOpenFourOnAxis(board, r, c, dr, dc, stone);
     board[rr][cc] = 0;
@@ -211,14 +419,14 @@ function isOpenThreeOnAxis(board, r, c, dr, dc, stone) {
 }
 function countOpenFours(board, r, c, stone) {
   let n = 0;
-  for (const [dr, dc] of DIRS) {
+  for (const [dr, dc] of DIRS2) {
     if (isOpenFourOnAxis(board, r, c, dr, dc, stone)) n += 1;
   }
   return n;
 }
 function countOpenThrees(board, r, c, stone) {
   let n = 0;
-  for (const [dr, dc] of DIRS) {
+  for (const [dr, dc] of DIRS2) {
     if (isOpenThreeOnAxis(board, r, c, dr, dc, stone)) n += 1;
   }
   return n;
@@ -305,55 +513,12 @@ function viewGomoku(state, viewerId) {
     rpsReveal: state.rpsReveal
   };
 }
-function scoreCell(board, r, c, stone) {
-  let score = 0;
-  for (const [dr, dc] of DIRS) {
-    const n = axisLen(board, r, c, dr, dc, stone);
-    if (n >= 5) score += 1e4;
-    else if (n === 4) score += 800;
-    else if (n === 3) score += 120;
-    else if (n === 2) score += 20;
-  }
-  return score;
-}
 function aiGomoku(state) {
   if (state.phase === "rps") {
     const hand = ["rock", "paper", "scissors"][Math.floor(Math.random() * 3)];
     return { type: "rps", throw: hand };
   }
-  const me = state.players[state.turn];
-  const myStone = me.stone ?? 1;
-  const oppStone = myStone === 1 ? 2 : 1;
-  let best = null;
-  for (let r = 0; r < SIZE; r++) {
-    for (let c = 0; c < SIZE; c++) {
-      if (state.board[r][c]) continue;
-      let near = 0;
-      for (let dr = -2; dr <= 2; dr++) {
-        for (let dc = -2; dc <= 2; dc++) {
-          const rr = r + dr;
-          const cc = c + dc;
-          if (inBoard(rr, cc) && state.board[rr][cc]) near += 1;
-        }
-      }
-      if (!near && state.last) continue;
-      const trial = state.board.map((row) => row.slice());
-      trial[r][c] = myStone;
-      if (myStone === 1 && blackFoulAt(trial, r, c)) continue;
-      if (winsAt(trial, r, c)) return { type: "place", r, c };
-      trial[r][c] = oppStone;
-      const block = winsAt(trial, r, c) ? 5e3 : 0;
-      trial[r][c] = myStone;
-      const attack = scoreCell(trial, r, c, myStone);
-      trial[r][c] = oppStone;
-      const defend = scoreCell(trial, r, c, oppStone) * 0.9;
-      const center = 7 - Math.abs(r - 7) - Math.abs(c - 7);
-      const score = block + attack + defend + near * 3 + center;
-      if (!best || score > best.score) best = { r, c, score };
-    }
-  }
-  if (best) return { type: "place", r: best.r, c: best.c };
-  return { type: "place", r: 7, c: 7 };
+  return computeGomokuMove(state);
 }
 export {
   RPS_REVEAL_MS,
