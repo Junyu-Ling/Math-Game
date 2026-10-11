@@ -6,6 +6,12 @@ export type RpsThrow = "rock" | "paper" | "scissors";
 export type RpsReveal = { aId: string; a: RpsThrow; bId: string; b: RpsThrow };
 
 export const RPS_REVEAL_MS = 2800;
+/** Full match: 12 rounds in 4 sets of 3. */
+export const TOTAL_ROUNDS = 12;
+export const ROUNDS_PER_SET = 3;
+/** Slave-side round win pays 5× an Emperor-side round win. */
+export const EMPEROR_WIN_POINTS = 1;
+export const SLAVE_WIN_POINTS = 5;
 
 export type ECard = { id: string; kind: EKind };
 
@@ -24,9 +30,10 @@ export type EPhase = "rps" | "role" | "pick" | "reveal" | "over";
 export type EState = {
   players: EPlayer[];
   phase: EPhase;
+  /** Current round 1..12 (increments when a round is decided). */
   round: number;
+  /** Current set 1..4. */
   set: number;
-  tricksInSet: number;
   rpsThrows: Partial<Record<string, RpsThrow>>;
   rpsReveal: RpsReveal | null;
   roleChooserId: string | null;
@@ -35,13 +42,16 @@ export type EState = {
     a: EKind;
     bId: string;
     b: EKind;
-    result: "a" | "b" | "draw" | "match";
-    matchWinnerId: string | null;
+    result: "a" | "b" | "draw" | "round";
+    /** Player who won the round (role-based payout already applied). */
+    roundWinnerId: string | null;
+    /** Which role won the round. */
+    winningRole: ERole | null;
   } | null;
   winnerId: string | null;
-  wins: Record<string, number>;
+  /** Cumulative payout score (Emperor win +1, Slave win +5). */
+  score: Record<string, number>;
   log: Array<{ id: string; text: string }>;
-  goal: number;
 };
 
 function handFor(role: ERole): ECard[] {
@@ -73,18 +83,16 @@ export function startEcardDuel(
     phase: "rps",
     round: 1,
     set: 1,
-    tricksInSet: 0,
     rpsThrows: {},
     rpsReveal: null,
     roleChooserId: null,
     last: null,
     winnerId: null,
-    wins: { [a.id]: 0, [b.id]: 0 },
-    goal: 3,
+    score: { [a.id]: 0, [b.id]: 0 },
     log: [
       {
         id: uid("l"),
-        text: "Rock-paper-scissors. Winner picks Emperor or Slave. First to 3 match wins.",
+        text: `Rock-paper-scissors. Winner picks the opening side. ${TOTAL_ROUNDS} rounds · roles swap every ${ROUNDS_PER_SET}. Slave win = ${SLAVE_WIN_POINTS}× Emperor win.`,
       },
     ],
   };
@@ -106,18 +114,27 @@ export function cardArt(kind: EKind) {
   return "/ecard-citizen.png";
 }
 
-/** Returns who wins the clash. Any non-citizen-vs-citizen result ends the match. */
-export function clash(a: EKind, b: EKind): { result: "a" | "b" | "draw"; matchEnd: boolean } {
-  if (a === "citizen" && b === "citizen") return { result: "draw", matchEnd: false };
-  if (a === b) return { result: "draw", matchEnd: false };
-  // Emperor vs Citizen → Emperor wins the match immediately.
-  if (a === "emperor" && b === "citizen") return { result: "a", matchEnd: true };
-  if (a === "citizen" && b === "emperor") return { result: "b", matchEnd: true };
-  if (a === "citizen" && b === "slave") return { result: "a", matchEnd: true };
-  if (a === "slave" && b === "citizen") return { result: "b", matchEnd: true };
-  if (a === "slave" && b === "emperor") return { result: "a", matchEnd: true };
-  if (a === "emperor" && b === "slave") return { result: "b", matchEnd: true };
-  return { result: "draw", matchEnd: false };
+export function cardBack() {
+  return "/ecard-back.png";
+}
+
+/**
+ * Clash resolution (original hierarchy).
+ * Round ends only when Emperor or Slave is defeated:
+ *   E vs C → Emperor wins clash, Emperor returns, Citizen out (round continues)
+ *   C vs S → Emperor side wins the round
+ *   S vs E → Slave side wins the round
+ *   C vs C → both out, continue
+ */
+export function clash(a: EKind, b: EKind): { result: "a" | "b" | "draw"; roundEnd: boolean } {
+  if (a === "citizen" && b === "citizen") return { result: "draw", roundEnd: false };
+  if (a === "emperor" && b === "citizen") return { result: "a", roundEnd: false };
+  if (a === "citizen" && b === "emperor") return { result: "b", roundEnd: false };
+  if (a === "citizen" && b === "slave") return { result: "a", roundEnd: true };
+  if (a === "slave" && b === "citizen") return { result: "b", roundEnd: true };
+  if (a === "slave" && b === "emperor") return { result: "a", roundEnd: true };
+  if (a === "emperor" && b === "slave") return { result: "b", roundEnd: true };
+  return { result: "draw", roundEnd: false };
 }
 
 function dealWithRoles(state: EState, r0: ERole, r1: ERole, note: string): EState {
@@ -138,15 +155,14 @@ function dealWithRoles(state: EState, r0: ERole, r1: ERole, note: string): EStat
   };
 }
 
-/** Winner of the match becomes Emperor; loser becomes Slave. */
-function refillRoles(state: EState, matchWinnerId: string | null): EState {
+function refillHands(state: EState, swap: boolean): EState {
   const p0 = state.players[0]!;
   const p1 = state.players[1]!;
   let r0 = p0.role ?? "emperor";
   let r1 = p1.role ?? "slave";
-  if (matchWinnerId) {
-    r0 = p0.id === matchWinnerId ? "emperor" : "slave";
-    r1 = p1.id === matchWinnerId ? "emperor" : "slave";
+  if (swap) {
+    r0 = r0 === "emperor" ? "slave" : "emperor";
+    r1 = r1 === "emperor" ? "slave" : "emperor";
   }
   return {
     ...state,
@@ -257,7 +273,7 @@ export function applyEcardAction(state: EState, actorId: string, action: EAction
       state,
       r0,
       r1,
-      `${me.name} chooses ${mine.toUpperCase()} · ${other.name} is ${theirs.toUpperCase()}.`,
+      `${me.name} chooses ${mine.toUpperCase()} · ${other.name} is ${theirs.toUpperCase()}. Round 1/${TOTAL_ROUNDS}.`,
     );
   }
 
@@ -295,7 +311,7 @@ function reveal(state: EState): EState {
   const b = state.players[1]!;
   const ca = a.hand.find((c) => c.id === a.selectedId)!;
   const cb = b.hand.find((c) => c.id === b.selectedId)!;
-  const { result, matchEnd } = clash(ca.kind, cb.kind);
+  const { result, roundEnd } = clash(ca.kind, cb.kind);
   let log = [
     ...state.log,
     {
@@ -304,91 +320,119 @@ function reveal(state: EState): EState {
     },
   ];
 
-  // Citizen vs Citizen: both discarded, match continues. Any other clash ends the match.
   const players = state.players.map((p) => {
     const mine = p.id === a.id ? ca : cb;
-    const hand = p.hand.filter((c) => c.id !== mine.id);
+    let hand = p.hand.filter((c) => c.id !== mine.id);
+    const myResult =
+      result === "draw" ? "draw" : (result === "a" && p.id === a.id) || (result === "b" && p.id === b.id) ? "win" : "lose";
+    // Soft win (Emperor vs Citizen): Emperor returns; Citizen stays out.
+    if (!roundEnd && myResult === "win") {
+      hand = [...hand, mine];
+    }
     return { ...p, hand, selectedId: null, locked: false };
   });
 
+  let score = { ...state.score };
+  let roundWinnerId: string | null = null;
+  let winningRole: ERole | null = null;
+
   if (result === "draw") {
-    log = [...log, { id: uid("l"), text: "Citizens cancel. Both discarded." }];
+    log = [...log, { id: uid("l"), text: "Citizens cancel. Both leave the hand — keep playing." }];
+  } else if (!roundEnd) {
+    const winner = result === "a" ? a : b;
+    log = [...log, { id: uid("l"), text: `${winner.name}'s Emperor beats Citizen — Emperor returns. Round continues.` }];
   } else {
     const winner = result === "a" ? a : b;
     const winCard = result === "a" ? ca.kind : cb.kind;
-    const loseCard = result === "a" ? cb.kind : ca.kind;
+    // Round winner is by role: Citizen beating Slave = Emperor side; Slave beating Emperor = Slave side.
+    winningRole = winCard === "slave" ? "slave" : "emperor";
+    // If emperor side won via Citizen, winner.role is emperor; if via... Citizen is emperor side.
+    // If slave won via Slave card, winner.role is slave.
+    roundWinnerId = winner.id;
+    const payout = winningRole === "slave" ? SLAVE_WIN_POINTS : EMPEROR_WIN_POINTS;
+    score[roundWinnerId] = (score[roundWinnerId] || 0) + payout;
     log = [
       ...log,
       {
         id: uid("l"),
-        text:
-          winCard === "emperor" && loseCard === "citizen"
-            ? `${winner.name}'s Emperor beats Citizen — match point!`
-            : `${winner.name} wins the clash.`,
+        text: `${winner.name} (${winningRole}) wins round ${state.round}. +${payout} (${score[a.id]}–${score[b.id]}).`,
       },
     ];
-  }
-
-  let wins = { ...state.wins };
-  let winnerId: string | null = null;
-  let phase: EPhase = "reveal";
-
-  let matchWinnerId: string | null = null;
-  if (matchEnd) {
-    matchWinnerId = result === "a" ? a.id : b.id;
-    wins[matchWinnerId] = (wins[matchWinnerId] || 0) + 1;
-    log = [...log, { id: uid("l"), text: `${result === "a" ? a.name : b.name} takes the match point! (${wins[a.id]}–${wins[b.id]})` }];
-    if ((wins[matchWinnerId] || 0) >= state.goal) {
-      phase = "over";
-      winnerId = matchWinnerId;
-      log = [...log, { id: uid("l"), text: `${result === "a" ? a.name : b.name} wins the E-Card duel.` }];
-    }
   }
 
   return {
     ...state,
     players,
-    phase,
+    phase: "reveal",
     last: {
       aId: a.id,
       a: ca.kind,
       bId: b.id,
       b: cb.kind,
-      result: matchEnd ? "match" : result,
-      matchWinnerId,
+      result: roundEnd ? "round" : result,
+      roundWinnerId,
+      winningRole,
     },
-    wins,
-    winnerId,
+    score,
     log,
-    tricksInSet: state.tricksInSet + 1,
+  };
+}
+
+function finishMatch(state: EState): EState {
+  const p0 = state.players[0]!;
+  const p1 = state.players[1]!;
+  const s0 = state.score[p0.id] || 0;
+  const s1 = state.score[p1.id] || 0;
+  let winnerId: string | null = null;
+  let text = `Final ${s0}–${s1}. `;
+  if (s0 > s1) {
+    winnerId = p0.id;
+    text += `${p0.name} wins the match.`;
+  } else if (s1 > s0) {
+    winnerId = p1.id;
+    text += `${p1.name} wins the match.`;
+  } else {
+    text += "Draw.";
+  }
+  return {
+    ...state,
+    phase: "over",
+    winnerId,
+    log: [...state.log, { id: uid("l"), text }],
   };
 }
 
 function continueAfterReveal(state: EState): EState {
   if (state.phase === "over") return state;
-  const needFresh = state.last?.result === "match" || state.players.some((p) => p.hand.length === 0);
-  if (needFresh) {
-    const matchWinnerId = state.last?.result === "match" ? state.last.matchWinnerId : null;
-    const next = refillRoles(state, matchWinnerId);
-    const emp = next.players.find((p) => p.role === "emperor");
-    const slv = next.players.find((p) => p.role === "slave");
-    return {
-      ...next,
-      set: state.set + (matchWinnerId ? 1 : 0),
-      round: state.round + 1,
-      tricksInSet: 0,
-      log: [
-        ...state.log,
-        {
-          id: uid("l"),
-          text: matchWinnerId
-            ? `${emp?.name || "Winner"} plays Emperor next · ${slv?.name || "Loser"} plays Slave. Fresh hands.`
-            : "Fresh hands for the next match.",
-        },
-      ],
-    };
+
+  // Soft clash / citizen cancel — keep hands, stay in this round.
+  if (state.last?.result !== "round") {
+    return { ...state, phase: "pick", last: null };
   }
-  return { ...state, phase: "pick", last: null, round: state.round + 1 };
+
+  // Round decided — reclaim cards for next round (or end after 12).
+  if (state.round >= TOTAL_ROUNDS) {
+    return finishMatch(state);
+  }
+
+  const nextRound = state.round + 1;
+  const swap = state.round % ROUNDS_PER_SET === 0;
+  const nextSet = swap ? state.set + 1 : state.set;
+  const next = refillHands(state, swap);
+  return {
+    ...next,
+    round: nextRound,
+    set: nextSet,
+    log: [
+      ...state.log,
+      {
+        id: uid("l"),
+        text: swap
+          ? `Set ${state.set} done. Roles swap. ${next.players[0]!.name} is ${next.players[0]!.role?.toUpperCase()}. Round ${nextRound}/${TOTAL_ROUNDS}.`
+          : `Cards reclaimed. Round ${nextRound}/${TOTAL_ROUNDS}.`,
+      },
+    ],
+  };
 }
 
 export function viewEcard(state: EState, viewerId: string): EState {
@@ -413,10 +457,6 @@ export function viewEcard(state: EState, viewerId: string): EState {
   };
 }
 
-/**
- * Psychological AI. House rule: Emperor vs Citizen ends the match (Emperor wins).
- * Mid-match: each side still holds its special until played. Hand size h ⇒ 1 special + (h−1) citizens.
- */
 function pickWeighted(weights: Array<{ card: ECard; w: number }>): ECard {
   const floor = weights.map((x) => ({ card: x.card, w: Math.max(0.01, x.w) }));
   const sum = floor.reduce((s, x) => s + x.w, 0);
@@ -429,39 +469,39 @@ function pickWeighted(weights: Array<{ card: ECard; w: number }>): ECard {
 }
 
 function seriesPressure(state: EState, meId: string, rivalId: string) {
-  const mine = state.wins[meId] || 0;
-  const theirs = state.wins[rivalId] || 0;
-  const need = state.goal - mine;
-  const theyNeed = state.goal - theirs;
-  return { mine, theirs, need, theyNeed, behind: mine < theirs, matchPoint: need === 1, rivalMatchPoint: theyNeed === 1 };
+  const mine = state.score[meId] || 0;
+  const theirs = state.score[rivalId] || 0;
+  const remaining = TOTAL_ROUNDS - state.round + 1;
+  return {
+    mine,
+    theirs,
+    behind: mine < theirs,
+    late: remaining <= 3,
+    remaining,
+  };
 }
 
-function aiPickEmperor(me: EPlayer, rivalHandSize: number, pressure: ReturnType<typeof seriesPressure>, _last: EState["last"]): ECard {
+function aiPickEmperor(me: EPlayer, rivalHandSize: number, pressure: ReturnType<typeof seriesPressure>): ECard {
   const citizens = me.hand.filter((c) => c.kind === "citizen");
   const special = me.hand.find((c) => c.kind === "emperor")!;
-  // Rival must play Slave — only Citizen wins.
   if (rivalHandSize <= 1 && citizens[0]) return citizens[0];
   if (!citizens.length) return special;
 
   const pSlave = 1 / Math.max(1, rivalHandSize);
-  // Emperor vs Citizen = instant match win; Emperor vs Slave = instant loss.
-  let wCitizen = 0.9 + pSlave * 3.4 + citizens.length * 0.1;
-  let wEmperor = 0.7 + (1 - pSlave) * 3.6 - pSlave * 4.2;
+  // E vs C continues (soft); C vs S wins round (+1); E vs S loses round (rival +5).
+  let wCitizen = 1.2 + pSlave * 3.5 + citizens.length * 0.12;
+  let wEmperor = 0.55 + (1 - pSlave) * 1.6 - pSlave * 5.5;
 
-  // Early: Slave diluted — press Emperor more often.
-  if (rivalHandSize >= 4) wEmperor += 0.9;
-  // Late: Slave denser — fish with Citizen.
+  if (me.hand.length >= 4) {
+    wCitizen += 0.8;
+    wEmperor -= 0.4;
+  }
   if (rivalHandSize <= 2) {
     wEmperor -= 1.8;
-    wCitizen += 1.3;
+    wCitizen += 1.2;
   }
-  if (pressure.behind) wEmperor += 0.45;
-  if (pressure.matchPoint) {
-    // Prefer the higher-EV line: Emperor when Slave is thin, else Citizen trap.
-    if (rivalHandSize >= 3) wEmperor += 0.6;
-    else wCitizen += 0.7;
-  }
-  if (pressure.rivalMatchPoint) wEmperor -= 0.5;
+  if (pressure.behind) wCitizen += 0.5;
+  if (pressure.late) wEmperor -= 0.4;
 
   wCitizen *= 0.85 + Math.random() * 0.3;
   wEmperor *= 0.85 + Math.random() * 0.3;
@@ -472,28 +512,26 @@ function aiPickEmperor(me: EPlayer, rivalHandSize: number, pressure: ReturnType<
   ]);
 }
 
-function aiPickSlave(me: EPlayer, rivalHandSize: number, pressure: ReturnType<typeof seriesPressure>, _last: EState["last"]): ECard {
+function aiPickSlave(me: EPlayer, rivalHandSize: number, pressure: ReturnType<typeof seriesPressure>): ECard {
   const citizens = me.hand.filter((c) => c.kind === "citizen");
   const special = me.hand.find((c) => c.kind === "slave")!;
-  // Rival must play Emperor — Slave wins.
   if (rivalHandSize <= 1) return special;
   if (!citizens.length) return special;
 
   const pEmperor = 1 / Math.max(1, rivalHandSize);
-  // Citizen vs Emperor = instant loss; Slave vs Citizen = instant loss; Slave vs Emperor = win.
-  let wCitizen = 1.0 + (1 - pEmperor) * 0.8 + citizens.length * 0.1;
-  let wSlave = 0.45 + pEmperor * 4.5 - (1 - pEmperor) * 3.6;
+  // Slave win is worth 5× — spring the trap when Emperor denser.
+  let wCitizen = 1.15 + (1 - pEmperor) * 1.2 + citizens.length * 0.1;
+  let wSlave = 0.4 + pEmperor * 5.0 - (1 - pEmperor) * 3.5;
 
   if (me.hand.length >= 4) {
-    wCitizen += 0.7;
-    wSlave -= 0.5;
+    wCitizen += 0.9;
+    wSlave -= 0.7;
   }
   if (rivalHandSize <= 2) {
-    wSlave += 2.0;
-    wCitizen -= 0.5;
+    wSlave += 2.2;
+    wCitizen -= 0.4;
   }
-  if (pressure.behind || pressure.matchPoint) wSlave += rivalHandSize >= 3 ? 0.8 : 1.3;
-  if (pressure.rivalMatchPoint) wSlave += 0.6;
+  if (pressure.behind || pressure.late) wSlave += 1.0;
 
   wCitizen *= 0.85 + Math.random() * 0.3;
   wSlave *= 0.85 + Math.random() * 0.3;
@@ -517,22 +555,20 @@ export function aiEcard(state: EState, cpuId: string): EAction {
 
   if (state.phase === "role") {
     if (state.roleChooserId !== cpuId) return { type: "role", role: "emperor" };
-    const ahead = (state.wins[cpuId] || 0) > (state.wins[rival?.id || ""] || 0);
-    const role: ERole = Math.random() < (ahead ? 0.58 : 0.42) ? "emperor" : "slave";
+    // Prefer Slave slightly for the 5× payout upside.
+    const role: ERole = Math.random() < 0.45 ? "emperor" : "slave";
     return { type: "role", role };
   }
 
   if (state.phase === "reveal") return { type: "next" };
   if (me.locked) return { type: "lock" };
   if (!me.selectedId) {
-    if (!rival || !me.role) {
-      return { type: "select", cardId: me.hand[0]!.id };
-    }
+    if (!rival || !me.role) return { type: "select", cardId: me.hand[0]!.id };
     const pressure = seriesPressure(state, me.id, rival.id);
     const card =
       me.role === "emperor"
-        ? aiPickEmperor(me, rival.hand.length, pressure, state.last)
-        : aiPickSlave(me, rival.hand.length, pressure, state.last);
+        ? aiPickEmperor(me, rival.hand.length, pressure)
+        : aiPickSlave(me, rival.hand.length, pressure);
     return { type: "select", cardId: card.id };
   }
   return { type: "lock" };

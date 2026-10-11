@@ -5,6 +5,10 @@ function uid(prefix = "id") {
 
 // src/games/ecard/engine.ts
 var RPS_REVEAL_MS = 2800;
+var TOTAL_ROUNDS = 12;
+var ROUNDS_PER_SET = 3;
+var EMPEROR_WIN_POINTS = 1;
+var SLAVE_WIN_POINTS = 5;
 function handFor(role) {
   const special = role === "emperor" ? "emperor" : "slave";
   return [
@@ -29,18 +33,16 @@ function startEcardDuel(a, b) {
     phase: "rps",
     round: 1,
     set: 1,
-    tricksInSet: 0,
     rpsThrows: {},
     rpsReveal: null,
     roleChooserId: null,
     last: null,
     winnerId: null,
-    wins: { [a.id]: 0, [b.id]: 0 },
-    goal: 3,
+    score: { [a.id]: 0, [b.id]: 0 },
     log: [
       {
         id: uid("l"),
-        text: "Rock-paper-scissors. Winner picks Emperor or Slave. First to 3 match wins."
+        text: `Rock-paper-scissors. Winner picks the opening side. ${TOTAL_ROUNDS} rounds \xB7 roles swap every ${ROUNDS_PER_SET}. Slave win = ${SLAVE_WIN_POINTS}\xD7 Emperor win.`
       }
     ]
   };
@@ -58,16 +60,18 @@ function cardArt(kind) {
   if (kind === "slave") return "/ecard-slave.png";
   return "/ecard-citizen.png";
 }
+function cardBack() {
+  return "/ecard-back.png";
+}
 function clash(a, b) {
-  if (a === "citizen" && b === "citizen") return { result: "draw", matchEnd: false };
-  if (a === b) return { result: "draw", matchEnd: false };
-  if (a === "emperor" && b === "citizen") return { result: "a", matchEnd: true };
-  if (a === "citizen" && b === "emperor") return { result: "b", matchEnd: true };
-  if (a === "citizen" && b === "slave") return { result: "a", matchEnd: true };
-  if (a === "slave" && b === "citizen") return { result: "b", matchEnd: true };
-  if (a === "slave" && b === "emperor") return { result: "a", matchEnd: true };
-  if (a === "emperor" && b === "slave") return { result: "b", matchEnd: true };
-  return { result: "draw", matchEnd: false };
+  if (a === "citizen" && b === "citizen") return { result: "draw", roundEnd: false };
+  if (a === "emperor" && b === "citizen") return { result: "a", roundEnd: false };
+  if (a === "citizen" && b === "emperor") return { result: "b", roundEnd: false };
+  if (a === "citizen" && b === "slave") return { result: "a", roundEnd: true };
+  if (a === "slave" && b === "citizen") return { result: "b", roundEnd: true };
+  if (a === "slave" && b === "emperor") return { result: "a", roundEnd: true };
+  if (a === "emperor" && b === "slave") return { result: "b", roundEnd: true };
+  return { result: "draw", roundEnd: false };
 }
 function dealWithRoles(state, r0, r1, note) {
   const p0 = state.players[0];
@@ -86,14 +90,14 @@ function dealWithRoles(state, r0, r1, note) {
     log: [...state.log, { id: uid("l"), text: note }]
   };
 }
-function refillRoles(state, matchWinnerId) {
+function refillHands(state, swap) {
   const p0 = state.players[0];
   const p1 = state.players[1];
   let r0 = p0.role ?? "emperor";
   let r1 = p1.role ?? "slave";
-  if (matchWinnerId) {
-    r0 = p0.id === matchWinnerId ? "emperor" : "slave";
-    r1 = p1.id === matchWinnerId ? "emperor" : "slave";
+  if (swap) {
+    r0 = r0 === "emperor" ? "slave" : "emperor";
+    r1 = r1 === "emperor" ? "slave" : "emperor";
   }
   return {
     ...state,
@@ -185,7 +189,7 @@ function applyEcardAction(state, actorId, action) {
       state,
       r0,
       r1,
-      `${me.name} chooses ${mine.toUpperCase()} \xB7 ${other.name} is ${theirs.toUpperCase()}.`
+      `${me.name} chooses ${mine.toUpperCase()} \xB7 ${other.name} is ${theirs.toUpperCase()}. Round 1/${TOTAL_ROUNDS}.`
     );
   }
   if (state.phase === "reveal" && action.type === "next") {
@@ -217,7 +221,7 @@ function reveal(state) {
   const b = state.players[1];
   const ca = a.hand.find((c) => c.id === a.selectedId);
   const cb = b.hand.find((c) => c.id === b.selectedId);
-  const { result, matchEnd } = clash(ca.kind, cb.kind);
+  const { result, roundEnd } = clash(ca.kind, cb.kind);
   let log = [
     ...state.log,
     {
@@ -227,78 +231,100 @@ function reveal(state) {
   ];
   const players = state.players.map((p) => {
     const mine = p.id === a.id ? ca : cb;
-    const hand = p.hand.filter((c) => c.id !== mine.id);
+    let hand = p.hand.filter((c) => c.id !== mine.id);
+    const myResult = result === "draw" ? "draw" : result === "a" && p.id === a.id || result === "b" && p.id === b.id ? "win" : "lose";
+    if (!roundEnd && myResult === "win") {
+      hand = [...hand, mine];
+    }
     return { ...p, hand, selectedId: null, locked: false };
   });
+  let score = { ...state.score };
+  let roundWinnerId = null;
+  let winningRole = null;
   if (result === "draw") {
-    log = [...log, { id: uid("l"), text: "Citizens cancel. Both discarded." }];
+    log = [...log, { id: uid("l"), text: "Citizens cancel. Both leave the hand \u2014 keep playing." }];
+  } else if (!roundEnd) {
+    const winner = result === "a" ? a : b;
+    log = [...log, { id: uid("l"), text: `${winner.name}'s Emperor beats Citizen \u2014 Emperor returns. Round continues.` }];
   } else {
     const winner = result === "a" ? a : b;
     const winCard = result === "a" ? ca.kind : cb.kind;
-    const loseCard = result === "a" ? cb.kind : ca.kind;
+    winningRole = winCard === "slave" ? "slave" : "emperor";
+    roundWinnerId = winner.id;
+    const payout = winningRole === "slave" ? SLAVE_WIN_POINTS : EMPEROR_WIN_POINTS;
+    score[roundWinnerId] = (score[roundWinnerId] || 0) + payout;
     log = [
       ...log,
       {
         id: uid("l"),
-        text: winCard === "emperor" && loseCard === "citizen" ? `${winner.name}'s Emperor beats Citizen \u2014 match point!` : `${winner.name} wins the clash.`
+        text: `${winner.name} (${winningRole}) wins round ${state.round}. +${payout} (${score[a.id]}\u2013${score[b.id]}).`
       }
     ];
-  }
-  let wins = { ...state.wins };
-  let winnerId = null;
-  let phase = "reveal";
-  let matchWinnerId = null;
-  if (matchEnd) {
-    matchWinnerId = result === "a" ? a.id : b.id;
-    wins[matchWinnerId] = (wins[matchWinnerId] || 0) + 1;
-    log = [...log, { id: uid("l"), text: `${result === "a" ? a.name : b.name} takes the match point! (${wins[a.id]}\u2013${wins[b.id]})` }];
-    if ((wins[matchWinnerId] || 0) >= state.goal) {
-      phase = "over";
-      winnerId = matchWinnerId;
-      log = [...log, { id: uid("l"), text: `${result === "a" ? a.name : b.name} wins the E-Card duel.` }];
-    }
   }
   return {
     ...state,
     players,
-    phase,
+    phase: "reveal",
     last: {
       aId: a.id,
       a: ca.kind,
       bId: b.id,
       b: cb.kind,
-      result: matchEnd ? "match" : result,
-      matchWinnerId
+      result: roundEnd ? "round" : result,
+      roundWinnerId,
+      winningRole
     },
-    wins,
+    score,
+    log
+  };
+}
+function finishMatch(state) {
+  const p0 = state.players[0];
+  const p1 = state.players[1];
+  const s0 = state.score[p0.id] || 0;
+  const s1 = state.score[p1.id] || 0;
+  let winnerId = null;
+  let text = `Final ${s0}\u2013${s1}. `;
+  if (s0 > s1) {
+    winnerId = p0.id;
+    text += `${p0.name} wins the match.`;
+  } else if (s1 > s0) {
+    winnerId = p1.id;
+    text += `${p1.name} wins the match.`;
+  } else {
+    text += "Draw.";
+  }
+  return {
+    ...state,
+    phase: "over",
     winnerId,
-    log,
-    tricksInSet: state.tricksInSet + 1
+    log: [...state.log, { id: uid("l"), text }]
   };
 }
 function continueAfterReveal(state) {
   if (state.phase === "over") return state;
-  const needFresh = state.last?.result === "match" || state.players.some((p) => p.hand.length === 0);
-  if (needFresh) {
-    const matchWinnerId = state.last?.result === "match" ? state.last.matchWinnerId : null;
-    const next = refillRoles(state, matchWinnerId);
-    const emp = next.players.find((p) => p.role === "emperor");
-    const slv = next.players.find((p) => p.role === "slave");
-    return {
-      ...next,
-      set: state.set + (matchWinnerId ? 1 : 0),
-      round: state.round + 1,
-      tricksInSet: 0,
-      log: [
-        ...state.log,
-        {
-          id: uid("l"),
-          text: matchWinnerId ? `${emp?.name || "Winner"} plays Emperor next \xB7 ${slv?.name || "Loser"} plays Slave. Fresh hands.` : "Fresh hands for the next match."
-        }
-      ]
-    };
+  if (state.last?.result !== "round") {
+    return { ...state, phase: "pick", last: null };
   }
-  return { ...state, phase: "pick", last: null, round: state.round + 1 };
+  if (state.round >= TOTAL_ROUNDS) {
+    return finishMatch(state);
+  }
+  const nextRound = state.round + 1;
+  const swap = state.round % ROUNDS_PER_SET === 0;
+  const nextSet = swap ? state.set + 1 : state.set;
+  const next = refillHands(state, swap);
+  return {
+    ...next,
+    round: nextRound,
+    set: nextSet,
+    log: [
+      ...state.log,
+      {
+        id: uid("l"),
+        text: swap ? `Set ${state.set} done. Roles swap. ${next.players[0].name} is ${next.players[0].role?.toUpperCase()}. Round ${nextRound}/${TOTAL_ROUNDS}.` : `Cards reclaimed. Round ${nextRound}/${TOTAL_ROUNDS}.`
+      }
+    ]
+  };
 }
 function viewEcard(state, viewerId) {
   return {
@@ -328,31 +354,35 @@ function pickWeighted(weights) {
   return floor[floor.length - 1].card;
 }
 function seriesPressure(state, meId, rivalId) {
-  const mine = state.wins[meId] || 0;
-  const theirs = state.wins[rivalId] || 0;
-  const need = state.goal - mine;
-  const theyNeed = state.goal - theirs;
-  return { mine, theirs, need, theyNeed, behind: mine < theirs, matchPoint: need === 1, rivalMatchPoint: theyNeed === 1 };
+  const mine = state.score[meId] || 0;
+  const theirs = state.score[rivalId] || 0;
+  const remaining = TOTAL_ROUNDS - state.round + 1;
+  return {
+    mine,
+    theirs,
+    behind: mine < theirs,
+    late: remaining <= 3,
+    remaining
+  };
 }
-function aiPickEmperor(me, rivalHandSize, pressure, _last) {
+function aiPickEmperor(me, rivalHandSize, pressure) {
   const citizens = me.hand.filter((c) => c.kind === "citizen");
   const special = me.hand.find((c) => c.kind === "emperor");
   if (rivalHandSize <= 1 && citizens[0]) return citizens[0];
   if (!citizens.length) return special;
   const pSlave = 1 / Math.max(1, rivalHandSize);
-  let wCitizen = 0.9 + pSlave * 3.4 + citizens.length * 0.1;
-  let wEmperor = 0.7 + (1 - pSlave) * 3.6 - pSlave * 4.2;
-  if (rivalHandSize >= 4) wEmperor += 0.9;
+  let wCitizen = 1.2 + pSlave * 3.5 + citizens.length * 0.12;
+  let wEmperor = 0.55 + (1 - pSlave) * 1.6 - pSlave * 5.5;
+  if (me.hand.length >= 4) {
+    wCitizen += 0.8;
+    wEmperor -= 0.4;
+  }
   if (rivalHandSize <= 2) {
     wEmperor -= 1.8;
-    wCitizen += 1.3;
+    wCitizen += 1.2;
   }
-  if (pressure.behind) wEmperor += 0.45;
-  if (pressure.matchPoint) {
-    if (rivalHandSize >= 3) wEmperor += 0.6;
-    else wCitizen += 0.7;
-  }
-  if (pressure.rivalMatchPoint) wEmperor -= 0.5;
+  if (pressure.behind) wCitizen += 0.5;
+  if (pressure.late) wEmperor -= 0.4;
   wCitizen *= 0.85 + Math.random() * 0.3;
   wEmperor *= 0.85 + Math.random() * 0.3;
   return pickWeighted([
@@ -360,24 +390,23 @@ function aiPickEmperor(me, rivalHandSize, pressure, _last) {
     { card: special, w: wEmperor }
   ]);
 }
-function aiPickSlave(me, rivalHandSize, pressure, _last) {
+function aiPickSlave(me, rivalHandSize, pressure) {
   const citizens = me.hand.filter((c) => c.kind === "citizen");
   const special = me.hand.find((c) => c.kind === "slave");
   if (rivalHandSize <= 1) return special;
   if (!citizens.length) return special;
   const pEmperor = 1 / Math.max(1, rivalHandSize);
-  let wCitizen = 1 + (1 - pEmperor) * 0.8 + citizens.length * 0.1;
-  let wSlave = 0.45 + pEmperor * 4.5 - (1 - pEmperor) * 3.6;
+  let wCitizen = 1.15 + (1 - pEmperor) * 1.2 + citizens.length * 0.1;
+  let wSlave = 0.4 + pEmperor * 5 - (1 - pEmperor) * 3.5;
   if (me.hand.length >= 4) {
-    wCitizen += 0.7;
-    wSlave -= 0.5;
+    wCitizen += 0.9;
+    wSlave -= 0.7;
   }
   if (rivalHandSize <= 2) {
-    wSlave += 2;
-    wCitizen -= 0.5;
+    wSlave += 2.2;
+    wCitizen -= 0.4;
   }
-  if (pressure.behind || pressure.matchPoint) wSlave += rivalHandSize >= 3 ? 0.8 : 1.3;
-  if (pressure.rivalMatchPoint) wSlave += 0.6;
+  if (pressure.behind || pressure.late) wSlave += 1;
   wCitizen *= 0.85 + Math.random() * 0.3;
   wSlave *= 0.85 + Math.random() * 0.3;
   return pickWeighted([
@@ -396,27 +425,29 @@ function aiEcard(state, cpuId) {
   }
   if (state.phase === "role") {
     if (state.roleChooserId !== cpuId) return { type: "role", role: "emperor" };
-    const ahead = (state.wins[cpuId] || 0) > (state.wins[rival?.id || ""] || 0);
-    const role = Math.random() < (ahead ? 0.58 : 0.42) ? "emperor" : "slave";
+    const role = Math.random() < 0.45 ? "emperor" : "slave";
     return { type: "role", role };
   }
   if (state.phase === "reveal") return { type: "next" };
   if (me.locked) return { type: "lock" };
   if (!me.selectedId) {
-    if (!rival || !me.role) {
-      return { type: "select", cardId: me.hand[0].id };
-    }
+    if (!rival || !me.role) return { type: "select", cardId: me.hand[0].id };
     const pressure = seriesPressure(state, me.id, rival.id);
-    const card = me.role === "emperor" ? aiPickEmperor(me, rival.hand.length, pressure, state.last) : aiPickSlave(me, rival.hand.length, pressure, state.last);
+    const card = me.role === "emperor" ? aiPickEmperor(me, rival.hand.length, pressure) : aiPickSlave(me, rival.hand.length, pressure);
     return { type: "select", cardId: card.id };
   }
   return { type: "lock" };
 }
 export {
+  EMPEROR_WIN_POINTS,
+  ROUNDS_PER_SET,
   RPS_REVEAL_MS,
+  SLAVE_WIN_POINTS,
+  TOTAL_ROUNDS,
   aiEcard,
   applyEcardAction,
   cardArt,
+  cardBack,
   cardLabel,
   clash,
   finishEcardRps,

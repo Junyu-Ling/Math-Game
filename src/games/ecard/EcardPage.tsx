@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   RPS_REVEAL_MS,
+  TOTAL_ROUNDS,
   aiEcard,
   applyEcardAction,
   cardArt,
+  cardBack,
   cardLabel,
   finishEcardRps,
   startEcardPractice,
@@ -37,10 +39,10 @@ function EFace({ kind, small }: { kind: EKind; small?: boolean }) {
   );
 }
 
-function Back() {
+function Back({ small }: { small?: boolean }) {
   return (
-    <div className="ecard-face back" aria-hidden>
-      <b>E</b>
+    <div className={`ecard-face back${small ? " mini" : ""}`} aria-hidden>
+      <img src={cardBack()} alt="" />
     </div>
   );
 }
@@ -247,7 +249,7 @@ export function EcardPage() {
               <GameSetup
                 kicker="E-CARD"
                 title="Emperor · Citizen · Slave"
-                blurb="Invite one friend for 1v1. Rock-paper-scissors — winner picks Emperor or Slave. First to 3 match wins."
+                blurb="Invite one friend for 1v1. RPS picks the opening side. 12 rounds · roles swap every 3 · Slave win pays 5×."
                 game="ecard"
                 onPractice={() => setLocal(startEcardPractice())}
               />
@@ -342,11 +344,15 @@ export function EcardPage() {
             <>
               <div className="ecard-meta">
                 <span>
-                  {me.name} · {(me.role || "?").toUpperCase()} · {state.wins[me.id] || 0}
+                  R{state.round}/{TOTAL_ROUNDS} · SET {state.set}/4
+                </span>
+                <span className="ecard-vs">·</span>
+                <span>
+                  {me.name} · {(me.role || "?").toUpperCase()} · {state.score[me.id] || 0}
                 </span>
                 <span className="ecard-vs">VS</span>
                 <span>
-                  {rival.name} · {(rival.role || "?").toUpperCase()} · {state.wins[rival.id] || 0}
+                  {rival.name} · {(rival.role || "?").toUpperCase()} · {state.score[rival.id] || 0}
                 </span>
               </div>
               <div className="ecard-rival-row">
@@ -354,7 +360,7 @@ export function EcardPage() {
                   state.phase === "reveal" || state.phase === "over" ? (
                     <EFace key={c.id} kind={c.kind} small />
                   ) : (
-                    <Back key={c.id} />
+                    <Back key={c.id} small />
                   ),
                 )}
               </div>
@@ -373,7 +379,9 @@ export function EcardPage() {
               </div>
               <p className="status-line">
                 {state.phase === "over"
-                  ? `${state.players.find((p) => p.id === state.winnerId)?.name || ""} wins`
+                  ? state.winnerId
+                    ? `${state.players.find((p) => p.id === state.winnerId)?.name || ""} wins ${state.score[me.id] || 0}–${state.score[rival.id] || 0}`
+                    : `Draw ${state.score[me.id] || 0}–${state.score[rival.id] || 0}`
                   : state.phase === "reveal"
                     ? state.log.at(-1)?.text || "Reveal"
                     : me.locked

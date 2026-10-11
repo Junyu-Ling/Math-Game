@@ -38,9 +38,9 @@ const RULES: Record<string, string[]> = {
     "Best five-card hand using hole cards and the board wins the pot.",
   ],
   ecard: [
-    "Invite-only 1v1. Rock-paper-scissors first — winner picks Emperor or Slave; loser takes the other side.",
-    "Emperor side: E + 4 Citizens. Slave side: S + 4 Citizens. E beats C, C beats S, S beats E. Citizens cancel each other.",
-    "Any decisive clash ends the match — including Emperor vs Citizen (Emperor wins that match). Match winner plays Emperor next. First to 3 match wins.",
+    "Invite-only 1v1. RPS winner picks the opening side. Full match: 12 rounds in 4 sets of 3; roles swap every 3 rounds.",
+    "Emperor: E + 4C. Slave: S + 4C. E beats C (Emperor returns, round continues). C beats S (Emperor side wins the round). S beats E (Slave side wins). C vs C cancel and stay out.",
+    "After a round, reclaim all cards. Slave-side round win scores 5× an Emperor-side round win. Highest score after 12 rounds wins.",
   ],
   gomoku: [
     "15×15 board. Players alternate placing stones. Black opens.",
