@@ -879,8 +879,7 @@
   margin-bottom: 16px;
 }
 
-.table-coda .coda-rps,
-.table-ecard .coda-rps {
+.table-coda .coda-rps {
   position: absolute;
   inset: auto 0;
   top: 50%;
@@ -888,21 +887,40 @@
   z-index: 8;
 }
 
-.table-coda > .coda-deal.coda-rps,
-.table-ecard > .coda-deal.coda-rps {
+.table-coda > .coda-deal.coda-rps {
   width: min(420px, 94%);
   padding: 12px 16px 14px;
   background: rgba(255, 255, 255, 0.97);
 }
 
-.table-coda .coda-rps > p,
-.table-ecard .coda-rps > p {
+.table-coda .coda-rps > p {
   margin: 0 0 10px;
 }
 
 .table-ecard:has(> .coda-rps),
 .table-ecard:has(> .ecard-role-pick) {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-ecard > .coda-deal.coda-rps {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  width: min(420px, 94%);
+  margin: 0 auto;
+  padding: 12px 16px 14px;
+  background: rgba(255, 255, 255, 0.97);
+  text-align: center;
+  z-index: 8;
+}
+
+.table-ecard .coda-rps > p {
+  margin: 0 0 10px;
+  text-align: center;
 }
 
 .table-coda .coda-burst {
