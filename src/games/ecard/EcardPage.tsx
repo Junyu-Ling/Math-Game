@@ -11,6 +11,7 @@ import {
   type EState,
 } from "./engine";
 import { GameSetup } from "../../components/GameSetup";
+import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
 import { useAuth } from "../../context/AuthContext";
@@ -113,13 +114,16 @@ export function EcardPage() {
       <div className="game-layout">
         <div className="table table-ecard">
           {!state || !me || !rival ? (
-            <GameSetup
-              kicker="E-CARD"
-              title="Emperor · Citizen · Slave"
-              blurb="Kaiji’s psychological duel. Slave beats Emperor. First to 3 match wins. Roles swap every 3 matches."
-              game="ecard"
-              onPractice={() => setLocal(startEcardPractice())}
-            />
+            <>
+              <LobbyDecor game="ecard" />
+              <GameSetup
+                kicker="E-CARD"
+                title="Emperor · Citizen · Slave"
+                blurb="Kaiji’s psychological duel. Slave beats Emperor. First to 3 match wins. Roles swap every 3 matches."
+                game="ecard"
+                onPractice={() => setLocal(startEcardPractice())}
+              />
+            </>
           ) : (
             <>
               <div className="ecard-meta">

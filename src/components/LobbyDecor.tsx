@@ -4,7 +4,7 @@ import type { FlipCard } from "../games/flip7/engine";
 import type { UnoCard } from "../games/uno/engine";
 import type { PokerCard } from "../lib/poker";
 
-export type LobbyGame = "coda" | "flip7" | "uno" | "bj" | "holdem" | "m24" | "halli";
+export type LobbyGame = "coda" | "flip7" | "uno" | "bj" | "holdem" | "m24" | "halli" | "ecard";
 
 const poker = (id: string, suit: PokerCard["suit"], rank: PokerCard["rank"]): PokerCard => ({ id, suit, rank });
 
@@ -74,6 +74,22 @@ export function LobbyDecor({ game }: { game: LobbyGame }) {
           <span className="decor-card b"><PokerFace card={poker("m3", "H", "3")} /></span>
           <span className="decor-card c"><PokerFace card={poker("m3d", "D", "3")} /></span>
           <span className="decor-card d"><PokerFace card={poker("m4", "C", "4")} /></span>
+        </>
+      ) : null}
+      {game === "ecard" ? (
+        <>
+          <span className="decor-card a">
+            <span className="ecard-face"><img src="/ecard-emperor.png" alt="" /></span>
+          </span>
+          <span className="decor-card b">
+            <span className="ecard-face"><img src="/ecard-citizen.png" alt="" /></span>
+          </span>
+          <span className="decor-card c">
+            <span className="ecard-face"><img src="/ecard-slave.png" alt="" /></span>
+          </span>
+          <span className="decor-card d">
+            <span className="ecard-face"><img src="/ecard-citizen.png" alt="" /></span>
+          </span>
         </>
       ) : null}
     </div>

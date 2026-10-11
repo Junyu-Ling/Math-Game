@@ -1,4 +1,4 @@
-/* âââ Da Vinci standing / knocked-down cards âââ */
+/* Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Da Vinci standing / knocked-down cards Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ */
 .mj {
   --w: 70px;
   --h: 104px;
@@ -314,7 +314,7 @@
   80% { transform: rotateX(-16deg) rotateY(-26deg) translateX(4px); }
 }
 
-/* âââ Playing cards âââ */
+/* Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Playing cards Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ */
 .pcards {
   display: flex;
   gap: 10px;
@@ -698,6 +698,13 @@
   --h: 96px;
   margin: 0;
   cursor: default;
+}
+
+.lobby-decor .ecard-face {
+  width: var(--cw);
+  height: var(--ch);
+  border-radius: 8px;
+  box-shadow: none;
 }
 
 .table:has(> .lobby-decor) > .coda-deal {
@@ -2335,7 +2342,7 @@
   .coda-num { font-size: 26px; }
 }
 
-/* Flip 7 â cream cards with colored wreath ovals */
+/* Flip 7 Ã¢ÂÂ cream cards with colored wreath ovals */
 .flip7-card {
   --cw: 74px;
   --ch: 112px;
@@ -2459,7 +2466,7 @@
   line-height: 1;
 }
 
-/* UNO â oval number + corner indices */
+/* UNO Ã¢ÂÂ oval number + corner indices */
 .uno-card {
   --cw: 70px;
   --ch: 106px;
@@ -2736,7 +2743,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 .preview-row .uno-n { font-size: 18px; }
 .preview-row .uno-corner { font-size: 8px; }
 
-/* ââ Halli Galli ââ */
+/* Ã¢ÂÂÃ¢ÂÂ Halli Galli Ã¢ÂÂÃ¢ÂÂ */
 .table-hg .center-well {
   display: flex;
   flex-direction: column;
@@ -2925,7 +2932,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   font-size: 18px;
 }
 
-/* ——— E-Card / Gomoku (match site tables) ——— */
+/* âââ E-Card / Gomoku (match site tables) âââ */
 .table-ecard,
 .table-gomoku {
   display: flex;
