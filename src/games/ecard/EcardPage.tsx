@@ -174,7 +174,7 @@ export function EcardPage() {
                     key={c.id}
                     type="button"
                     className={`ecard-pick${me.selectedId === c.id ? " on" : ""}`}
-                    disabled={state.phase !== "pick" || Boolean(me.selectedId && me.selectedId !== c.id)}
+                    disabled={state.phase !== "pick"}
                     onClick={() => playCard(c)}
                   >
                     <EFace kind={c.kind} />
