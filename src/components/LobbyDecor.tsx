@@ -78,18 +78,10 @@ export function LobbyDecor({ game }: { game: LobbyGame }) {
       ) : null}
       {game === "ecard" ? (
         <>
-          <span className="decor-card a">
-            <span className="ecard-face"><img src="/ecard-emperor.png" alt="" /></span>
-          </span>
-          <span className="decor-card b">
-            <span className="ecard-face"><img src="/ecard-citizen.png" alt="" /></span>
-          </span>
-          <span className="decor-card c">
-            <span className="ecard-face"><img src="/ecard-slave.png" alt="" /></span>
-          </span>
-          <span className="decor-card d">
-            <span className="ecard-face"><img src="/ecard-citizen.png" alt="" /></span>
-          </span>
+          <span className="decor-card a"><img className="ecard-decor" src="/ecard-emperor.png" alt="" /></span>
+          <span className="decor-card b"><img className="ecard-decor" src="/ecard-citizen.png" alt="" /></span>
+          <span className="decor-card c"><img className="ecard-decor" src="/ecard-slave.png" alt="" /></span>
+          <span className="decor-card d"><img className="ecard-decor" src="/ecard-citizen.png" alt="" /></span>
         </>
       ) : null}
     </div>

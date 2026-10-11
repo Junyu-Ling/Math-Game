@@ -1,4 +1,4 @@
-/* ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Da Vinci standing / knocked-down cards ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ */
+/* ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Da Vinci standing / knocked-down cards ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ */
 .mj {
   --w: 70px;
   --h: 104px;
@@ -314,7 +314,7 @@
   80% { transform: rotateX(-16deg) rotateY(-26deg) translateX(4px); }
 }
 
-/* ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Playing cards ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ */
+/* ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Playing cards ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ */
 .pcards {
   display: flex;
   gap: 10px;
@@ -700,11 +700,16 @@
   cursor: default;
 }
 
-.lobby-decor .ecard-face {
-  width: 64px;
-  height: 94px;
-  border-radius: 6px;
-  box-shadow: none;
+/* Same box as .uno-card in lobby (70×106, radius 9) */
+.lobby-decor .ecard-decor {
+  --cw: 70px;
+  --ch: 106px;
+  width: var(--cw);
+  height: var(--ch);
+  object-fit: cover;
+  border-radius: 9px;
+  display: block;
+  border: 0;
 }
 
 .table:has(> .lobby-decor) > .coda-deal {
@@ -2342,7 +2347,7 @@
   .coda-num { font-size: 26px; }
 }
 
-/* Flip 7 ÃÂ¢ÃÂÃÂ cream cards with colored wreath ovals */
+/* Flip 7 ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ cream cards with colored wreath ovals */
 .flip7-card {
   --cw: 74px;
   --ch: 112px;
@@ -2466,7 +2471,7 @@
   line-height: 1;
 }
 
-/* UNO ÃÂ¢ÃÂÃÂ oval number + corner indices */
+/* UNO ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ oval number + corner indices */
 .uno-card {
   --cw: 70px;
   --ch: 106px;
@@ -2743,7 +2748,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 .preview-row .uno-n { font-size: 18px; }
 .preview-row .uno-corner { font-size: 8px; }
 
-/* ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Halli Galli ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ */
+/* ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Halli Galli ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ */
 .table-hg .center-well {
   display: flex;
   flex-direction: column;
@@ -2932,7 +2937,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   font-size: 18px;
 }
 
-/* Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ E-Card / Gomoku (match site tables) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ */
+/* ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ E-Card / Gomoku (match site tables) ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ */
 .table-ecard,
 .table-gomoku {
   display: flex;
@@ -2945,16 +2950,6 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   padding: clamp(20px, 2.4vw, 30px);
   color: var(--ink);
 }
-
-.table-ecard:has(> .lobby-decor) {
-  --cw: 64px;
-  --ch: 94px;
-}
-
-.table-ecard .lobby-decor .decor-card.a { top: 8%; left: 5%; }
-.table-ecard .lobby-decor .decor-card.b { top: 10%; right: 5%; }
-.table-ecard .lobby-decor .decor-card.c { bottom: 10%; left: 6%; }
-.table-ecard .lobby-decor .decor-card.d { bottom: 12%; right: 5%; }
 
 .ecard-meta {
   display: flex;
@@ -3003,23 +2998,9 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   position: relative;
 }
 
-.lobby-decor .ecard-face,
-.lobby-decor .decor-card .ecard-face {
-  width: 64px;
-  height: 94px;
-  border-radius: 6px;
-  box-shadow: none;
-}
-
 .ecard-face.mini {
   width: 72px;
   height: 104px;
-}
-
-.table-ecard .ecard-rival-row .ecard-face.mini,
-.table-ecard .ecard-rival-row .ecard-face.back {
-  width: 56px;
-  height: 82px;
 }
 
 .ecard-face img {
