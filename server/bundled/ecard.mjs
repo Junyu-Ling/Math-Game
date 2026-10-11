@@ -65,8 +65,8 @@ function cardBack() {
 }
 function clash(a, b) {
   if (a === "citizen" && b === "citizen") return { result: "draw", roundEnd: false };
-  if (a === "emperor" && b === "citizen") return { result: "a", roundEnd: false };
-  if (a === "citizen" && b === "emperor") return { result: "b", roundEnd: false };
+  if (a === "emperor" && b === "citizen") return { result: "a", roundEnd: true };
+  if (a === "citizen" && b === "emperor") return { result: "b", roundEnd: true };
   if (a === "citizen" && b === "slave") return { result: "a", roundEnd: true };
   if (a === "slave" && b === "citizen") return { result: "b", roundEnd: true };
   if (a === "slave" && b === "emperor") return { result: "a", roundEnd: true };
@@ -231,11 +231,7 @@ function reveal(state) {
   ];
   const players = state.players.map((p) => {
     const mine = p.id === a.id ? ca : cb;
-    let hand = p.hand.filter((c) => c.id !== mine.id);
-    const myResult = result === "draw" ? "draw" : result === "a" && p.id === a.id || result === "b" && p.id === b.id ? "win" : "lose";
-    if (!roundEnd && myResult === "win") {
-      hand = [...hand, mine];
-    }
+    const hand = p.hand.filter((c) => c.id !== mine.id);
     return { ...p, hand, selectedId: null, locked: false };
   });
   let score = { ...state.score };
@@ -243,9 +239,6 @@ function reveal(state) {
   let winningRole = null;
   if (result === "draw") {
     log = [...log, { id: uid("l"), text: "Citizens cancel. Both leave the hand \u2014 keep playing." }];
-  } else if (!roundEnd) {
-    const winner = result === "a" ? a : b;
-    log = [...log, { id: uid("l"), text: `${winner.name}'s Emperor beats Citizen \u2014 Emperor returns. Round continues.` }];
   } else {
     const winner = result === "a" ? a : b;
     const winCard = result === "a" ? ca.kind : cb.kind;
@@ -371,18 +364,18 @@ function aiPickEmperor(me, rivalHandSize, pressure) {
   if (rivalHandSize <= 1 && citizens[0]) return citizens[0];
   if (!citizens.length) return special;
   const pSlave = 1 / Math.max(1, rivalHandSize);
-  let wCitizen = 1.2 + pSlave * 3.5 + citizens.length * 0.12;
-  let wEmperor = 0.55 + (1 - pSlave) * 1.6 - pSlave * 5.5;
+  let wCitizen = 1.1 + pSlave * 3.2 + citizens.length * 0.1;
+  let wEmperor = 0.9 + (1 - pSlave) * 2.2 - pSlave * 6;
   if (me.hand.length >= 4) {
-    wCitizen += 0.8;
-    wEmperor -= 0.4;
+    wCitizen += 0.5;
+    wEmperor -= 0.2;
   }
   if (rivalHandSize <= 2) {
-    wEmperor -= 1.8;
-    wCitizen += 1.2;
+    wEmperor -= 2;
+    wCitizen += 1.4;
   }
-  if (pressure.behind) wCitizen += 0.5;
-  if (pressure.late) wEmperor -= 0.4;
+  if (pressure.behind) wEmperor += 0.35;
+  if (pressure.late) wEmperor -= 0.25;
   wCitizen *= 0.85 + Math.random() * 0.3;
   wEmperor *= 0.85 + Math.random() * 0.3;
   return pickWeighted([

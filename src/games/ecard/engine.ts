@@ -119,17 +119,16 @@ export function cardBack() {
 }
 
 /**
- * Clash resolution (original hierarchy).
- * Round ends only when Emperor or Slave is defeated:
- *   E vs C → Emperor wins clash, Emperor returns, Citizen out (round continues)
+ * Clash resolution:
+ *   E vs C → Emperor side wins the round (Emperor did not hit Slave)
  *   C vs S → Emperor side wins the round
  *   S vs E → Slave side wins the round
  *   C vs C → both out, continue
  */
 export function clash(a: EKind, b: EKind): { result: "a" | "b" | "draw"; roundEnd: boolean } {
   if (a === "citizen" && b === "citizen") return { result: "draw", roundEnd: false };
-  if (a === "emperor" && b === "citizen") return { result: "a", roundEnd: false };
-  if (a === "citizen" && b === "emperor") return { result: "b", roundEnd: false };
+  if (a === "emperor" && b === "citizen") return { result: "a", roundEnd: true };
+  if (a === "citizen" && b === "emperor") return { result: "b", roundEnd: true };
   if (a === "citizen" && b === "slave") return { result: "a", roundEnd: true };
   if (a === "slave" && b === "citizen") return { result: "b", roundEnd: true };
   if (a === "slave" && b === "emperor") return { result: "a", roundEnd: true };
@@ -322,13 +321,7 @@ function reveal(state: EState): EState {
 
   const players = state.players.map((p) => {
     const mine = p.id === a.id ? ca : cb;
-    let hand = p.hand.filter((c) => c.id !== mine.id);
-    const myResult =
-      result === "draw" ? "draw" : (result === "a" && p.id === a.id) || (result === "b" && p.id === b.id) ? "win" : "lose";
-    // Soft win (Emperor vs Citizen): Emperor returns; Citizen stays out.
-    if (!roundEnd && myResult === "win") {
-      hand = [...hand, mine];
-    }
+    const hand = p.hand.filter((c) => c.id !== mine.id);
     return { ...p, hand, selectedId: null, locked: false };
   });
 
@@ -338,16 +331,11 @@ function reveal(state: EState): EState {
 
   if (result === "draw") {
     log = [...log, { id: uid("l"), text: "Citizens cancel. Both leave the hand — keep playing." }];
-  } else if (!roundEnd) {
-    const winner = result === "a" ? a : b;
-    log = [...log, { id: uid("l"), text: `${winner.name}'s Emperor beats Citizen — Emperor returns. Round continues.` }];
   } else {
     const winner = result === "a" ? a : b;
     const winCard = result === "a" ? ca.kind : cb.kind;
-    // Round winner is by role: Citizen beating Slave = Emperor side; Slave beating Emperor = Slave side.
+    // Slave card win → Slave side; Emperor or Citizen win → Emperor side.
     winningRole = winCard === "slave" ? "slave" : "emperor";
-    // If emperor side won via Citizen, winner.role is emperor; if via... Citizen is emperor side.
-    // If slave won via Slave card, winner.role is slave.
     roundWinnerId = winner.id;
     const payout = winningRole === "slave" ? SLAVE_WIN_POINTS : EMPEROR_WIN_POINTS;
     score[roundWinnerId] = (score[roundWinnerId] || 0) + payout;
@@ -405,7 +393,7 @@ function finishMatch(state: EState): EState {
 function continueAfterReveal(state: EState): EState {
   if (state.phase === "over") return state;
 
-  // Soft clash / citizen cancel — keep hands, stay in this round.
+  // Citizen cancel — keep hands, stay in this round.
   if (state.last?.result !== "round") {
     return { ...state, phase: "pick", last: null };
   }
@@ -488,20 +476,20 @@ function aiPickEmperor(me: EPlayer, rivalHandSize: number, pressure: ReturnType<
   if (!citizens.length) return special;
 
   const pSlave = 1 / Math.max(1, rivalHandSize);
-  // E vs C continues (soft); C vs S wins round (+1); E vs S loses round (rival +5).
-  let wCitizen = 1.2 + pSlave * 3.5 + citizens.length * 0.12;
-  let wEmperor = 0.55 + (1 - pSlave) * 1.6 - pSlave * 5.5;
+  // E vs C wins round (+1); C vs S wins round (+1); E vs S loses round (rival +5).
+  let wCitizen = 1.1 + pSlave * 3.2 + citizens.length * 0.1;
+  let wEmperor = 0.9 + (1 - pSlave) * 2.2 - pSlave * 6.0;
 
   if (me.hand.length >= 4) {
-    wCitizen += 0.8;
-    wEmperor -= 0.4;
+    wCitizen += 0.5;
+    wEmperor -= 0.2;
   }
   if (rivalHandSize <= 2) {
-    wEmperor -= 1.8;
-    wCitizen += 1.2;
+    wEmperor -= 2.0;
+    wCitizen += 1.4;
   }
-  if (pressure.behind) wCitizen += 0.5;
-  if (pressure.late) wEmperor -= 0.4;
+  if (pressure.behind) wEmperor += 0.35;
+  if (pressure.late) wEmperor -= 0.25;
 
   wCitizen *= 0.85 + Math.random() * 0.3;
   wEmperor *= 0.85 + Math.random() * 0.3;

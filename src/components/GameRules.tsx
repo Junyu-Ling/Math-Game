@@ -39,7 +39,7 @@ const RULES: Record<string, string[]> = {
   ],
   ecard: [
     "Invite-only 1v1. RPS winner picks the opening side. Full match: 12 rounds in 4 sets of 3; roles swap every 3 rounds.",
-    "Emperor: E + 4C. Slave: S + 4C. E beats C (Emperor returns, round continues). C beats S (Emperor side wins the round). S beats E (Slave side wins). C vs C cancel and stay out.",
+    "Emperor: E + 4C. Slave: S + 4C. E beats C (Emperor side wins the round). C beats S (Emperor side wins the round). S beats E (Slave side wins). C vs C cancel and stay out.",
     "After a round, reclaim all cards. Slave-side round win scores 5× an Emperor-side round win. Highest score after 12 rounds wins.",
   ],
   gomoku: [
