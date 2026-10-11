@@ -36,6 +36,10 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       {game === "uno" ? <p>UNO is 2–4. Open a table, add CPUs or invite, then the host starts at 2+.</p> : null}
       {game === "flip7" ? <p>Flip 7 has no fixed seat count. Add CPUs or invite, then start with 2+.</p> : null}
       {game === "halli" ? <p>Halli Galli is 2–4. Open a table, add CPUs or invite, then start. Ring on five.</p> : null}
+      {game === "ecard" ? <p>E-Card is invite-only heads-up. Practice vs CPU, or invite someone online.</p> : null}
+      {["gomoku", "ludo", "animal", "army"].includes(game) ? (
+        <p>Invite-only duel. Practice vs CPU, or challenge someone online.</p>
+      ) : null}
       {tableWait ? <p>Seated {seated.size}{max < 16 ? `/${max}` : ""}.</p> : null}
       {online.length === 0 ? (
         <p>No other accounts yet. Anyone who registers or logs in will appear here, even when they are offline.</p>

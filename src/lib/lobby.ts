@@ -53,6 +53,11 @@ export const GAME_LABEL: Record<string, string> = {
   holdem: "Hold’em",
   uno: "UNO",
   halli: "Halli Galli",
+  ecard: "E-Card",
+  gomoku: "Gomoku",
+  ludo: "Flying Chess",
+  animal: "Animal Chess",
+  army: "Army Chess",
 };
 
 /** Soft seat cap for open tables. Flip 7 is effectively unlimited. */
@@ -116,4 +121,9 @@ export const GAME_PATH: Record<string, string> = {
   holdem: "/play/holdem",
   uno: "/play/uno",
   halli: "/play/halli",
+  ecard: "/play/ecard",
+  gomoku: "/play/gomoku",
+  ludo: "/play/ludo",
+  animal: "/play/animal",
+  army: "/play/army",
 };

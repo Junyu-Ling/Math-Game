@@ -2918,3 +2918,289 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 .lobby-decor .hg-fruit {
   font-size: 18px;
 }
+
+/* ！！！ E-Card / Kaiji table ！！！ */
+.table-ecard,
+.table-gomoku,
+.table-ludo,
+.table-animal,
+.table-army {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 20%, rgba(80, 60, 40, 0.35), transparent 55%),
+    linear-gradient(165deg, #1a1510 0%, #0a0908 48%, #12100e 100%);
+  border: 1px solid #c9a227;
+  box-shadow: inset 0 0 0 3px #0a0908, inset 0 0 0 4px #8a7020, 0 18px 40px rgba(0, 0, 0, 0.35);
+  color: #e8dcc8;
+}
+
+.table-ecard .status-line,
+.table-gomoku .status-line,
+.table-ludo .status-line,
+.table-animal .status-line,
+.table-army .status-line {
+  color: #d4c4a8;
+}
+
+.ecard-page .kicker { color: #c9a227; letter-spacing: 0.22em; }
+
+.ecard-meta {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: 0.12em;
+  font-size: 13px;
+  color: #c9a227;
+  text-transform: uppercase;
+}
+
+.ecard-vs {
+  color: #8a7020;
+  font-weight: 700;
+}
+
+.ecard-rival-row,
+.ecard-hand {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 120px;
+  align-items: center;
+}
+
+.ecard-stage {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  align-items: center;
+  min-height: 200px;
+  padding: 12px 0;
+}
+
+.ecard-face {
+  width: 118px;
+  height: 170px;
+  border: 2px solid #c9a227;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #111;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+  position: relative;
+}
+
+.ecard-face.mini {
+  width: 72px;
+  height: 104px;
+}
+
+.ecard-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ecard-face.back {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 40%, #3a2a18, #0e0c0a 70%),
+    repeating-linear-gradient(45deg, #1a140e 0 6px, #12100c 6px 12px);
+}
+
+.ecard-face.back b {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 42px;
+  color: #c9a227;
+  text-shadow: 0 2px 0 #000;
+}
+
+.ecard-slot {
+  width: 118px;
+  height: 170px;
+  border: 1px dashed #8a7020;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  color: #8a7020;
+  letter-spacing: 0.2em;
+  font-size: 12px;
+}
+
+.ecard-pick {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  transition: transform 0.14s ease;
+}
+
+.ecard-pick:not(:disabled):hover { transform: translateY(-8px); }
+.ecard-pick.on { transform: translateY(-12px); }
+.ecard-pick.on .ecard-face {
+  box-shadow: 0 0 0 2px #f0d878, 0 14px 28px rgba(0, 0, 0, 0.5);
+}
+.ecard-pick:disabled { opacity: 0.55; }
+
+.preview-ecard {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.preview-ecard img {
+  width: 48px;
+  height: 70px;
+  object-fit: cover;
+  border: 1px solid #c9a227;
+  border-radius: 2px;
+}
+
+/* board games shared */
+.kaiji-board-wrap {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  padding: 8px 0 16px;
+}
+
+.gomoku-board {
+  display: grid;
+  grid-template-columns: repeat(15, 28px);
+  grid-template-rows: repeat(15, 28px);
+  gap: 0;
+  background: #c4a574;
+  border: 2px solid #c9a227;
+  box-shadow: inset 0 0 0 1px #8a7020;
+  padding: 10px;
+}
+
+.gomoku-cell {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  position: relative;
+  padding: 0;
+  border-radius: 0;
+}
+
+.gomoku-cell::before {
+  content: "";
+  position: absolute;
+  inset: 13px 0 auto 0;
+  height: 1px;
+  background: #5a4030;
+}
+
+.gomoku-cell::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 13px;
+  width: 1px;
+  background: #5a4030;
+}
+
+.gomoku-stone {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  z-index: 1;
+}
+
+.gomoku-stone.black {
+  background: radial-gradient(circle at 35% 30%, #555, #0a0a0a 70%);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+.gomoku-stone.white {
+  background: radial-gradient(circle at 35% 30%, #fff, #c8c0b0 75%);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.35);
+}
+
+.ludo-track {
+  display: grid;
+  grid-template-columns: repeat(11, 36px);
+  grid-template-rows: repeat(11, 36px);
+  gap: 2px;
+  border: 2px solid #c9a227;
+  padding: 8px;
+  background: #15120e;
+}
+
+.ludo-cell {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #3a3228;
+  background: #221c16;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: #8a7020;
+  padding: 0;
+  border-radius: 2px;
+}
+
+.ludo-cell.path { background: #2a241c; }
+.ludo-cell.base-a { background: #3a2218; }
+.ludo-cell.base-b { background: #1a2a28; }
+.ludo-cell.home { background: #2a2818; border-color: #c9a227; }
+.ludo-piece {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid #c9a227;
+}
+.ludo-piece.a { background: #8b3a2a; }
+.ludo-piece.b { background: #2a6b5a; }
+
+.animal-board,
+.army-board {
+  display: grid;
+  gap: 3px;
+  border: 2px solid #c9a227;
+  padding: 8px;
+  background: #15120e;
+}
+
+.animal-board { grid-template-columns: repeat(7, 48px); }
+.army-board { grid-template-columns: repeat(5, 56px); }
+
+.piece-cell {
+  width: 48px;
+  height: 48px;
+  border: 1px solid #3a3228;
+  background: #221c16;
+  color: #e8dcc8;
+  font-size: 11px;
+  font-family: Georgia, "Times New Roman", serif;
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border-radius: 2px;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.army-board .piece-cell { width: 56px; height: 56px; font-size: 12px; }
+.piece-cell.river { background: #1a2830; color: #6a8a9a; }
+.piece-cell.trap { background: #3a2818; }
+.piece-cell.den { background: #2a2810; border-color: #c9a227; }
+.piece-cell.sel { box-shadow: inset 0 0 0 2px #f0d878; }
+.piece-cell.can { box-shadow: inset 0 0 0 2px #6a9a6a; }
+.piece-cell .side-a { color: #e8a090; }
+.piece-cell .side-b { color: #90c8b8; }
+.dice-pill {
+  min-width: 52px;
+  height: 52px;
+  border: 2px solid #c9a227;
+  background: #1a1510;
+  color: #f0d878;
+  font-size: 24px;
+  font-family: Georgia, serif;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+}

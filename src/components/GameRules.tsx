@@ -37,6 +37,27 @@ const RULES: Record<string, string[]> = {
     "Heads-up Texas Hold’em. Blinds, then flop / turn / river, then showdown.",
     "Best five-card hand using hole cards and the board wins the pot.",
   ],
+  ecard: [
+    "Heads-up Kaiji E-Card. Emperor side: E + 4 Citizens. Slave side: S + 4 Citizens.",
+    "E beats C. C beats S. S beats E. Citizen vs Citizen cancels — both discarded.",
+    "A match ends when Emperor or Slave loses a clash. First to 3 match wins. Roles swap every 3 matches.",
+  ],
+  gomoku: [
+    "15×15 board. Players alternate placing stones. Black opens.",
+    "First to form five consecutive stones in a line (row, column, or diagonal) wins.",
+  ],
+  ludo: [
+    "Two-player flying chess. Each has four pieces. Roll a die to move.",
+    "Need a 6 to leave base. Exact count to enter home. First to park all four wins. Rolling 6 grants another roll.",
+  ],
+  animal: [
+    "Dou Shou Qi on a 7×9 board with rivers, traps, and dens.",
+    "Higher rank captures lower. Rat beats Elephant; Elephant cannot eat Rat. Lions/Tigers jump rivers. Enter the rival den to win.",
+  ],
+  army: [
+    "Simplified open 军棋. Higher rank wins clashes; equal ranks both fall.",
+    "Bomb trades with anything. Only Engineer clears mines. Capture the rival 军旗 to win.",
+  ],
 };
 
 export function GameRules({ game }: { game: string }) {

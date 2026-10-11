@@ -806,6 +806,16 @@ function startRoom(invite, from, to, mods) {
     state = mods.halli.startHalliLobby([a, b]);
   } else if (invite.game === "holdem") {
     state = mods.holdem.startHoldemDuel(a, b);
+  } else if (invite.game === "ecard") {
+    state = mods.ecard.startEcardDuel(a, b);
+  } else if (invite.game === "gomoku") {
+    state = mods.gomoku.startGomokuDuel(a, b);
+  } else if (invite.game === "ludo") {
+    state = mods.ludo.startLudoDuel(a, b);
+  } else if (invite.game === "animal") {
+    state = mods.animal.startAnimalDuel(a, b);
+  } else if (invite.game === "army") {
+    state = mods.army.startArmyDuel(a, b);
   } else {
     throw new Error("Unknown game");
   }
@@ -1048,6 +1058,16 @@ export async function applyRoomAction(user, roomId, action, mods) {
     room.state = mods.halli.applyHalliAction(room.state, user.id, action);
   } else if (room.game === "holdem") {
     room.state = mods.holdem.applyHoldemAction(room.state, user.id, action);
+  } else if (room.game === "ecard") {
+    room.state = mods.ecard.applyEcardAction(room.state, user.id, action);
+  } else if (room.game === "gomoku") {
+    room.state = mods.gomoku.applyGomokuAction(room.state, user.id, action);
+  } else if (room.game === "ludo") {
+    room.state = mods.ludo.applyLudoAction(room.state, user.id, action);
+  } else if (room.game === "animal") {
+    room.state = mods.animal.applyAnimalAction(room.state, user.id, action);
+  } else if (room.game === "army") {
+    room.state = mods.army.applyArmyAction(room.state, user.id, action);
   }
   armCpuThink(room);
   room.seq = (room.seq || 0) + 1;
@@ -1095,6 +1115,11 @@ function publicRoom(room, viewerId) {
     if (room.game === "flip7") view = mods.flip.viewFlip7(room.state, viewerId);
     if (room.game === "halli") view = mods.halli.viewHalli(room.state, viewerId);
     if (room.game === "holdem") view = mods.holdem.viewHoldem(room.state, viewerId);
+    if (room.game === "ecard") view = mods.ecard.viewEcard(room.state, viewerId);
+    if (room.game === "gomoku") view = mods.gomoku.viewGomoku(room.state, viewerId);
+    if (room.game === "ludo") view = mods.ludo.viewLudo(room.state, viewerId);
+    if (room.game === "animal") view = mods.animal.viewAnimal(room.state, viewerId);
+    if (room.game === "army") view = mods.army.viewArmy(room.state, viewerId);
   }
   return {
     id: room.id,

@@ -11,6 +11,27 @@ function shuffle(items) {
   }
   return next;
 }
+function uid(prefix = "id") {
+  return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// src/lib/poker.ts
+var RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+var SUITS = ["S", "H", "D", "C"];
+function rankValue(rank) {
+  if (rank === "A") return 1;
+  if (rank === "J") return 11;
+  if (rank === "Q") return 12;
+  if (rank === "K") return 13;
+  if (rank === "BJ") return 14;
+  if (rank === "RJ") return 15;
+  return Number(rank);
+}
+function makeDeck() {
+  const cards = [];
+  for (const suit of SUITS) for (const rank of RANKS) cards.push({ id: uid("pk"), suit, rank });
+  return shuffle(cards);
+}
 
 // src/games/math24/engine.ts
 var OPS = [
@@ -50,13 +71,15 @@ function solve24(nums) {
   };
   return search(nums.map((n) => ({ n, e: String(n) })));
 }
-function newPuzzle(max = 10) {
-  for (let i = 0; i < 400; i++) {
-    const nums = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * max));
+function newPuzzle(_max = 13) {
+  for (let i = 0; i < 500; i++) {
+    const cards2 = makeDeck().slice(0, 4);
+    const nums = cards2.map((c) => rankValue(c.rank));
     const solution = solve24(nums);
-    if (solution) return { nums, solution };
+    if (solution) return { nums, cards: cards2, solution };
   }
-  return { nums: [1, 3, 4, 6], solution: "(6/(1-(3/4)))" };
+  const cards = makeDeck().slice(0, 4);
+  return { nums: [1, 3, 4, 6], cards, solution: "(6/(1-(3/4)))" };
 }
 function randomUnsolved(max = 10) {
   return Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * max));
@@ -83,7 +106,7 @@ function tokenize(src) {
       out.push(n);
       continue;
     }
-    throw new Error(`\u65E0\u6CD5\u8BC6\u522B\u7684\u7B26\u53F7\uFF1A${ch}`);
+    throw new Error(`Unknown symbol: ${ch}`);
   }
   return out;
 }
@@ -92,7 +115,7 @@ function parseExpr(tokens) {
   const peek = () => tokens[i];
   const eat = (t) => {
     const v = tokens[i];
-    if (t && v !== t) throw new Error("\u8868\u8FBE\u5F0F\u4E0D\u5408\u6CD5");
+    if (t && v !== t) throw new Error("Invalid expression");
     i += 1;
     return v;
   };
@@ -110,7 +133,7 @@ function parseExpr(tokens) {
       used.push(Number(t));
       return Number(t);
     }
-    throw new Error("\u8868\u8FBE\u5F0F\u4E0D\u5408\u6CD5");
+    throw new Error("Invalid expression");
   };
   const parseMul = () => {
     let v = parsePrimary();
@@ -131,7 +154,7 @@ function parseExpr(tokens) {
     return v;
   };
   const value = parseAdd();
-  if (i !== tokens.length) throw new Error("\u8868\u8FBE\u5F0F\u4E0D\u5B8C\u6574");
+  if (i !== tokens.length) throw new Error("Incomplete expression");
   return { value, used };
 }
 function checkSolution(nums, expr) {
@@ -140,14 +163,14 @@ function checkSolution(nums, expr) {
     const a = [...used].sort((x, y) => x - y);
     const b = [...nums].sort((x, y) => x - y);
     if (a.length !== b.length || a.some((n, i) => n !== b[i])) {
-      return { ok: false, error: "\u5FC5\u987B\u7528\u5B8C\u8FD9\u56DB\u5F20\u724C\uFF0C\u4E14\u6BCF\u5F20\u53EA\u7528\u4E00\u6B21\u3002" };
+      return { ok: false, error: "Use all four cards, each once." };
     }
     if (!Number.isFinite(value) || Math.abs(value - 24) > 1e-6) {
-      return { ok: false, value, error: `\u7ED3\u679C\u662F ${Number(value.toFixed(4))}\uFF0C\u4E0D\u662F 24\u3002` };
+      return { ok: false, value, error: `Got ${Number(value.toFixed(4))}, not 24.` };
     }
     return { ok: true, value: 24 };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "\u65E0\u6CD5\u8BA1\u7B97" };
+    return { ok: false, error: e instanceof Error ? e.message : "Cannot evaluate" };
   }
 }
 function shuffleDeck() {
@@ -156,7 +179,7 @@ function shuffleDeck() {
 }
 function startM24Practice() {
   const state = startM24Duel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU" });
-  return { ...state, message: "\u7EC3\u4E60\u4EBA\u673A\u3002CPU \u7EA6 8 \u79D2\u540E\u4F1A\u4EA4\u5377\uFF0C\u62A2\u5148\u51D1\u51FA 24\u3002" };
+  return { ...state, message: "Practice vs CPU. The CPU submits in about 8 seconds. Make 24 first." };
 }
 function startM24Duel(a, b) {
   const puzzle = newPuzzle();
@@ -164,13 +187,14 @@ function startM24Duel(a, b) {
     mode: "duel",
     players: [a, b],
     nums: puzzle.nums,
+    cards: puzzle.cards,
     solution: puzzle.solution,
     scores: { [a.id]: 0, [b.id]: 0 },
     phase: "play",
     round: 1,
     goal: 3,
     winnerId: null,
-    message: "\u540C\u4E00\u7EC4\u724C\uFF0C\u8C01\u5148\u51D1\u51FA 24 \u5F97\u5206\u3002\u5148\u5230 3 \u5206\u3002"
+    message: "Same cards. First to make 24 scores. First to 3 points."
   };
 }
 function applyM24Action(state, actorId, action) {
@@ -180,7 +204,7 @@ function applyM24Action(state, actorId, action) {
   const res = checkSolution(state.nums, action.expr);
   const actor = state.players.find((p) => p.id === actorId);
   if (!res.ok) {
-    return { ...state, message: `${actor?.name || "\u73A9\u5BB6"}\uFF1A${res.error}` };
+    return { ...state, message: `${actor?.name || "Player"}: ${res.error}` };
   }
   const scores = { ...state.scores, [actorId]: (state.scores[actorId] || 0) + 1 };
   if (scores[actorId] >= state.goal) {
@@ -189,7 +213,7 @@ function applyM24Action(state, actorId, action) {
       scores,
       phase: "over",
       winnerId: actorId,
-      message: `${actor?.name} \u51D1\u51FA 24\uFF0C\u5148\u5230 ${state.goal} \u5206\u83B7\u80DC\u3002`
+      message: `${actor?.name} made 24. First to ${state.goal} wins.`
     };
   }
   const puzzle = newPuzzle();
@@ -197,9 +221,10 @@ function applyM24Action(state, actorId, action) {
     ...state,
     scores,
     nums: puzzle.nums,
+    cards: puzzle.cards,
     solution: puzzle.solution,
     round: state.round + 1,
-    message: `${actor?.name} \u5F97\u5206\uFF01${scores[actorId]} / ${state.goal}\u3002\u4E0B\u4E00\u9898\u3002`
+    message: `${actor?.name} scores! ${scores[actorId]} / ${state.goal}. Next hand.`
   };
 }
 function viewM24(state, _viewerId) {

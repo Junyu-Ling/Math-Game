@@ -59,6 +59,46 @@ const games = [
     blurb: "Flip fruit cards. When five of one fruit show, ring the bell first.",
     preview: "halli" as const,
   },
+  {
+    to: "/play/ecard",
+    idx: "08",
+    code: "ECARD",
+    name: "E-Card",
+    blurb: "Kaiji’s Emperor · Citizen · Slave. Psychological duel — Slave alone can kill the Emperor.",
+    preview: "ecard" as const,
+  },
+  {
+    to: "/play/gomoku",
+    idx: "09",
+    code: "GOMOKU",
+    name: "Gomoku",
+    blurb: "15×15. Place stones. First five in a row wins.",
+    preview: "gomoku" as const,
+  },
+  {
+    to: "/play/ludo",
+    idx: "10",
+    code: "LUDO",
+    name: "Flying Chess",
+    blurb: "Roll, race four pieces home. Six opens the gate.",
+    preview: "ludo" as const,
+  },
+  {
+    to: "/play/animal",
+    idx: "11",
+    code: "ANIMAL",
+    name: "Animal Chess",
+    blurb: "Jungle ranks, rivers, and dens. Enter the rival den to win.",
+    preview: "animal" as const,
+  },
+  {
+    to: "/play/army",
+    idx: "12",
+    code: "ARMY",
+    name: "Army Chess",
+    blurb: "Open 军棋. Bombs, mines, and the flag. Capture 军旗 to win.",
+    preview: "army" as const,
+  },
 ];
 
 function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
@@ -129,6 +169,35 @@ function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
       </div>
     );
   }
+  if (kind === "ecard") {
+    return (
+      <div className="preview-row preview-ecard">
+        <img src="/ecard-emperor.png" alt="Emperor" />
+        <img src="/ecard-citizen.png" alt="Citizen" />
+        <img src="/ecard-slave.png" alt="Slave" />
+      </div>
+    );
+  }
+  if (kind === "gomoku") {
+    return (
+      <div className="preview-row">
+        <span className="gomoku-stone black" style={{ position: "relative", width: 28, height: 28, display: "inline-block" }} />
+        <span className="gomoku-stone white" style={{ position: "relative", width: 28, height: 28, display: "inline-block" }} />
+      </div>
+    );
+  }
+  if (kind === "ludo" || kind === "animal" || kind === "army") {
+    return (
+      <div className="preview-row">
+        <div className="piece-cell" style={{ width: 40, height: 40 }}>
+          {kind === "ludo" ? "🎲" : kind === "animal" ? "狮" : "旗"}
+        </div>
+        <div className="piece-cell" style={{ width: 40, height: 40 }}>
+          {kind === "ludo" ? "🏠" : kind === "animal" ? "象" : "炸"}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="preview-row">
       <button className="m24-num" type="button" style={{ width: 52, height: 70, fontSize: 24 }}>
@@ -146,7 +215,7 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="kicker">Seven tables · Invite play</p>
+          <p className="kicker">Twelve tables · Invite play</p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
             Card art follows the physical decks. Practice against the CPU, or sign in and invite someone who is online.

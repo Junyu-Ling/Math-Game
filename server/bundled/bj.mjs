@@ -15,15 +15,28 @@ function uid(prefix = "id") {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-// src/games/blackjack/engine.ts
-var ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-var suits = ["S", "H", "D", "C"];
-function freshShoe(n = 4) {
+// src/lib/poker.ts
+var RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+var SUITS = ["S", "H", "D", "C"];
+function suitGlyph(suit) {
+  return { S: "\u2660", H: "\u2665", D: "\u2666", C: "\u2663", J: "\u2605" }[suit];
+}
+function isRed(suit, rank) {
+  if (suit === "J") return rank === "RJ";
+  return suit === "H" || suit === "D";
+}
+function makeDeck() {
   const cards = [];
-  for (let i = 0; i < n; i++) {
-    for (const suit of suits) for (const rank of ranks) cards.push({ id: uid("b"), suit, rank });
-  }
+  for (const suit of SUITS) for (const rank of RANKS) cards.push({ id: uid("pk"), suit, rank });
   return shuffle(cards);
+}
+function makeShoe(n = 1) {
+  return shuffle(Array.from({ length: n }, () => makeDeck()).flat());
+}
+
+// src/games/blackjack/engine.ts
+function freshShoe(n = 4) {
+  return makeShoe(n);
 }
 function startBj(chips) {
   return {
@@ -34,7 +47,7 @@ function startBj(chips) {
     chips,
     bet: 50,
     phase: "bet",
-    message: "\u4E0B\u6CE8\u540E\u53D1\u724C\u3002\u76EE\u6807 21\uFF0C\u4E0D\u8D85\u8FC7\u3002"
+    message: "Bet, then deal. Get close to 21 without going over."
   };
 }
 function draw(state) {
@@ -70,7 +83,7 @@ function isBlackjack(cards) {
 function deal(state) {
   if (state.phase !== "bet") return state;
   if (state.chips < state.bet || state.bet <= 0) {
-    return { ...state, message: "\u7B79\u7801\u4E0D\u8DB3\u3002" };
+    return { ...state, message: "Not enough chips." };
   }
   let next = { ...state, chips: state.chips - state.bet, dealer: [], hands: [] };
   const player = [];
@@ -94,12 +107,12 @@ function deal(state) {
     next.chips += Math.floor(state.bet * 2.5);
     next.dealer = next.dealer.map((c) => ({ ...c, hidden: false }));
     next.phase = "settle";
-    next.message = "Blackjack\u3002\u8D54\u4ED8 3:2\u3002";
+    next.message = "Blackjack. Pays 3:2.";
     next.hands = next.hands.map((h) => ({ ...h, stood: true }));
     return next;
   }
   next.phase = "player";
-  next.message = "\u8981\u724C\u3001\u505C\u724C\u3001\u52A0\u500D\uFF1B\u5BF9\u5B50\u53EF\u5206\u724C\u3002";
+  next.message = "Hit, stand, or double. Split pairs if you can.";
   return next;
 }
 function handDone(h) {
@@ -119,7 +132,7 @@ function hit(state) {
   const cards = [...hand.cards, pulled.card];
   const hands = state.hands.map((h, i) => i === state.active ? { ...h, cards, stood: hardSoft(cards).total >= 21 } : h);
   const total = hardSoft(cards).total;
-  let next = { ...pulled.state, hands, message: total > 21 ? "\u7206\u724C\u3002" : `\u5F53\u524D ${total}` };
+  let next = { ...pulled.state, hands, message: total > 21 ? "Bust." : `Total ${total}` };
   if (hands[state.active] && handDone(hands[state.active])) return nextHand(next);
   return next;
 }
@@ -131,7 +144,7 @@ function stand(state) {
 function doubleDown(state) {
   if (state.phase !== "player") return state;
   const hand = state.hands[state.active];
-  if (!hand || hand.cards.length !== 2 || state.chips < hand.bet) return { ...state, message: "\u65E0\u6CD5\u52A0\u500D\u3002" };
+  if (!hand || hand.cards.length !== 2 || state.chips < hand.bet) return { ...state, message: "Cannot double." };
   let next = { ...state, chips: state.chips - hand.bet };
   const pulled = draw(next);
   const cards = [...hand.cards, pulled.card];
@@ -148,7 +161,7 @@ function split(state) {
   if (!a || !b) return state;
   const va = hardSoft([a]).total;
   const vb = hardSoft([b]).total;
-  if (va !== vb || state.chips < hand.bet) return { ...state, message: "\u65E0\u6CD5\u5206\u724C\u3002" };
+  if (va !== vb || state.chips < hand.bet) return { ...state, message: "Cannot split." };
   let next = { ...state, chips: state.chips - hand.bet };
   let c1;
   let c2;
@@ -158,7 +171,7 @@ function split(state) {
   const right = { cards: [b, c2], bet: hand.bet, stood: false, doubled: false };
   const hands = [...state.hands];
   hands.splice(state.active, 1, left, right);
-  return { ...next, hands, chips: next.chips, active: state.active, phase: "player", message: "\u5DF2\u5206\u724C\u3002" };
+  return { ...next, hands, chips: next.chips, active: state.active, phase: "player", message: "Split." };
 }
 function playDealer(state) {
   let next = { ...state, dealer: state.dealer.map((c) => ({ ...c, hidden: false })), phase: "dealer" };
@@ -179,17 +192,17 @@ function settle(state) {
     const t = hardSoft(hand.cards).total;
     const bj = isBlackjack(hand.cards) && state.hands.length === 1;
     if (t > 21) {
-      notes.push("\u73A9\u5BB6\u7206\uFF0C\u8F93\u3002");
+      notes.push("Player busts. Loss.");
     } else if (bj && !dealerBj) {
       chips += Math.floor(hand.bet * 2.5);
-      notes.push("Blackjack \u8D62\u3002");
+      notes.push("Blackjack win.");
     } else if (dealerTotal > 21 || t > dealerTotal) {
       chips += hand.bet * 2;
-      notes.push(`\u8D62 ${hand.bet}\u3002`);
+      notes.push(`Win ${hand.bet}.`);
     } else if (t === dealerTotal) {
       chips += hand.bet;
-      notes.push("\u5E73\u5C40\uFF0C\u9000\u6CE8\u3002");
-    } else notes.push("\u5E84\u5BB6\u8F83\u5927\uFF0C\u8F93\u3002");
+      notes.push("Push. Bet returned.");
+    } else notes.push("Dealer is higher. Loss.");
   }
   return { ...state, chips, phase: "settle", message: notes.join(" ") };
 }
@@ -200,7 +213,7 @@ function nextRound(state) {
     hands: [],
     active: 0,
     phase: "bet",
-    message: "\u518D\u4E0B\u4E00\u6CE8\u3002"
+    message: "Place another bet."
   };
 }
 function emptySeat(p) {
@@ -224,7 +237,7 @@ function startBjDuel(a, b) {
     turn: 0,
     phase: "play",
     winnerId: null,
-    message: `${a.name} \u5148\u624B\u3002\u6BD4\u70B9\u6570\uFF0C\u4E0D\u8D85\u8FC7 21\u3002`
+    message: `${a.name} acts first. Closest to 21 without going over.`
   };
 }
 function settleDuel(state) {
@@ -237,20 +250,20 @@ function settleDuel(state) {
   let winnerId = null;
   let message = "";
   if (ba && bb) {
-    message = "\u53CC\u65B9\u7206\u724C\uFF0C\u5E73\u5C40\u3002";
+    message = "Both bust. Push.";
   } else if (ba) {
     winnerId = b.id;
-    message = `${a.name} \u7206\u724C\uFF0C${b.name} \u83B7\u80DC\u3002`;
+    message = `${a.name} busts. ${b.name} wins.`;
   } else if (bb) {
     winnerId = a.id;
-    message = `${b.name} \u7206\u724C\uFF0C${a.name} \u83B7\u80DC\u3002`;
+    message = `${b.name} busts. ${a.name} wins.`;
   } else if (ta > tb) {
     winnerId = a.id;
-    message = `${a.name} ${ta} \u5BF9 ${tb}\uFF0C\u83B7\u80DC\u3002`;
+    message = `${a.name} ${ta} vs ${tb} wins.`;
   } else if (tb > ta) {
     winnerId = b.id;
-    message = `${b.name} ${tb} \u5BF9 ${ta}\uFF0C\u83B7\u80DC\u3002`;
-  } else message = `${ta} \u5E73\u5C40\u3002`;
+    message = `${b.name} ${tb} vs ${ta} wins.`;
+  } else message = `${ta} push.`;
   return { ...state, phase: "over", winnerId, message };
 }
 function startBjPractice() {
@@ -279,7 +292,7 @@ function applyBjDuelAction(state, actorId, action) {
       ...state,
       players,
       deck,
-      message: total > 21 ? `${me.name} \u7206\u724C\u3002` : `${me.name} ${total}`
+      message: total > 21 ? `${me.name} busts.` : `${me.name} ${total}`
     };
     if (stood && players.every((p) => p.stood)) return settleDuel(next2);
     if (stood) {
@@ -289,7 +302,7 @@ function applyBjDuelAction(state, actorId, action) {
     return next2;
   }
   players = players.map((p) => p.id === me.id ? { ...p, stood: true } : p);
-  const next = { ...state, players, message: `${me.name} \u505C\u724C\u3002` };
+  const next = { ...state, players, message: `${me.name} stands.` };
   if (players.every((p) => p.stood)) return settleDuel(next);
   return { ...next, turn: (state.turn + 1) % players.length };
 }
@@ -306,12 +319,6 @@ function viewBjDuel(state, viewerId) {
       };
     })
   };
-}
-function suitGlyph(suit) {
-  return { S: "\u2660", H: "\u2665", D: "\u2666", C: "\u2663" }[suit];
-}
-function isRed(suit) {
-  return suit === "H" || suit === "D";
 }
 export {
   aiBjAction,

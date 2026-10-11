@@ -21,6 +21,11 @@ export function Shell({ children }: { children: ReactNode }) {
           <NavLink to="/play/holdem">Hold’em</NavLink>
           <NavLink to="/play/uno">UNO</NavLink>
           <NavLink to="/play/halli">Halli</NavLink>
+          <NavLink to="/play/ecard">E-Card</NavLink>
+          <NavLink to="/play/gomoku">Gomoku</NavLink>
+          <NavLink to="/play/ludo">Ludo</NavLink>
+          <NavLink to="/play/animal">Animal</NavLink>
+          <NavLink to="/play/army">Army</NavLink>
           {user ? (
             <>
               <span className="chip-pill">{user.chips}</span>
