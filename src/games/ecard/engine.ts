@@ -9,12 +9,14 @@ export type EPlayer = {
   id: string;
   name: string;
   human: boolean;
-  role: ERole;
+  role: ERole | null;
+  rolePick: ERole | null;
+  roleReady: boolean;
   hand: ECard[];
   selectedId: string | null;
 };
 
-export type EPhase = "pick" | "reveal" | "over";
+export type EPhase = "role" | "pick" | "reveal" | "over";
 
 export type EState = {
   players: EPlayer[];
@@ -37,13 +39,15 @@ function handFor(role: ERole): ECard[] {
   ];
 }
 
-function seat(p: { id: string; name: string; human?: boolean }, role: ERole): EPlayer {
+function seat(p: { id: string; name: string; human?: boolean }): EPlayer {
   return {
     id: p.id,
     name: p.name,
     human: p.human !== false,
-    role,
-    hand: handFor(role),
+    role: null,
+    rolePick: null,
+    roleReady: false,
+    hand: [],
     selectedId: null,
   };
 }
@@ -53,8 +57,8 @@ export function startEcardDuel(
   b: { id: string; name: string; human?: boolean },
 ): EState {
   return {
-    players: [seat(a, "emperor"), seat(b, "slave")],
-    phase: "pick",
+    players: [seat(a), seat(b)],
+    phase: "role",
     round: 1,
     set: 1,
     tricksInSet: 0,
@@ -62,7 +66,7 @@ export function startEcardDuel(
     winnerId: null,
     wins: { [a.id]: 0, [b.id]: 0 },
     goal: 3,
-    log: [{ id: uid("l"), text: `${a.name} is Emperor · ${b.name} is Slave. First to 3 match wins. Roles swap every 3 matches.` }],
+    log: [{ id: uid("l"), text: "Choose Emperor or Slave. First to 3 match wins. Roles swap every 3 matches." }],
   };
 }
 
@@ -95,32 +99,101 @@ export function clash(a: EKind, b: EKind): { result: "a" | "b" | "draw"; matchEn
   return { result: "draw", matchEnd: false };
 }
 
+function dealWithRoles(state: EState, r0: ERole, r1: ERole, note: string): EState {
+  const p0 = state.players[0]!;
+  const p1 = state.players[1]!;
+  return {
+    ...state,
+    players: [
+      { ...p0, role: r0, rolePick: r0, roleReady: true, hand: handFor(r0), selectedId: null },
+      { ...p1, role: r1, rolePick: r1, roleReady: true, hand: handFor(r1), selectedId: null },
+    ],
+    phase: "pick",
+    last: null,
+    log: [...state.log, { id: uid("l"), text: note }],
+  };
+}
+
+function resolveRoles(state: EState): EState {
+  const p0 = state.players[0]!;
+  const p1 = state.players[1]!;
+  const a = p0.rolePick;
+  const b = p1.rolePick;
+  if (!a || !b) return state;
+
+  if (a !== b) {
+    return dealWithRoles(
+      state,
+      a,
+      b,
+      `${p0.name} is ${a.toUpperCase()} · ${p1.name} is ${b.toUpperCase()}.`,
+    );
+  }
+
+  // Same pick — coin flip who keeps it.
+  const keepFirst = Math.random() < 0.5;
+  const r0: ERole = keepFirst ? a : a === "emperor" ? "slave" : "emperor";
+  const r1: ERole = r0 === "emperor" ? "slave" : "emperor";
+  return dealWithRoles(
+    state,
+    r0,
+    r1,
+    `Both wanted ${a}. Coin flip → ${p0.name} ${r0.toUpperCase()} · ${p1.name} ${r1.toUpperCase()}.`,
+  );
+}
+
 function refillRoles(state: EState, swap: boolean): EState {
   const p0 = state.players[0]!;
   const p1 = state.players[1]!;
-  let r0 = p0.role;
-  let r1 = p1.role;
+  let r0 = p0.role ?? "emperor";
+  let r1 = p1.role ?? "slave";
   if (swap) {
-    r0 = p0.role === "emperor" ? "slave" : "emperor";
-    r1 = p1.role === "emperor" ? "slave" : "emperor";
+    r0 = r0 === "emperor" ? "slave" : "emperor";
+    r1 = r1 === "emperor" ? "slave" : "emperor";
   }
   return {
     ...state,
     players: [
-      { ...p0, role: r0, hand: handFor(r0), selectedId: null },
-      { ...p1, role: r1, hand: handFor(r1), selectedId: null },
+      { ...p0, role: r0, rolePick: r0, roleReady: true, hand: handFor(r0), selectedId: null },
+      { ...p1, role: r1, rolePick: r1, roleReady: true, hand: handFor(r1), selectedId: null },
     ],
     phase: "pick",
     last: null,
   };
 }
 
-export type EAction = { type: "select"; cardId: string } | { type: "lock" } | { type: "next" };
+export type EAction =
+  | { type: "role"; role: ERole }
+  | { type: "confirmRole" }
+  | { type: "select"; cardId: string }
+  | { type: "lock" }
+  | { type: "next" };
 
 export function applyEcardAction(state: EState, actorId: string, action: EAction): EState {
   if (state.phase === "over") return state;
   const me = state.players.find((p) => p.id === actorId);
   if (!me) return state;
+
+  if (state.phase === "role") {
+    if (action.type === "role") {
+      if (me.roleReady) return state;
+      return {
+        ...state,
+        players: state.players.map((p) => (p.id === actorId ? { ...p, rolePick: action.role } : p)),
+      };
+    }
+    if (action.type === "confirmRole") {
+      if (!me.rolePick || me.roleReady) return state;
+      const next: EState = {
+        ...state,
+        players: state.players.map((p) => (p.id === actorId ? { ...p, roleReady: true } : p)),
+        log: [...state.log, { id: uid("l"), text: `${me.name} locks in ${me.rolePick}.` }],
+      };
+      if (next.players.every((p) => p.roleReady && p.rolePick)) return resolveRoles(next);
+      return next;
+    }
+    return state;
+  }
 
   if (state.phase === "reveal" && action.type === "next") {
     return continueAfterReveal(state);
@@ -138,7 +211,7 @@ export function applyEcardAction(state: EState, actorId: string, action: EAction
 
   if (action.type === "lock") {
     if (!me.selectedId) return state;
-    let next: EState = {
+    const next: EState = {
       ...state,
       players: state.players.map((p) => (p.id === actorId ? { ...p, selectedId: me.selectedId } : p)),
     };
@@ -165,21 +238,34 @@ function reveal(state: EState): EState {
     },
   ];
 
-  let players = state.players.map((p) => {
+  // Original Kaiji: winner's card returns (Emperor after beating Citizen, Citizen after… only on non-match wins).
+  // Citizen vs Citizen: both discarded. Match-ending clashes discard both and refill next match.
+  const players = state.players.map((p) => {
     const mine = p.id === a.id ? ca : cb;
-    const theirs = p.id === a.id ? cb : ca;
-    const myResult = result === "draw" ? "draw" : (result === "a" && p.id === a.id) || (result === "b" && p.id === b.id) ? "win" : "lose";
+    const myResult =
+      result === "draw" ? "draw" : (result === "a" && p.id === a.id) || (result === "b" && p.id === b.id) ? "win" : "lose";
     let hand = p.hand.filter((c) => c.id !== mine.id);
-    // Winner's card returns (except citizen vs citizen both discarded).
-    if (myResult === "win" && !(ca.kind === "citizen" && cb.kind === "citizen")) {
+    if (!matchEnd && myResult === "win") {
       hand = [...hand, mine];
     }
-    void theirs;
     return { ...p, hand, selectedId: null };
   });
 
   if (result === "draw") {
     log = [...log, { id: uid("l"), text: "Citizens cancel. Both discarded." }];
+  } else if (!matchEnd) {
+    const winner = result === "a" ? a : b;
+    const winCard = result === "a" ? ca.kind : cb.kind;
+    log = [
+      ...log,
+      {
+        id: uid("l"),
+        text:
+          winCard === "emperor"
+            ? `${winner.name} wins — Emperor returns to hand.`
+            : `${winner.name} wins the clash — card returns.`,
+      },
+    ];
   } else {
     const winner = result === "a" ? a : b;
     log = [...log, { id: uid("l"), text: `${winner.name} wins the clash.` }];
@@ -242,7 +328,12 @@ export function viewEcard(state: EState, viewerId: string): EState {
   return {
     ...state,
     players: state.players.map((p) => {
-      if (p.id === viewerId || state.phase === "reveal" || state.phase === "over") return p;
+      if (p.id === viewerId || state.phase === "reveal" || state.phase === "over" || state.phase === "role") {
+        if (state.phase === "role" && p.id !== viewerId) {
+          return { ...p, rolePick: p.roleReady ? p.rolePick : null };
+        }
+        return p;
+      }
       return {
         ...p,
         hand: p.hand.map((c) => ({ id: c.id, kind: "citizen" as const })),
@@ -255,9 +346,20 @@ export function viewEcard(state: EState, viewerId: string): EState {
 export function aiEcard(state: EState, cpuId: string): EAction {
   const me = state.players.find((p) => p.id === cpuId);
   if (!me) return { type: "lock" };
+
+  if (state.phase === "role") {
+    if (!me.rolePick) {
+      const rival = state.players.find((p) => p.id !== cpuId);
+      const role: ERole =
+        rival?.rolePick === "emperor" ? "slave" : rival?.rolePick === "slave" ? "emperor" : Math.random() < 0.5 ? "emperor" : "slave";
+      return { type: "role", role };
+    }
+    if (!me.roleReady) return { type: "confirmRole" };
+    return { type: "confirmRole" };
+  }
+
   if (state.phase === "reveal") return { type: "next" };
   if (!me.selectedId) {
-    // Prefer citizen pressure; sometimes bluff special late.
     const citizens = me.hand.filter((c) => c.kind === "citizen");
     const special = me.hand.find((c) => c.kind !== "citizen");
     const pick =

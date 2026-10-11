@@ -8,6 +8,7 @@ import {
   type EAction,
   type ECard,
   type EKind,
+  type ERole,
   type EState,
 } from "./engine";
 import { GameSetup } from "../../components/GameSetup";
@@ -56,6 +57,7 @@ export function EcardPage() {
     if (!cpu) return;
     if (local.phase === "pick" && cpu.selectedId) return;
     if (local.phase === "pick" && local.players.every((p) => p.selectedId)) return;
+    if (local.phase === "role" && cpu.roleReady) return;
     let stop = false;
     void (async () => {
       await wait(CPU_THINK_MS);
@@ -65,6 +67,18 @@ export function EcardPage() {
         const bot = s.players.find((p) => !p.human);
         if (!bot) return s;
         if (s.phase === "reveal") return applyEcardAction(s, bot.id, { type: "next" });
+        if (s.phase === "role") {
+          let next = s;
+          const act1 = aiEcard(next, bot.id);
+          next = applyEcardAction(next, bot.id, act1);
+          const again = aiEcard(next, bot.id);
+          if (again.type !== act1.type || (again.type === "role" && act1.type === "role" && again.role !== act1.role)) {
+            next = applyEcardAction(next, bot.id, again);
+          } else if (again.type === "confirmRole" && act1.type === "role") {
+            next = applyEcardAction(next, bot.id, again);
+          }
+          return next;
+        }
         if (s.phase === "pick") {
           let next = s;
           if (!bot.selectedId) next = applyEcardAction(next, bot.id, aiEcard(next, bot.id));
@@ -91,6 +105,10 @@ export function EcardPage() {
 
   function playCard(card: ECard) {
     act({ type: "select", cardId: card.id });
+  }
+
+  function pickRole(role: ERole) {
+    act({ type: "role", role });
   }
 
   return (
@@ -124,15 +142,61 @@ export function EcardPage() {
                 onPractice={() => setLocal(startEcardPractice())}
               />
             </>
+          ) : state.phase === "role" ? (
+            <div className="ecard-role-pick">
+              <p className="kicker">CHOOSE SIDE</p>
+              <h2>Emperor or Slave?</h2>
+              <p className="status-line">Both players pick. If you choose the same side, a coin flip decides.</p>
+              <div className="ecard-role-row">
+                <button
+                  type="button"
+                  className={`ecard-role-btn${me.rolePick === "emperor" ? " on" : ""}`}
+                  disabled={me.roleReady}
+                  onClick={() => pickRole("emperor")}
+                >
+                  <EFace kind="emperor" />
+                  <span>EMPEROR</span>
+                </button>
+                <button
+                  type="button"
+                  className={`ecard-role-btn${me.rolePick === "slave" ? " on" : ""}`}
+                  disabled={me.roleReady}
+                  onClick={() => pickRole("slave")}
+                >
+                  <EFace kind="slave" />
+                  <span>SLAVE</span>
+                </button>
+              </div>
+              <p className="status-line">
+                {me.roleReady
+                  ? rival.roleReady
+                    ? "Resolving…"
+                    : "Waiting for rival…"
+                  : me.rolePick
+                    ? `Selected ${me.rolePick.toUpperCase()}. Confirm when ready.`
+                    : "Tap a side."}
+                {rival.roleReady ? " · Rival is ready." : ""}
+              </p>
+              <div className="row-actions" style={{ justifyContent: "center" }}>
+                <button
+                  className="btn btn-go"
+                  type="button"
+                  disabled={!me.rolePick || me.roleReady}
+                  onClick={() => act({ type: "confirmRole" })}
+                >
+                  CONFIRM SIDE
+                </button>
+              </div>
+            </div>
           ) : (
             <>
               <div className="ecard-meta">
                 <span>
-                  {me.name} · {me.role.toUpperCase()} · {state.wins[me.id] || 0}
+                  {me.name} · {(me.role || "?").toUpperCase()} · {state.wins[me.id] || 0}
                 </span>
                 <span className="ecard-vs">VS</span>
                 <span>
-                  {rival.name} · {rival.role.toUpperCase()} · {state.wins[rival.id] || 0}
+                  {rival.name} · {(rival.role || "?").toUpperCase()} · {state.wins[rival.id] || 0}
                 </span>
               </div>
               <div className="ecard-rival-row">
