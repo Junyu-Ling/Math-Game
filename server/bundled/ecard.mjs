@@ -284,13 +284,108 @@ function viewEcard(state, viewerId) {
     })
   };
 }
+function pickWeighted(weights) {
+  const floor = weights.map((x) => ({ card: x.card, w: Math.max(0.01, x.w) }));
+  const sum = floor.reduce((s, x) => s + x.w, 0);
+  let r = Math.random() * sum;
+  for (const x of floor) {
+    r -= x.w;
+    if (r <= 0) return x.card;
+  }
+  return floor[floor.length - 1].card;
+}
+function seriesPressure(state, meId, rivalId) {
+  const mine = state.wins[meId] || 0;
+  const theirs = state.wins[rivalId] || 0;
+  const need = state.goal - mine;
+  const theyNeed = state.goal - theirs;
+  return { mine, theirs, need, theyNeed, behind: mine < theirs, matchPoint: need === 1, rivalMatchPoint: theyNeed === 1 };
+}
+function aiPickEmperor(me, rivalHandSize, pressure, last) {
+  const citizens = me.hand.filter((c) => c.kind === "citizen");
+  const special = me.hand.find((c) => c.kind === "emperor");
+  if (rivalHandSize <= 1 && citizens[0]) return citizens[0];
+  if (!citizens.length) return special;
+  const pSlave = 1 / Math.max(1, rivalHandSize);
+  let wCitizen = 1.15 + pSlave * 3.2 + citizens.length * 0.15;
+  let wEmperor = 0.55 + (1 - pSlave) * 1.8 - pSlave * 4.5;
+  if (me.hand.length >= 4) {
+    wCitizen += 0.9;
+    wEmperor -= 0.5;
+  }
+  if (rivalHandSize <= 2) {
+    wEmperor -= 1.6;
+    wCitizen += 1.1;
+  }
+  if (last && last.result !== "match") {
+    const iPlayedE = last.aId === me.id && last.a === "emperor" || last.bId === me.id && last.b === "emperor";
+    if (iPlayedE && last.result !== "draw") {
+      wEmperor += 0.7;
+      wCitizen += 0.35;
+    }
+  }
+  if (pressure.behind) wCitizen += 0.55;
+  if (pressure.matchPoint) {
+    wEmperor -= 0.8;
+    wCitizen += 0.5;
+  }
+  if (pressure.rivalMatchPoint) {
+    wEmperor -= 1.2;
+  }
+  wCitizen *= 0.85 + Math.random() * 0.3;
+  wEmperor *= 0.85 + Math.random() * 0.3;
+  const choice = pickWeighted([
+    ...citizens.map((c) => ({ card: c, w: wCitizen / citizens.length })),
+    { card: special, w: wEmperor }
+  ]);
+  return choice;
+}
+function aiPickSlave(me, rivalHandSize, pressure, last) {
+  const citizens = me.hand.filter((c) => c.kind === "citizen");
+  const special = me.hand.find((c) => c.kind === "slave");
+  if (rivalHandSize <= 1) return special;
+  if (!citizens.length) return special;
+  const pEmperor = 1 / Math.max(1, rivalHandSize);
+  let wCitizen = 1.2 + (1 - pEmperor) * 1.4 + citizens.length * 0.12;
+  let wSlave = 0.35 + pEmperor * 4.2 - (1 - pEmperor) * 3.8;
+  if (me.hand.length >= 4) {
+    wCitizen += 1;
+    wSlave -= 0.8;
+  }
+  if (rivalHandSize <= 2) {
+    wSlave += 1.8;
+    wCitizen -= 0.4;
+  }
+  if (last && last.result !== "match") {
+    const theyPlayedE = last.aId !== me.id && last.a === "emperor" || last.bId !== me.id && last.b === "emperor";
+    if (theyPlayedE) {
+      wSlave -= 0.6;
+      wCitizen += 0.5;
+    }
+  }
+  if (pressure.behind || pressure.matchPoint) {
+    wSlave += rivalHandSize >= 3 ? 0.9 : 1.4;
+  }
+  if (pressure.rivalMatchPoint) {
+    wSlave += 0.7;
+  }
+  wCitizen *= 0.85 + Math.random() * 0.3;
+  wSlave *= 0.85 + Math.random() * 0.3;
+  return pickWeighted([
+    ...citizens.map((c) => ({ card: c, w: wCitizen / citizens.length })),
+    { card: special, w: wSlave }
+  ]);
+}
 function aiEcard(state, cpuId) {
   const me = state.players.find((p) => p.id === cpuId);
   if (!me) return { type: "lock" };
+  const rival = state.players.find((p) => p.id !== cpuId);
   if (state.phase === "role") {
     if (!me.rolePick) {
-      const rival = state.players.find((p) => p.id !== cpuId);
-      const role = rival?.rolePick === "emperor" ? "slave" : rival?.rolePick === "slave" ? "emperor" : Math.random() < 0.5 ? "emperor" : "slave";
+      if (rival?.rolePick === "emperor") return { type: "role", role: "slave" };
+      if (rival?.rolePick === "slave") return { type: "role", role: "emperor" };
+      const ahead = (state.wins[cpuId] || 0) > (state.wins[rival?.id || ""] || 0);
+      const role = Math.random() < (ahead ? 0.58 : 0.42) ? "emperor" : "slave";
       return { type: "role", role };
     }
     if (!me.roleReady) return { type: "confirmRole" };
@@ -299,10 +394,12 @@ function aiEcard(state, cpuId) {
   if (state.phase === "reveal") return { type: "next" };
   if (me.locked) return { type: "lock" };
   if (!me.selectedId) {
-    const citizens = me.hand.filter((c) => c.kind === "citizen");
-    const special = me.hand.find((c) => c.kind !== "citizen");
-    const pick = citizens.length && (me.hand.length > 2 || Math.random() < 0.7) ? citizens[Math.floor(Math.random() * citizens.length)] : special || me.hand[0];
-    return { type: "select", cardId: pick.id };
+    if (!rival || !me.role) {
+      return { type: "select", cardId: me.hand[0].id };
+    }
+    const pressure = seriesPressure(state, me.id, rival.id);
+    const card = me.role === "emperor" ? aiPickEmperor(me, rival.hand.length, pressure, state.last) : aiPickSlave(me, rival.hand.length, pressure, state.last);
+    return { type: "select", cardId: card.id };
   }
   return { type: "lock" };
 }

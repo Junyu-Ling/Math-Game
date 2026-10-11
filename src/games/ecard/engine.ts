@@ -367,15 +367,145 @@ export function viewEcard(state: EState, viewerId: string): EState {
   };
 }
 
+/**
+ * Psychological / game-theory AI for E-Card.
+ *
+ * Mid-match invariant (Kaiji rules): each side still holds its special until the match ends.
+ * Hand size h ⇒ 1 special + (h−1) citizens. So forced plays are readable:
+ *   h=1 → must play the special.
+ * Emperor wants Citizen when rival h=1 (catch Slave). Slave wants Slave when rival h=1 (catch Emperor).
+ */
+function pickWeighted(weights: Array<{ card: ECard; w: number }>): ECard {
+  const floor = weights.map((x) => ({ card: x.card, w: Math.max(0.01, x.w) }));
+  const sum = floor.reduce((s, x) => s + x.w, 0);
+  let r = Math.random() * sum;
+  for (const x of floor) {
+    r -= x.w;
+    if (r <= 0) return x.card;
+  }
+  return floor[floor.length - 1]!.card;
+}
+
+function seriesPressure(state: EState, meId: string, rivalId: string) {
+  const mine = state.wins[meId] || 0;
+  const theirs = state.wins[rivalId] || 0;
+  const need = state.goal - mine;
+  const theyNeed = state.goal - theirs;
+  return { mine, theirs, need, theyNeed, behind: mine < theirs, matchPoint: need === 1, rivalMatchPoint: theyNeed === 1 };
+}
+
+function aiPickEmperor(me: EPlayer, rivalHandSize: number, pressure: ReturnType<typeof seriesPressure>, last: EState["last"]): ECard {
+  const citizens = me.hand.filter((c) => c.kind === "citizen");
+  const special = me.hand.find((c) => c.kind === "emperor")!;
+  // Rival must play Slave — Citizen wins the match.
+  if (rivalHandSize <= 1 && citizens[0]) return citizens[0];
+  if (!citizens.length) return special;
+
+  const pSlave = 1 / Math.max(1, rivalHandSize); // rival still holds Slave
+  // EV sketch: Citizen can steal the match; Emperor risks instant loss to Slave.
+  let wCitizen = 1.15 + pSlave * 3.2 + citizens.length * 0.15;
+  let wEmperor = 0.55 + (1 - pSlave) * 1.8 - pSlave * 4.5;
+
+  // Early match: probe with citizens (burn / fish for Slave).
+  if (me.hand.length >= 4) {
+    wCitizen += 0.9;
+    wEmperor -= 0.5;
+  }
+  // Late: Slave is denser — hide Emperor unless a soft read suggests otherwise.
+  if (rivalHandSize <= 2) {
+    wEmperor -= 1.6;
+    wCitizen += 1.1;
+  }
+  // After we just showed Emperor and won, humans often expect a safe Citizen next — sometimes double-bluff Emperor.
+  if (last && last.result !== "match") {
+    const iPlayedE =
+      (last.aId === me.id && last.a === "emperor") || (last.bId === me.id && last.b === "emperor");
+    if (iPlayedE && last.result !== "draw") {
+      wEmperor += 0.7; // rare double press
+      wCitizen += 0.35;
+    }
+  }
+  // Score psychology: behind → more Citizen traps; match point → tighter, less Emperor gambling.
+  if (pressure.behind) wCitizen += 0.55;
+  if (pressure.matchPoint) {
+    wEmperor -= 0.8;
+    wCitizen += 0.5;
+  }
+  if (pressure.rivalMatchPoint) {
+    // Must not gift the match — avoid Emperor unless Slave is diluted.
+    wEmperor -= 1.2;
+  }
+
+  // Mix: never pure — keeps reads fuzzy.
+  wCitizen *= 0.85 + Math.random() * 0.3;
+  wEmperor *= 0.85 + Math.random() * 0.3;
+
+  const choice = pickWeighted([
+    ...citizens.map((c) => ({ card: c, w: wCitizen / citizens.length })),
+    { card: special, w: wEmperor },
+  ]);
+  return choice;
+}
+
+function aiPickSlave(me: EPlayer, rivalHandSize: number, pressure: ReturnType<typeof seriesPressure>, last: EState["last"]): ECard {
+  const citizens = me.hand.filter((c) => c.kind === "citizen");
+  const special = me.hand.find((c) => c.kind === "slave")!;
+  // Rival must play Emperor — Slave wins the match.
+  if (rivalHandSize <= 1) return special;
+  if (!citizens.length) return special;
+
+  const pEmperor = 1 / Math.max(1, rivalHandSize);
+  // Citizen vs Emperor continues (soft loss of a citizen); Slave vs Citizen ends the match in loss.
+  let wCitizen = 1.2 + (1 - pEmperor) * 1.4 + citizens.length * 0.12;
+  let wSlave = 0.35 + pEmperor * 4.2 - (1 - pEmperor) * 3.8;
+
+  if (me.hand.length >= 4) {
+    wCitizen += 1.0;
+    wSlave -= 0.8; // bank the dagger
+  }
+  if (rivalHandSize <= 2) {
+    wSlave += 1.8; // Emperor denser — spring the trap
+    wCitizen -= 0.4;
+  }
+  // If Emperor just pressed E successfully, they often "take a breath" with Citizen — hold Slave one more beat.
+  if (last && last.result !== "match") {
+    const theyPlayedE =
+      (last.aId !== me.id && last.a === "emperor") || (last.bId !== me.id && last.b === "emperor");
+    if (theyPlayedE) {
+      wSlave -= 0.6;
+      wCitizen += 0.5;
+    }
+  }
+  if (pressure.behind || pressure.matchPoint) {
+    // Need an upset — raise Slave frequency when Emperor is still diluted enough.
+    wSlave += rivalHandSize >= 3 ? 0.9 : 1.4;
+  }
+  if (pressure.rivalMatchPoint) {
+    // Desperate steal attempts.
+    wSlave += 0.7;
+  }
+
+  wCitizen *= 0.85 + Math.random() * 0.3;
+  wSlave *= 0.85 + Math.random() * 0.3;
+
+  return pickWeighted([
+    ...citizens.map((c) => ({ card: c, w: wCitizen / citizens.length })),
+    { card: special, w: wSlave },
+  ]);
+}
+
 export function aiEcard(state: EState, cpuId: string): EAction {
   const me = state.players.find((p) => p.id === cpuId);
   if (!me) return { type: "lock" };
+  const rival = state.players.find((p) => p.id !== cpuId);
 
   if (state.phase === "role") {
     if (!me.rolePick) {
-      const rival = state.players.find((p) => p.id !== cpuId);
-      const role: ERole =
-        rival?.rolePick === "emperor" ? "slave" : rival?.rolePick === "slave" ? "emperor" : Math.random() < 0.5 ? "emperor" : "slave";
+      if (rival?.rolePick === "emperor") return { type: "role", role: "slave" };
+      if (rival?.rolePick === "slave") return { type: "role", role: "emperor" };
+      // Prefer Slave slightly (counter-punch); lean Emperor when already ahead in a rematch series.
+      const ahead = (state.wins[cpuId] || 0) > (state.wins[rival?.id || ""] || 0);
+      const role: ERole = Math.random() < (ahead ? 0.58 : 0.42) ? "emperor" : "slave";
       return { type: "role", role };
     }
     if (!me.roleReady) return { type: "confirmRole" };
@@ -385,13 +515,15 @@ export function aiEcard(state: EState, cpuId: string): EAction {
   if (state.phase === "reveal") return { type: "next" };
   if (me.locked) return { type: "lock" };
   if (!me.selectedId) {
-    const citizens = me.hand.filter((c) => c.kind === "citizen");
-    const special = me.hand.find((c) => c.kind !== "citizen");
-    const pick =
-      citizens.length && (me.hand.length > 2 || Math.random() < 0.7)
-        ? citizens[Math.floor(Math.random() * citizens.length)]!
-        : special || me.hand[0]!;
-    return { type: "select", cardId: pick.id };
+    if (!rival || !me.role) {
+      return { type: "select", cardId: me.hand[0]!.id };
+    }
+    const pressure = seriesPressure(state, me.id, rival.id);
+    const card =
+      me.role === "emperor"
+        ? aiPickEmperor(me, rival.hand.length, pressure, state.last)
+        : aiPickSlave(me, rival.hand.length, pressure, state.last);
+    return { type: "select", cardId: card.id };
   }
   return { type: "lock" };
 }
