@@ -14,6 +14,7 @@ export type EPlayer = {
   roleReady: boolean;
   hand: ECard[];
   selectedId: string | null;
+  locked: boolean;
 };
 
 export type EPhase = "role" | "pick" | "reveal" | "over";
@@ -49,6 +50,7 @@ function seat(p: { id: string; name: string; human?: boolean }): EPlayer {
     roleReady: false,
     hand: [],
     selectedId: null,
+    locked: false,
   };
 }
 
@@ -105,8 +107,8 @@ function dealWithRoles(state: EState, r0: ERole, r1: ERole, note: string): EStat
   return {
     ...state,
     players: [
-      { ...p0, role: r0, rolePick: r0, roleReady: true, hand: handFor(r0), selectedId: null },
-      { ...p1, role: r1, rolePick: r1, roleReady: true, hand: handFor(r1), selectedId: null },
+      { ...p0, role: r0, rolePick: r0, roleReady: true, hand: handFor(r0), selectedId: null, locked: false },
+      { ...p1, role: r1, rolePick: r1, roleReady: true, hand: handFor(r1), selectedId: null, locked: false },
     ],
     phase: "pick",
     last: null,
@@ -154,8 +156,8 @@ function refillRoles(state: EState, swap: boolean): EState {
   return {
     ...state,
     players: [
-      { ...p0, role: r0, rolePick: r0, roleReady: true, hand: handFor(r0), selectedId: null },
-      { ...p1, role: r1, rolePick: r1, roleReady: true, hand: handFor(r1), selectedId: null },
+      { ...p0, role: r0, rolePick: r0, roleReady: true, hand: handFor(r0), selectedId: null, locked: false },
+      { ...p1, role: r1, rolePick: r1, roleReady: true, hand: handFor(r1), selectedId: null, locked: false },
     ],
     phase: "pick",
     last: null,
@@ -202,6 +204,7 @@ export function applyEcardAction(state: EState, actorId: string, action: EAction
   if (state.phase !== "pick") return state;
 
   if (action.type === "select") {
+    if (me.locked) return state;
     if (!me.hand.some((c) => c.id === action.cardId)) return state;
     return {
       ...state,
@@ -210,14 +213,13 @@ export function applyEcardAction(state: EState, actorId: string, action: EAction
   }
 
   if (action.type === "lock") {
-    if (!me.selectedId) return state;
+    if (!me.selectedId || me.locked) return state;
     const next: EState = {
       ...state,
-      players: state.players.map((p) => (p.id === actorId ? { ...p, selectedId: me.selectedId } : p)),
+      players: state.players.map((p) => (p.id === actorId ? { ...p, locked: true } : p)),
+      log: [...state.log, { id: uid("l"), text: `${me.name} locks a card.` }],
     };
-    const a = next.players[0]!;
-    const b = next.players[1]!;
-    if (!a.selectedId || !b.selectedId) return next;
+    if (!next.players.every((p) => p.locked && p.selectedId)) return next;
     return reveal(next);
   }
 
@@ -248,7 +250,7 @@ function reveal(state: EState): EState {
     if (!matchEnd && myResult === "win") {
       hand = [...hand, mine];
     }
-    return { ...p, hand, selectedId: null };
+    return { ...p, hand, selectedId: null, locked: false };
   });
 
   if (result === "draw") {
@@ -328,16 +330,16 @@ export function viewEcard(state: EState, viewerId: string): EState {
   return {
     ...state,
     players: state.players.map((p) => {
-      if (p.id === viewerId || state.phase === "reveal" || state.phase === "over" || state.phase === "role") {
-        if (state.phase === "role" && p.id !== viewerId) {
-          return { ...p, rolePick: p.roleReady ? p.rolePick : null };
-        }
+      if (state.phase === "role") {
+        if (p.id !== viewerId) return { ...p, rolePick: p.roleReady ? p.rolePick : null };
         return p;
       }
+      if (p.id === viewerId || state.phase === "reveal" || state.phase === "over") return p;
       return {
         ...p,
         hand: p.hand.map((c) => ({ id: c.id, kind: "citizen" as const })),
-        selectedId: p.selectedId ? "ready" : null,
+        // Hide which card until locked; only show that they locked.
+        selectedId: p.locked ? "ready" : null,
       };
     }),
   };
@@ -359,6 +361,7 @@ export function aiEcard(state: EState, cpuId: string): EAction {
   }
 
   if (state.phase === "reveal") return { type: "next" };
+  if (me.locked) return { type: "lock" };
   if (!me.selectedId) {
     const citizens = me.hand.filter((c) => c.kind === "citizen");
     const special = me.hand.find((c) => c.kind !== "citizen");

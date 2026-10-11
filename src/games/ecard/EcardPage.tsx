@@ -55,8 +55,8 @@ export function EcardPage() {
     if (!practice || !local || local.phase === "over") return;
     const cpu = local.players.find((p) => !p.human);
     if (!cpu) return;
-    if (local.phase === "pick" && cpu.selectedId) return;
-    if (local.phase === "pick" && local.players.every((p) => p.selectedId)) return;
+    if (local.phase === "pick" && cpu.locked) return;
+    if (local.phase === "pick" && local.players.every((p) => p.locked)) return;
     if (local.phase === "role" && cpu.roleReady) return;
     let stop = false;
     void (async () => {
@@ -81,9 +81,12 @@ export function EcardPage() {
         }
         if (s.phase === "pick") {
           let next = s;
-          if (!bot.selectedId) next = applyEcardAction(next, bot.id, aiEcard(next, bot.id));
-          if (next.players.find((p) => p.id === bot.id)?.selectedId) {
-            next = applyEcardAction(next, bot.id, { type: "lock" });
+          if (!bot.locked) {
+            if (!bot.selectedId) next = applyEcardAction(next, bot.id, aiEcard(next, bot.id));
+            const after = next.players.find((p) => p.id === bot.id);
+            if (after?.selectedId && !after.locked) {
+              next = applyEcardAction(next, bot.id, { type: "lock" });
+            }
           }
           return next;
         }
@@ -216,8 +219,8 @@ export function EcardPage() {
                   </>
                 ) : (
                   <>
-                    {me.selectedId ? <Back /> : <div className="ecard-slot">YOU</div>}
-                    {rival.selectedId ? <Back /> : <div className="ecard-slot">RIVAL</div>}
+                    {me.locked ? <Back /> : <div className="ecard-slot">{me.selectedId ? "PICKED" : "YOU"}</div>}
+                    {rival.locked ? <Back /> : <div className="ecard-slot">RIVAL</div>}
                   </>
                 )}
               </div>
@@ -226,11 +229,15 @@ export function EcardPage() {
                   ? `${state.players.find((p) => p.id === state.winnerId)?.name || ""} wins`
                   : state.phase === "reveal"
                     ? state.log.at(-1)?.text || "Reveal"
-                    : myTurnPick
-                      ? "Choose a card, then lock it in."
-                      : me.selectedId
-                        ? "Waiting for rival…"
-                        : "Waiting…"}
+                    : me.locked
+                      ? rival.locked
+                        ? "Revealing…"
+                        : "Locked. Waiting for rival…"
+                      : myTurnPick
+                        ? "Choose a card, then lock."
+                        : me.selectedId
+                          ? "Card selected — press LOCK when ready."
+                          : "Waiting…"}
               </p>
               <div className="ecard-hand">
                 {me.hand.map((c) => (
@@ -238,7 +245,7 @@ export function EcardPage() {
                     key={c.id}
                     type="button"
                     className={`ecard-pick${me.selectedId === c.id ? " on" : ""}`}
-                    disabled={state.phase !== "pick"}
+                    disabled={state.phase !== "pick" || me.locked}
                     onClick={() => playCard(c)}
                   >
                     <EFace kind={c.kind} />
@@ -247,8 +254,13 @@ export function EcardPage() {
               </div>
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {state.phase === "pick" ? (
-                  <button className="btn btn-go" type="button" disabled={!me.selectedId} onClick={() => act({ type: "lock" })}>
-                    LOCK
+                  <button
+                    className="btn btn-go"
+                    type="button"
+                    disabled={!me.selectedId || me.locked}
+                    onClick={() => act({ type: "lock" })}
+                  >
+                    {me.locked ? "LOCKED" : "LOCK"}
                   </button>
                 ) : null}
                 {state.phase === "reveal" ? (

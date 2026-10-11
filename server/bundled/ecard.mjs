@@ -20,7 +20,8 @@ function seat(p) {
     rolePick: null,
     roleReady: false,
     hand: [],
-    selectedId: null
+    selectedId: null,
+    locked: false
   };
 }
 function startEcardDuel(a, b) {
@@ -67,8 +68,8 @@ function dealWithRoles(state, r0, r1, note) {
   return {
     ...state,
     players: [
-      { ...p0, role: r0, rolePick: r0, roleReady: true, hand: handFor(r0), selectedId: null },
-      { ...p1, role: r1, rolePick: r1, roleReady: true, hand: handFor(r1), selectedId: null }
+      { ...p0, role: r0, rolePick: r0, roleReady: true, hand: handFor(r0), selectedId: null, locked: false },
+      { ...p1, role: r1, rolePick: r1, roleReady: true, hand: handFor(r1), selectedId: null, locked: false }
     ],
     phase: "pick",
     last: null,
@@ -111,8 +112,8 @@ function refillRoles(state, swap) {
   return {
     ...state,
     players: [
-      { ...p0, role: r0, rolePick: r0, roleReady: true, hand: handFor(r0), selectedId: null },
-      { ...p1, role: r1, rolePick: r1, roleReady: true, hand: handFor(r1), selectedId: null }
+      { ...p0, role: r0, rolePick: r0, roleReady: true, hand: handFor(r0), selectedId: null, locked: false },
+      { ...p1, role: r1, rolePick: r1, roleReady: true, hand: handFor(r1), selectedId: null, locked: false }
     ],
     phase: "pick",
     last: null
@@ -147,6 +148,7 @@ function applyEcardAction(state, actorId, action) {
   }
   if (state.phase !== "pick") return state;
   if (action.type === "select") {
+    if (me.locked) return state;
     if (!me.hand.some((c) => c.id === action.cardId)) return state;
     return {
       ...state,
@@ -154,14 +156,13 @@ function applyEcardAction(state, actorId, action) {
     };
   }
   if (action.type === "lock") {
-    if (!me.selectedId) return state;
+    if (!me.selectedId || me.locked) return state;
     const next = {
       ...state,
-      players: state.players.map((p) => p.id === actorId ? { ...p, selectedId: me.selectedId } : p)
+      players: state.players.map((p) => p.id === actorId ? { ...p, locked: true } : p),
+      log: [...state.log, { id: uid("l"), text: `${me.name} locks a card.` }]
     };
-    const a = next.players[0];
-    const b = next.players[1];
-    if (!a.selectedId || !b.selectedId) return next;
+    if (!next.players.every((p) => p.locked && p.selectedId)) return next;
     return reveal(next);
   }
   return state;
@@ -186,7 +187,7 @@ function reveal(state) {
     if (!matchEnd && myResult === "win") {
       hand = [...hand, mine];
     }
-    return { ...p, hand, selectedId: null };
+    return { ...p, hand, selectedId: null, locked: false };
   });
   if (result === "draw") {
     log = [...log, { id: uid("l"), text: "Citizens cancel. Both discarded." }];
@@ -255,16 +256,16 @@ function viewEcard(state, viewerId) {
   return {
     ...state,
     players: state.players.map((p) => {
-      if (p.id === viewerId || state.phase === "reveal" || state.phase === "over" || state.phase === "role") {
-        if (state.phase === "role" && p.id !== viewerId) {
-          return { ...p, rolePick: p.roleReady ? p.rolePick : null };
-        }
+      if (state.phase === "role") {
+        if (p.id !== viewerId) return { ...p, rolePick: p.roleReady ? p.rolePick : null };
         return p;
       }
+      if (p.id === viewerId || state.phase === "reveal" || state.phase === "over") return p;
       return {
         ...p,
         hand: p.hand.map((c) => ({ id: c.id, kind: "citizen" })),
-        selectedId: p.selectedId ? "ready" : null
+        // Hide which card until locked; only show that they locked.
+        selectedId: p.locked ? "ready" : null
       };
     })
   };
@@ -282,6 +283,7 @@ function aiEcard(state, cpuId) {
     return { type: "confirmRole" };
   }
   if (state.phase === "reveal") return { type: "next" };
+  if (me.locked) return { type: "lock" };
   if (!me.selectedId) {
     const citizens = me.hand.filter((c) => c.kind === "citizen");
     const special = me.hand.find((c) => c.kind !== "citizen");
