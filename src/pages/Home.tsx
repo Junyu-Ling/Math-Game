@@ -75,30 +75,31 @@ const games = [
     blurb: "15×15. Place stones. First five in a row wins.",
     preview: "gomoku" as const,
   },
-  {
-    to: "/play/ludo",
-    idx: "10",
-    code: "LUDO",
-    name: "Flying Chess",
-    blurb: "Roll, race four pieces home. Six opens the gate.",
-    preview: "ludo" as const,
-  },
-  {
-    to: "/play/animal",
-    idx: "11",
-    code: "ANIMAL",
-    name: "Animal Chess",
-    blurb: "Jungle ranks, rivers, and dens. Enter the rival den to win.",
-    preview: "animal" as const,
-  },
-  {
-    to: "/play/army",
-    idx: "12",
-    code: "ARMY",
-    name: "Army Chess",
-    blurb: "Open 军棋. Bombs, mines, and the flag. Capture 军旗 to win.",
-    preview: "army" as const,
-  },
+  // Deferred — Flying Chess / Animal Chess / Army Chess
+  // {
+  //   to: "/play/ludo",
+  //   idx: "10",
+  //   code: "LUDO",
+  //   name: "Flying Chess",
+  //   blurb: "Roll, race four pieces home. Six opens the gate.",
+  //   preview: "ludo" as const,
+  // },
+  // {
+  //   to: "/play/animal",
+  //   idx: "11",
+  //   code: "ANIMAL",
+  //   name: "Animal Chess",
+  //   blurb: "Jungle ranks, rivers, and dens. Enter the rival den to win.",
+  //   preview: "animal" as const,
+  // },
+  // {
+  //   to: "/play/army",
+  //   idx: "12",
+  //   code: "ARMY",
+  //   name: "Army Chess",
+  //   blurb: "Open 军棋. Bombs, mines, and the flag. Capture 军旗 to win.",
+  //   preview: "army" as const,
+  // },
 ];
 
 function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
@@ -186,18 +187,6 @@ function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
       </div>
     );
   }
-  if (kind === "ludo" || kind === "animal" || kind === "army") {
-    return (
-      <div className="preview-row">
-        <div className="piece-cell" style={{ width: 40, height: 40 }}>
-          {kind === "ludo" ? "🎲" : kind === "animal" ? "狮" : "旗"}
-        </div>
-        <div className="piece-cell" style={{ width: 40, height: 40 }}>
-          {kind === "ludo" ? "🏠" : kind === "animal" ? "象" : "炸"}
-        </div>
-      </div>
-    );
-  }
   return (
     <div className="preview-row">
       <button className="m24-num" type="button" style={{ width: 52, height: 70, fontSize: 24 }}>
@@ -215,7 +204,7 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="kicker">Twelve tables · Invite play</p>
+          <p className="kicker">Nine tables · Invite play</p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
             Card art follows the physical decks. Practice against the CPU, or sign in and invite someone who is online.

@@ -16,9 +16,10 @@ import { UnoPage } from "./games/uno/UnoPage";
 import { HalliGalliPage } from "./games/halligalli/HalliGalliPage";
 import { EcardPage } from "./games/ecard/EcardPage";
 import { GomokuPage } from "./games/gomoku/GomokuPage";
-import { LudoPage } from "./games/ludo/LudoPage";
-import { AnimalPage } from "./games/animal/AnimalPage";
-import { ArmyPage } from "./games/army/ArmyPage";
+// Deferred: Flying Chess / Animal Chess / Army Chess
+// import { LudoPage } from "./games/ludo/LudoPage";
+// import { AnimalPage } from "./games/animal/AnimalPage";
+// import { ArmyPage } from "./games/army/ArmyPage";
 
 export function App() {
   return (
@@ -41,9 +42,7 @@ export function App() {
             <Route path="/play/halli" element={<HalliGalliPage />} />
             <Route path="/play/ecard" element={<EcardPage />} />
             <Route path="/play/gomoku" element={<GomokuPage />} />
-            <Route path="/play/ludo" element={<LudoPage />} />
-            <Route path="/play/animal" element={<AnimalPage />} />
-            <Route path="/play/army" element={<ArmyPage />} />
+            {/* Deferred: /play/ludo, /play/animal, /play/army */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Shell>

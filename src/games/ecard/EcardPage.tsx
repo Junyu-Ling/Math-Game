@@ -93,7 +93,7 @@ export function EcardPage() {
   }
 
   return (
-    <div className="page-wide ecard-page">
+    <div className="page-wide">
       <div className="game-head">
         <div>
           <p className="kicker">08 / ECARD · Duel</p>

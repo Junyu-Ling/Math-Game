@@ -1,4 +1,4 @@
-/* ——— Da Vinci standing / knocked-down cards ——— */
+/* âââ Da Vinci standing / knocked-down cards âââ */
 .mj {
   --w: 70px;
   --h: 104px;
@@ -314,7 +314,7 @@
   80% { transform: rotateX(-16deg) rotateY(-26deg) translateX(4px); }
 }
 
-/* ——— Playing cards ——— */
+/* âââ Playing cards âââ */
 .pcards {
   display: flex;
   gap: 10px;
@@ -547,7 +547,9 @@
 .table-flip,
 .table-bj,
 .table-m24,
-.table-uno {
+.table-uno,
+.table-ecard,
+.table-gomoku {
   border-radius: 12px;
   overflow: visible;
   position: relative;
@@ -1401,7 +1403,9 @@
 .table-bj,
 .table-m24,
 .table-uno,
-.table-hg {
+.table-hg,
+.table-ecard,
+.table-gomoku {
   background: rgba(255, 255, 255, 0.45);
   box-shadow: none;
   border: 1px solid #e5e7eb;
@@ -1484,7 +1488,9 @@
 .table-bj:has(> .coda-deal),
 .table-uno:has(> .coda-deal),
 .table-hg:has(> .coda-deal),
-.table-m24:has(> .coda-deal) {
+.table-m24:has(> .coda-deal),
+.table-ecard:has(> .coda-deal),
+.table-gomoku:has(> .coda-deal) {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2329,7 +2335,7 @@
   .coda-num { font-size: 26px; }
 }
 
-/* Flip 7 — cream cards with colored wreath ovals */
+/* Flip 7 â cream cards with colored wreath ovals */
 .flip7-card {
   --cw: 74px;
   --ch: 112px;
@@ -2453,7 +2459,7 @@
   line-height: 1;
 }
 
-/* UNO — oval number + corner indices */
+/* UNO â oval number + corner indices */
 .uno-card {
   --cw: 70px;
   --ch: 106px;
@@ -2730,7 +2736,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 .preview-row .uno-n { font-size: 18px; }
 .preview-row .uno-corner { font-size: 8px; }
 
-/* —— Halli Galli —— */
+/* ââ Halli Galli ââ */
 .table-hg .center-well {
   display: flex;
   flex-direction: column;
@@ -2919,29 +2925,19 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   font-size: 18px;
 }
 
-/* ������ E-Card / Kaiji table ������ */
+/* ——— E-Card / Gomoku (match site tables) ——— */
 .table-ecard,
-.table-gomoku,
-.table-ludo,
-.table-animal,
-.table-army {
-  background:
-    radial-gradient(ellipse 80% 60% at 50% 20%, rgba(80, 60, 40, 0.35), transparent 55%),
-    linear-gradient(165deg, #1a1510 0%, #0a0908 48%, #12100e 100%);
-  border: 1px solid #c9a227;
-  box-shadow: inset 0 0 0 3px #0a0908, inset 0 0 0 4px #8a7020, 0 18px 40px rgba(0, 0, 0, 0.35);
-  color: #e8dcc8;
+.table-gomoku {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: clamp(680px, 84dvh, 840px);
+  min-height: clamp(680px, 84dvh, 840px);
+  max-height: clamp(680px, 84dvh, 840px);
+  overflow: hidden;
+  padding: clamp(20px, 2.4vw, 30px);
+  color: var(--ink);
 }
-
-.table-ecard .status-line,
-.table-gomoku .status-line,
-.table-ludo .status-line,
-.table-animal .status-line,
-.table-army .status-line {
-  color: #d4c4a8;
-}
-
-.ecard-page .kicker { color: #c9a227; letter-spacing: 0.22em; }
 
 .ecard-meta {
   display: flex;
@@ -2949,15 +2945,14 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
-  font-family: Georgia, "Times New Roman", serif;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   font-size: 13px;
-  color: #c9a227;
+  color: var(--muted);
   text-transform: uppercase;
 }
 
 .ecard-vs {
-  color: #8a7020;
+  color: var(--ink);
   font-weight: 700;
 }
 
@@ -2983,11 +2978,11 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 .ecard-face {
   width: 118px;
   height: 170px;
-  border: 2px solid #c9a227;
-  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   overflow: hidden;
-  background: #111;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(17, 17, 17, 0.08);
   position: relative;
 }
 
@@ -3007,27 +3002,27 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   display: grid;
   place-items: center;
   background:
-    radial-gradient(circle at 50% 40%, #3a2a18, #0e0c0a 70%),
-    repeating-linear-gradient(45deg, #1a140e 0 6px, #12100c 6px 12px);
+    linear-gradient(145deg, #f7f4ef, #ebe6de);
+  border-color: #d6d0c6;
 }
 
 .ecard-face.back b {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Cormorant Garamond", Georgia, serif;
   font-size: 42px;
-  color: #c9a227;
-  text-shadow: 0 2px 0 #000;
+  color: #111;
 }
 
 .ecard-slot {
   width: 118px;
   height: 170px;
-  border: 1px dashed #8a7020;
-  border-radius: 4px;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
   display: grid;
   place-items: center;
-  color: #8a7020;
-  letter-spacing: 0.2em;
+  color: var(--faint);
+  letter-spacing: 0.16em;
   font-size: 12px;
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .ecard-pick {
@@ -3040,7 +3035,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 .ecard-pick:not(:disabled):hover { transform: translateY(-8px); }
 .ecard-pick.on { transform: translateY(-12px); }
 .ecard-pick.on .ecard-face {
-  box-shadow: 0 0 0 2px #f0d878, 0 14px 28px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 2px #111, 0 12px 22px rgba(17, 17, 17, 0.12);
 }
 .ecard-pick:disabled { opacity: 0.55; }
 
@@ -3054,15 +3049,14 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   width: 48px;
   height: 70px;
   object-fit: cover;
-  border: 1px solid #c9a227;
-  border-radius: 2px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
 }
 
-/* board games shared */
 .kaiji-board-wrap {
   display: grid;
   place-items: center;
-  gap: 12px;
+  gap: 14px;
   padding: 8px 0 16px;
 }
 
@@ -3071,10 +3065,11 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   grid-template-columns: repeat(15, 28px);
   grid-template-rows: repeat(15, 28px);
   gap: 0;
-  background: #c4a574;
-  border: 2px solid #c9a227;
-  box-shadow: inset 0 0 0 1px #8a7020;
-  padding: 10px;
+  background: #e8d9bc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 18px rgba(17, 17, 17, 0.06);
+  padding: 12px;
 }
 
 .gomoku-cell {
@@ -3092,7 +3087,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   position: absolute;
   inset: 13px 0 auto 0;
   height: 1px;
-  background: #5a4030;
+  background: rgba(90, 64, 48, 0.45);
 }
 
 .gomoku-cell::after {
@@ -3100,7 +3095,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   position: absolute;
   inset: 0 auto 0 13px;
   width: 1px;
-  background: #5a4030;
+  background: rgba(90, 64, 48, 0.45);
 }
 
 .gomoku-stone {
@@ -3111,96 +3106,18 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 }
 
 .gomoku-stone.black {
-  background: radial-gradient(circle at 35% 30%, #555, #0a0a0a 70%);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  background: radial-gradient(circle at 35% 30%, #555, #111 70%);
+  box-shadow: 0 2px 4px rgba(17, 17, 17, 0.25);
 }
 
 .gomoku-stone.white {
-  background: radial-gradient(circle at 35% 30%, #fff, #c8c0b0 75%);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.35);
+  background: radial-gradient(circle at 35% 30%, #fff, #ebe6de 75%);
+  box-shadow: 0 2px 4px rgba(17, 17, 17, 0.18);
+  border: 1px solid #d6d0c6;
 }
 
-.ludo-track {
-  display: grid;
-  grid-template-columns: repeat(11, 36px);
-  grid-template-rows: repeat(11, 36px);
-  gap: 2px;
-  border: 2px solid #c9a227;
-  padding: 8px;
-  background: #15120e;
-}
-
-.ludo-cell {
-  width: 36px;
-  height: 36px;
-  border: 1px solid #3a3228;
-  background: #221c16;
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  color: #8a7020;
-  padding: 0;
-  border-radius: 2px;
-}
-
-.ludo-cell.path { background: #2a241c; }
-.ludo-cell.base-a { background: #3a2218; }
-.ludo-cell.base-b { background: #1a2a28; }
-.ludo-cell.home { background: #2a2818; border-color: #c9a227; }
-.ludo-piece {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 1px solid #c9a227;
-}
-.ludo-piece.a { background: #8b3a2a; }
-.ludo-piece.b { background: #2a6b5a; }
-
-.animal-board,
-.army-board {
-  display: grid;
-  gap: 3px;
-  border: 2px solid #c9a227;
-  padding: 8px;
-  background: #15120e;
-}
-
-.animal-board { grid-template-columns: repeat(7, 48px); }
-.army-board { grid-template-columns: repeat(5, 56px); }
-
-.piece-cell {
-  width: 48px;
-  height: 48px;
-  border: 1px solid #3a3228;
-  background: #221c16;
-  color: #e8dcc8;
-  font-size: 11px;
-  font-family: Georgia, "Times New Roman", serif;
-  display: grid;
-  place-items: center;
-  padding: 2px;
-  border-radius: 2px;
-  line-height: 1.15;
-  text-align: center;
-}
-
-.army-board .piece-cell { width: 56px; height: 56px; font-size: 12px; }
-.piece-cell.river { background: #1a2830; color: #6a8a9a; }
-.piece-cell.trap { background: #3a2818; }
-.piece-cell.den { background: #2a2810; border-color: #c9a227; }
-.piece-cell.sel { box-shadow: inset 0 0 0 2px #f0d878; }
-.piece-cell.can { box-shadow: inset 0 0 0 2px #6a9a6a; }
-.piece-cell .side-a { color: #e8a090; }
-.piece-cell .side-b { color: #90c8b8; }
-.dice-pill {
-  min-width: 52px;
-  height: 52px;
-  border: 2px solid #c9a227;
-  background: #1a1510;
-  color: #f0d878;
-  font-size: 24px;
-  font-family: Georgia, serif;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-}
+/* Deferred board-game styles kept for later (ludo / animal / army) */
+/*
+.ludo-track { ... }
+.animal-board, .army-board { ... }
+*/
