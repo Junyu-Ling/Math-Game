@@ -718,6 +718,8 @@ async function expireArrange(room) {
     }
   } else if (room.game === "ecard" && room.state.rpsReveal && room.mods.ecard.finishEcardRps) {
     room.state = room.mods.ecard.finishEcardRps(room.state);
+  } else if (room.game === "gomoku" && room.state.rpsReveal && room.mods.gomoku.finishGomokuRps) {
+    room.state = room.mods.gomoku.finishGomokuRps(room.state);
   } else {
     return;
   }
@@ -1071,6 +1073,9 @@ export async function applyRoomAction(user, roomId, action, mods) {
     }
   } else if (room.game === "gomoku") {
     room.state = mods.gomoku.applyGomokuAction(room.state, user.id, action);
+    if (room.state.rpsReveal && !before.rpsReveal) {
+      room.endsAt = Date.now() + (mods.gomoku.RPS_REVEAL_MS || 2800);
+    }
   } else if (room.game === "ludo") {
     room.state = mods.ludo.applyLudoAction(room.state, user.id, action);
   } else if (room.game === "animal") {

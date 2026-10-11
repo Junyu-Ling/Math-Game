@@ -43,8 +43,8 @@ const RULES: Record<string, string[]> = {
     "After a round, reclaim all cards. Slave-side round win scores 5× an Emperor-side round win. Highest score after 12 rounds wins.",
   ],
   gomoku: [
-    "15×15 board. Players alternate placing stones. Black opens. First exact five in a row wins.",
-    "Black (first) fouls lose immediately: 三三禁手 (two open threes), 四四禁手 (two fours), 长连禁手 (six or more). White has no forbidden moves.",
+    "15×15 board. Rock-paper-scissors: winner plays black and opens. First exact five in a row wins.",
+    "Black fouls lose immediately: double open three, double open four, or overline (six or more). White has no forbidden moves.",
   ],
   ludo: [
     "Two-player flying chess. Each has four pieces. Roll a die to move.",

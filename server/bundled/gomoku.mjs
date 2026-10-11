@@ -5,6 +5,7 @@ function uid(prefix = "id") {
 
 // src/games/gomoku/engine.ts
 var SIZE = 15;
+var RPS_REVEAL_MS = 2800;
 var DIRS = [
   [0, 1],
   [1, 0],
@@ -12,10 +13,11 @@ var DIRS = [
   [1, -1]
 ];
 var FOUL_LABEL = {
-  "double-three": "\u4E09\u4E09\u7981\u624B",
-  "double-four": "\u56DB\u56DB\u7981\u624B",
-  overline: "\u957F\u8FDE\u7981\u624B"
+  "double-three": "double open three",
+  "double-four": "double open four",
+  overline: "overline"
 };
+var RPS_LABEL = { rock: "rock", paper: "paper", scissors: "scissors" };
 function foulLabel(kind) {
   return FOUL_LABEL[kind];
 }
@@ -25,28 +27,106 @@ function emptyBoard() {
 function inBoard(r, c) {
   return r >= 0 && r < SIZE && c >= 0 && c < SIZE;
 }
+function seat(p) {
+  return { id: p.id, name: p.name, human: p.human !== false, stone: null };
+}
 function startGomokuDuel(a, b) {
   return {
     board: emptyBoard(),
-    players: [
-      { id: a.id, name: a.name, human: a.human !== false, stone: 1 },
-      { id: b.id, name: b.name, human: b.human !== false, stone: 2 }
-    ],
+    players: [seat(a), seat(b)],
     turn: 0,
-    phase: "play",
+    phase: "rps",
+    rpsThrows: {},
+    rpsReveal: null,
     winnerId: null,
     foul: null,
     last: null,
     log: [
       {
         id: uid("l"),
-        text: `${a.name} (black) vs ${b.name} (white). Five in a row wins. Black: \u4E09\u4E09 / \u56DB\u56DB / \u957F\u8FDE\u7981\u624B.`
+        text: `Rock-paper-scissors. Winner plays black. Five in a row wins. Black fouls: double open three, double open four, overline.`
       }
     ]
   };
 }
 function startGomokuPractice() {
   return startGomokuDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });
+}
+function rpsWins(a, b) {
+  return a === "rock" && b === "scissors" || a === "paper" && b === "rock" || a === "scissors" && b === "paper";
+}
+function beginRpsReveal(state, aId, a, bId, b) {
+  return {
+    ...state,
+    rpsThrows: { [aId]: a, [bId]: b },
+    rpsReveal: { aId, a, bId, b }
+  };
+}
+function assignBlack(state, blackId, note) {
+  const players = state.players.map((p) => ({
+    ...p,
+    stone: p.id === blackId ? 1 : 2
+  }));
+  const turn = players.findIndex((p) => p.id === blackId);
+  const black = players.find((p) => p.id === blackId);
+  const white = players.find((p) => p.id !== blackId);
+  return {
+    ...state,
+    players,
+    turn: turn < 0 ? 0 : turn,
+    phase: "play",
+    rpsThrows: {},
+    rpsReveal: null,
+    log: [
+      ...state.log,
+      { id: uid("l"), text: note },
+      {
+        id: uid("l"),
+        text: `${black?.name || "Black"} plays black \xB7 ${white?.name || "White"} plays white. Black to move.`
+      }
+    ]
+  };
+}
+function finishGomokuRps(state) {
+  if (state.phase !== "rps" || !state.rpsReveal) return state;
+  const { aId, a, bId, b } = state.rpsReveal;
+  if (a === b) {
+    return {
+      ...state,
+      rpsThrows: {},
+      rpsReveal: null,
+      log: [...state.log, { id: uid("l"), text: `Tie, both ${RPS_LABEL[a]}. Throw again.` }]
+    };
+  }
+  const winnerId = rpsWins(a, b) ? aId : bId;
+  const winner = state.players.find((p) => p.id === winnerId);
+  const aName = state.players.find((p) => p.id === aId)?.name;
+  const bName = state.players.find((p) => p.id === bId)?.name;
+  return assignBlack(
+    state,
+    winnerId,
+    `${aName} ${RPS_LABEL[a]} vs ${bName} ${RPS_LABEL[b]}. ${winner?.name || "Winner"} takes black.`
+  );
+}
+function playRps(state, actorId, you) {
+  if (state.phase !== "rps" || state.rpsReveal) return state;
+  const me = state.players.find((p) => p.id === actorId);
+  const foe = state.players.find((p) => p.id !== actorId);
+  if (!me || !foe) return state;
+  if (state.rpsThrows[me.id]) return state;
+  if (!foe.human) {
+    const ai = ["rock", "paper", "scissors"][Math.floor(Math.random() * 3)];
+    return beginRpsReveal(state, me.id, you, foe.id, ai);
+  }
+  const theirs = state.rpsThrows[foe.id];
+  if (!theirs) {
+    return {
+      ...state,
+      rpsThrows: { ...state.rpsThrows, [me.id]: you },
+      log: [...state.log, { id: uid("l"), text: `${me.name} is ready. Waiting for the other hand.` }]
+    };
+  }
+  return beginRpsReveal({ ...state, rpsThrows: { ...state.rpsThrows, [me.id]: you } }, me.id, you, foe.id, theirs);
 }
 function lineLen(board, r, c, dr, dc, stone) {
   let n = 0;
@@ -129,10 +209,10 @@ function isOpenThreeOnAxis(board, r, c, dr, dc, stone) {
   }
   return false;
 }
-function countFours(board, r, c, stone) {
+function countOpenFours(board, r, c, stone) {
   let n = 0;
   for (const [dr, dc] of DIRS) {
-    if (isFourOnAxis(board, r, c, dr, dc, stone)) n += 1;
+    if (isOpenFourOnAxis(board, r, c, dr, dc, stone)) n += 1;
   }
   return n;
 }
@@ -147,14 +227,19 @@ function blackFoulAt(board, r, c) {
   if (board[r][c] !== 1) return null;
   if (isOverline(board, r, c)) return "overline";
   if (winsAt(board, r, c)) return null;
-  if (countFours(board, r, c, 1) >= 2) return "double-four";
+  if (countOpenFours(board, r, c, 1) >= 2) return "double-four";
   if (countOpenThrees(board, r, c, 1) >= 2) return "double-three";
   return null;
 }
 function applyGomokuAction(state, actorId, action) {
+  if (state.phase === "over") return state;
+  if (state.phase === "rps") {
+    if (action.type === "rps") return playRps(state, actorId, action.throw);
+    return state;
+  }
   if (state.phase !== "play" || action.type !== "place") return state;
   const me = state.players[state.turn];
-  if (!me || me.id !== actorId) return state;
+  if (!me || me.id !== actorId || !me.stone) return state;
   const { r, c } = action;
   if (r < 0 || r >= SIZE || c < 0 || c >= SIZE || state.board[r][c]) return state;
   const board = state.board.map((row) => row.slice());
@@ -175,7 +260,7 @@ function applyGomokuAction(state, actorId, action) {
           ...state.log,
           {
             id: uid("l"),
-            text: `${me.name} \u9ED1\u65B9${tip}\uFF08${r + 1},${c + 1}\uFF09\u2014 ${opp.name} wins.`
+            text: `${me.name} fouls with ${tip} at (${r + 1},${c + 1}) \u2014 ${opp.name} wins.`
           }
         ]
       };
@@ -213,8 +298,12 @@ function applyGomokuAction(state, actorId, action) {
     log: [...state.log, { id: uid("l"), text: `${me.name} plays (${r + 1},${c + 1}).` }]
   };
 }
-function viewGomoku(state, _viewerId) {
-  return state;
+function viewGomoku(state, viewerId) {
+  return {
+    ...state,
+    rpsThrows: state.rpsReveal ? { [state.rpsReveal.aId]: state.rpsReveal.a, [state.rpsReveal.bId]: state.rpsReveal.b } : state.rpsThrows[viewerId] ? { [viewerId]: state.rpsThrows[viewerId] } : {},
+    rpsReveal: state.rpsReveal
+  };
 }
 function scoreCell(board, r, c, stone) {
   let score = 0;
@@ -228,8 +317,13 @@ function scoreCell(board, r, c, stone) {
   return score;
 }
 function aiGomoku(state) {
+  if (state.phase === "rps") {
+    const hand = ["rock", "paper", "scissors"][Math.floor(Math.random() * 3)];
+    return { type: "rps", throw: hand };
+  }
   const me = state.players[state.turn];
-  const oppStone = me.stone === 1 ? 2 : 1;
+  const myStone = me.stone ?? 1;
+  const oppStone = myStone === 1 ? 2 : 1;
   let best = null;
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
@@ -244,13 +338,13 @@ function aiGomoku(state) {
       }
       if (!near && state.last) continue;
       const trial = state.board.map((row) => row.slice());
-      trial[r][c] = me.stone;
-      if (me.stone === 1 && blackFoulAt(trial, r, c)) continue;
+      trial[r][c] = myStone;
+      if (myStone === 1 && blackFoulAt(trial, r, c)) continue;
       if (winsAt(trial, r, c)) return { type: "place", r, c };
       trial[r][c] = oppStone;
       const block = winsAt(trial, r, c) ? 5e3 : 0;
-      trial[r][c] = me.stone;
-      const attack = scoreCell(trial, r, c, me.stone);
+      trial[r][c] = myStone;
+      const attack = scoreCell(trial, r, c, myStone);
       trial[r][c] = oppStone;
       const defend = scoreCell(trial, r, c, oppStone) * 0.9;
       const center = 7 - Math.abs(r - 7) - Math.abs(c - 7);
@@ -262,10 +356,12 @@ function aiGomoku(state) {
   return { type: "place", r: 7, c: 7 };
 }
 export {
+  RPS_REVEAL_MS,
   SIZE,
   aiGomoku,
   applyGomokuAction,
   blackFoulAt,
+  finishGomokuRps,
   foulLabel,
   startGomokuDuel,
   startGomokuPractice,
