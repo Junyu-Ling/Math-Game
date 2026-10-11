@@ -35,7 +35,12 @@ function startEcardDuel(a, b) {
     winnerId: null,
     wins: { [a.id]: 0, [b.id]: 0 },
     goal: 3,
-    log: [{ id: uid("l"), text: "Choose Emperor or Slave. First to 3 match wins. Roles swap every 3 matches." }]
+    log: [
+      {
+        id: uid("l"),
+        text: "Choose Emperor or Slave. First to 3 match wins. Match winner plays Emperor next; loser plays Slave."
+      }
+    ]
   };
 }
 function startEcardPractice() {
@@ -100,14 +105,14 @@ function resolveRoles(state) {
     `Both wanted ${a}. Coin flip \u2192 ${p0.name} ${r0.toUpperCase()} \xB7 ${p1.name} ${r1.toUpperCase()}.`
   );
 }
-function refillRoles(state, swap) {
+function refillRoles(state, matchWinnerId) {
   const p0 = state.players[0];
   const p1 = state.players[1];
   let r0 = p0.role ?? "emperor";
   let r1 = p1.role ?? "slave";
-  if (swap) {
-    r0 = r0 === "emperor" ? "slave" : "emperor";
-    r1 = r1 === "emperor" ? "slave" : "emperor";
+  if (matchWinnerId) {
+    r0 = p0.id === matchWinnerId ? "emperor" : "slave";
+    r1 = p1.id === matchWinnerId ? "emperor" : "slave";
   }
   return {
     ...state,
@@ -208,13 +213,14 @@ function reveal(state) {
   let wins = { ...state.wins };
   let winnerId = null;
   let phase = "reveal";
+  let matchWinnerId = null;
   if (matchEnd) {
-    const matchWinner = result === "a" ? a.id : b.id;
-    wins[matchWinner] = (wins[matchWinner] || 0) + 1;
+    matchWinnerId = result === "a" ? a.id : b.id;
+    wins[matchWinnerId] = (wins[matchWinnerId] || 0) + 1;
     log = [...log, { id: uid("l"), text: `${result === "a" ? a.name : b.name} takes the match point! (${wins[a.id]}\u2013${wins[b.id]})` }];
-    if (wins[matchWinner] >= state.goal) {
+    if ((wins[matchWinnerId] || 0) >= state.goal) {
       phase = "over";
-      winnerId = matchWinner;
+      winnerId = matchWinnerId;
       log = [...log, { id: uid("l"), text: `${result === "a" ? a.name : b.name} wins the E-Card duel.` }];
     }
   }
@@ -222,7 +228,14 @@ function reveal(state) {
     ...state,
     players,
     phase,
-    last: { aId: a.id, a: ca.kind, bId: b.id, b: cb.kind, result: matchEnd ? "match" : result },
+    last: {
+      aId: a.id,
+      a: ca.kind,
+      bId: b.id,
+      b: cb.kind,
+      result: matchEnd ? "match" : result,
+      matchWinnerId
+    },
     wins,
     winnerId,
     log,
@@ -233,19 +246,20 @@ function continueAfterReveal(state) {
   if (state.phase === "over") return state;
   const needFresh = state.last?.result === "match" || state.players.some((p) => p.hand.length === 0);
   if (needFresh) {
-    const matchesDone = Object.values(state.wins).reduce((s, n) => s + n, 0);
-    const swap = matchesDone > 0 && matchesDone % 3 === 0;
-    const next = refillRoles(state, swap);
+    const matchWinnerId = state.last?.result === "match" ? state.last.matchWinnerId : null;
+    const next = refillRoles(state, matchWinnerId);
+    const emp = next.players.find((p) => p.role === "emperor");
+    const slv = next.players.find((p) => p.role === "slave");
     return {
       ...next,
-      set: state.set + (swap ? 1 : 0),
+      set: state.set + (matchWinnerId ? 1 : 0),
       round: state.round + 1,
       tricksInSet: 0,
       log: [
         ...state.log,
         {
           id: uid("l"),
-          text: swap ? `Roles swap. ${next.players[0].name} is ${next.players[0].role}. Fresh hands.` : "Fresh hands for the next match."
+          text: matchWinnerId ? `${emp?.name || "Winner"} plays Emperor next \xB7 ${slv?.name || "Loser"} plays Slave. Fresh hands.` : "Fresh hands for the next match."
         }
       ]
     };

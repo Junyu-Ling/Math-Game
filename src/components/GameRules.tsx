@@ -40,7 +40,7 @@ const RULES: Record<string, string[]> = {
   ecard: [
     "Heads-up Kaiji E-Card. Both players choose Emperor or Slave at the start (coin flip if both pick the same).",
     "Emperor side: E + 4 Citizens. Slave side: S + 4 Citizens. E beats C, C beats S, S beats E. Citizens cancel each other.",
-    "As in the original: when Emperor beats Citizen, Emperor returns to hand — the match only ends when Emperor or Slave loses. First to 3 match wins; roles swap every 3 matches.",
+    "When Emperor beats Citizen, Emperor returns to hand. A match ends when Emperor or Slave loses. Match winner plays Emperor next; loser plays Slave. First to 3 match wins.",
   ],
   gomoku: [
     "15×15 board. Players alternate placing stones. Black opens.",

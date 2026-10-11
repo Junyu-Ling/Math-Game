@@ -140,7 +140,7 @@ export function EcardPage() {
               <GameSetup
                 kicker="E-CARD"
                 title="Emperor · Citizen · Slave"
-                blurb="Kaiji’s psychological duel. Slave beats Emperor. First to 3 match wins. Roles swap every 3 matches."
+                blurb="Kaiji’s psychological duel. Slave beats Emperor. First to 3 match wins. Match winner plays Emperor next."
                 game="ecard"
                 onPractice={() => setLocal(startEcardPractice())}
               />
