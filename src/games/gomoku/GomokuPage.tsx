@@ -256,9 +256,12 @@ export function GomokuPage() {
                       <button
                         key={`${r}-${c}`}
                         type="button"
-                        className={`gomoku-cell${hoshi ? " star" : ""}${v ? " filled" : ""}${last ? " last" : ""}${foulCell ? " foul" : ""}`}
-                        disabled={!myTurn || Boolean(v) || state.phase !== "play"}
-                        onClick={() => act({ type: "place", r, c })}
+                        className={`gomoku-cell${hoshi ? " star" : ""}${v ? " filled" : ""}${last ? " last" : ""}${foulCell ? " foul" : ""}${!myTurn && state.phase === "play" && !v ? " waiting" : ""}`}
+                        disabled={Boolean(v) || state.phase !== "play"}
+                        onClick={() => {
+                          if (!myTurn) return;
+                          act({ type: "place", r, c });
+                        }}
                       >
                         {hoshi && !v ? <span className="gomoku-hoshi" /> : null}
                         {v ? <span className={`gomoku-stone ${v === 1 ? "black" : "white"}`} /> : null}

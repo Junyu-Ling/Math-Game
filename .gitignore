@@ -7,5 +7,7 @@ dist
 server/.env
 server/data
 server/coda-engine.mjs
+server/engines/*
+!server/engines/README.md
 
 .vercel

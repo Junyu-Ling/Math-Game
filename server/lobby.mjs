@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import { loadMods } from "./game-mods.mjs";
+import { rapfiAvailable, rapfiSuggest } from "./rapfi.mjs";
 
 const ONLINE_SEC = 20;
 const INVITE_SEC = 60;
@@ -968,18 +969,26 @@ function cpuIsToAct(room) {
 }
 
 function armCpuThink(room) {
-  room.cpuReadyAt = cpuIsToAct(room) ? Date.now() + CPU_THINK_MS : null;
+  if (!cpuIsToAct(room)) {
+    room.cpuReadyAt = null;
+    return;
+  }
+  // RAPFI already spends wall-clock time thinking; don't add a full extra second.
+  const delay = room.game === "gomoku" && rapfiAvailable() ? 180 : CPU_THINK_MS;
+  room.cpuReadyAt = Date.now() + delay;
 }
 
 async function pumpCpu(room) {
   if (!room?.id || !room.cpuReadyAt || Date.now() + 40 < room.cpuReadyAt) return false;
-  if (!(await kvSetNx(`axiom:cpustep:${room.id}`, "1", 4))) return false;
+  const lockTtl = room.game === "gomoku" && rapfiAvailable() ? 30 : 4;
+  if (!(await kvSetNx(`axiom:cpustep:${room.id}`, "1", lockTtl))) return false;
   try {
     const fresh = await attachMods(await getRoomRecord(room.id));
     if (!fresh) return false;
     fresh.mods = fresh.mods || room.mods;
     if (!fresh.cpuReadyAt || Date.now() + 40 < fresh.cpuReadyAt || !cpuIsToAct(fresh)) return false;
-    if (!playOneCpuTurn(fresh)) {
+    const ok = await playOneCpuTurn(fresh);
+    if (!ok) {
       fresh.cpuReadyAt = null;
     } else {
       fresh.cpuReadyAt = cpuIsToAct(fresh) ? Date.now() + CPU_THINK_MS : null;
@@ -993,7 +1002,7 @@ async function pumpCpu(room) {
   }
 }
 
-function playOneCpuTurn(room) {
+async function playOneCpuTurn(room) {
   const mods = room.mods;
   const s = room.state;
   if (!mods || !s || !cpuIsToAct(room)) return false;
@@ -1075,7 +1084,18 @@ function playOneCpuTurn(room) {
       return true;
     }
     const cur = s.players[s.turn];
-    if (!isCpuPlayer(cur)) return false;
+    if (!isCpuPlayer(cur) || !cur.stone) return false;
+    // Prefer RAPFI (Gomocup) when RAPFI_PATH / server/engines is configured.
+    if (s.phase === "play" && rapfiAvailable()) {
+      const move = await rapfiSuggest(s.board, cur.stone);
+      if (move) {
+        const next = mods.gomoku.applyGomokuAction(s, cur.id, { type: "place", r: move.r, c: move.c });
+        if (next.last?.r === move.r && next.last?.c === move.c) {
+          room.state = next;
+          return true;
+        }
+      }
+    }
     room.state = mods.gomoku.applyGomokuAction(s, cur.id, mods.gomoku.aiGomoku(s));
     return true;
   }
