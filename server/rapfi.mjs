@@ -27,10 +27,13 @@ function enginePath() {
   const fromEnv = String(process.env.RAPFI_PATH || "").trim();
   if (fromEnv) return fromEnv;
   const local = [
+    path.join(__dirname, "engines", "rapfi-extract", "pbrain-rapfi.exe"),
+    path.join(__dirname, "engines", "rapfi-extract", "pbrain-rapfi-windows-avx2.exe"),
+    path.join(__dirname, "engines", "rapfi-extract", "pbrain-rapfi-windows-sse.exe"),
     path.join(__dirname, "engines", "pbrain-rapfi.exe"),
     path.join(__dirname, "engines", "pbrain-rapfi"),
-    path.join(__dirname, "engines", "rapfi.exe"),
-    path.join(__dirname, "engines", "rapfi"),
+    path.join(__dirname, "engines", "rapfi-extract", "pbrain-rapfi-linux-clang-avx2"),
+    path.join(__dirname, "engines", "rapfi-extract", "pbrain-rapfi-linux-clang-sse"),
   ];
   return local.find((p) => existsSync(p)) || "";
 }

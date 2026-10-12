@@ -9,5 +9,6 @@ server/data
 server/coda-engine.mjs
 server/engines/*
 !server/engines/README.md
+server/engines/rapfi-extract/
 
 .vercel
