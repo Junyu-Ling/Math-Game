@@ -8,7 +8,6 @@ import {
   HALLI_FRUITS,
   HALLI_LABEL,
   ringingFruit,
-  startHalliPractice,
   topOpen,
   type HalliAction,
   type HalliCard,
@@ -215,11 +214,7 @@ export function HalliGalliPage() {
                     ) : (
                       <p>{host ? "Need at least 2 players to start." : "Waiting for the host to start."}</p>
                     )
-                  ) : (
-                    <button className="btn" type="button" onClick={() => setLocal(startHalliPractice(2))}>
-                      Practice vs CPU
-                    </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </>

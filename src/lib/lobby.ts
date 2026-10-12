@@ -64,6 +64,7 @@ export const GAME_LABEL: Record<string, string> = {
 /** Soft seat cap for open tables. Flip 7 is effectively unlimited. */
 export function tableMax(game: string) {
   if (game === "flip7") return 16;
+  if (game === "gomoku" || game === "ecard") return 2;
   return 4;
 }
 

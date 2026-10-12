@@ -6,7 +6,6 @@ import {
   currentUno,
   legalCards,
   needsUnoCall,
-  startUnoPractice,
   topCard,
   type UnoAction,
   type UnoColor,
@@ -282,11 +281,7 @@ export function UnoPage() {
                   ) : (
                     <p>{host ? "Need at least 2 players to start." : "Waiting for the host to start."}</p>
                   )
-                ) : (
-                  <button className="btn" type="button" onClick={() => setLocal(startUnoPractice(2))}>
-                    Practice vs CPU
-                  </button>
-                )}
+                ) : null}
               </div>
             </div>
             </>

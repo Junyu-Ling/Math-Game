@@ -19,7 +19,9 @@ function uid(prefix) {
 const CPU_NAMES = ["CPU", "CPU 2", "CPU 3", "CPU 4", "CPU 5", "CPU 6", "CPU 7", "CPU 8", "CPU 9", "CPU 10", "CPU 11", "CPU 12", "CPU 13", "CPU 14", "CPU 15"];
 
 function tableMax(game) {
-  return game === "flip7" ? 16 : 4;
+  if (game === "flip7") return 16;
+  if (game === "gomoku" || game === "ecard") return 2;
+  return 4;
 }
 
 function isCpuId(id) {
@@ -877,6 +879,8 @@ function newLobbyState(game, people, mods, meta) {
   if (game === "coda") return mods.coda.startCodaLobby(people, Boolean(meta?.useJokers));
   if (game === "flip7") return mods.flip.startFlip7Lobby(people);
   if (game === "halli") return mods.halli.startHalliLobby(people);
+  if (game === "gomoku") return mods.gomoku.startGomokuLobby(people);
+  if (game === "ecard") return mods.ecard.startEcardLobby(people);
   throw new Error("Unknown table game");
 }
 
@@ -885,6 +889,8 @@ function rebuildLobby(rec, joiner, mods) {
   if (rec.game === "uno") return mods.uno.startUnoLobby(people);
   if (rec.game === "flip7") return mods.flip.startFlip7Lobby(people);
   if (rec.game === "halli") return mods.halli.startHalliLobby(people);
+  if (rec.game === "gomoku") return mods.gomoku.startGomokuLobby(people);
+  if (rec.game === "ecard") return mods.ecard.startEcardLobby(people);
   if (rec.game === "coda") {
     let state = mods.coda.startCodaLobby(people, Boolean(rec.state?.useJokers));
     for (const p of rec.state.players || []) {
@@ -932,6 +938,31 @@ function cpuIsToAct(room) {
     }
     const cur = s.players[s.turn];
     return Boolean(isCpuPlayer(cur) && !cur.out);
+  }
+  if (room.game === "gomoku") {
+    if (s.rpsReveal) return false;
+    if (s.phase === "rps") {
+      return s.players.some((p) => isCpuPlayer(p) && !s.rpsThrows?.[p.id]);
+    }
+    if (s.phase !== "play") return false;
+    const cur = s.players[s.turn];
+    return Boolean(isCpuPlayer(cur));
+  }
+  if (room.game === "ecard") {
+    if (s.rpsReveal) return false;
+    if (s.phase === "rps") {
+      return s.players.some((p) => isCpuPlayer(p) && !s.rpsThrows?.[p.id]);
+    }
+    if (s.phase === "role") {
+      const chooser = s.players.find((p) => p.id === s.roleChooserId);
+      return Boolean(chooser && isCpuPlayer(chooser));
+    }
+    if (s.phase === "reveal") {
+      return s.players.some((p) => isCpuPlayer(p));
+    }
+    if (s.phase === "pick") {
+      return s.players.some((p) => isCpuPlayer(p) && !p.locked);
+    }
   }
   return false;
 }
@@ -1035,10 +1066,57 @@ function playOneCpuTurn(room) {
     room.state = mods.halli.applyHalliAction(s, cur.id, mods.halli.aiHalli(s));
     return true;
   }
+
+  if (room.game === "gomoku") {
+    if (s.phase === "rps" && !s.rpsReveal) {
+      const cpu = s.players.find((p) => isCpuPlayer(p) && !s.rpsThrows?.[p.id]);
+      if (!cpu) return false;
+      room.state = mods.gomoku.applyGomokuAction(s, cpu.id, mods.gomoku.aiGomoku(s));
+      return true;
+    }
+    const cur = s.players[s.turn];
+    if (!isCpuPlayer(cur)) return false;
+    room.state = mods.gomoku.applyGomokuAction(s, cur.id, mods.gomoku.aiGomoku(s));
+    return true;
+  }
+
+  if (room.game === "ecard") {
+    if (s.phase === "reveal") {
+      const cpu = s.players.find((p) => isCpuPlayer(p));
+      if (!cpu) return false;
+      room.state = mods.ecard.applyEcardAction(s, cpu.id, { type: "next" });
+      return true;
+    }
+    if (s.phase === "rps" && !s.rpsReveal) {
+      const cpu = s.players.find((p) => isCpuPlayer(p) && !s.rpsThrows?.[p.id]);
+      if (!cpu) return false;
+      room.state = mods.ecard.applyEcardAction(s, cpu.id, mods.ecard.aiEcard(s, cpu.id));
+      return true;
+    }
+    if (s.phase === "role") {
+      const cpu = s.players.find((p) => p.id === s.roleChooserId && isCpuPlayer(p));
+      if (!cpu) return false;
+      room.state = mods.ecard.applyEcardAction(s, cpu.id, mods.ecard.aiEcard(s, cpu.id));
+      return true;
+    }
+    if (s.phase === "pick") {
+      const cpu = s.players.find((p) => isCpuPlayer(p) && !p.locked);
+      if (!cpu) return false;
+      let next = s;
+      const act = mods.ecard.aiEcard(next, cpu.id);
+      next = mods.ecard.applyEcardAction(next, cpu.id, act);
+      const after = next.players.find((p) => p.id === cpu.id);
+      if (after && after.selectedId && !after.locked) {
+        next = mods.ecard.applyEcardAction(next, cpu.id, { type: "lock" });
+      }
+      room.state = next;
+      return true;
+    }
+  }
   return false;
 }
 
-const OPEN_TABLES = new Set(["coda", "uno", "flip7", "halli"]);
+const OPEN_TABLES = new Set(["coda", "uno", "flip7", "halli", "gomoku", "ecard"]);
 
 export async function applyRoomAction(user, roomId, action, mods) {
   mods = mods || (await getMods());

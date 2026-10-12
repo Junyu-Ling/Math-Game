@@ -1,14 +1,9 @@
 import { useEffect, useState } from "react";
 import {
-  RPS_REVEAL_MS,
   TOTAL_ROUNDS,
-  aiEcard,
-  applyEcardAction,
   cardArt,
   cardBack,
   cardLabel,
-  finishEcardRps,
-  startEcardPractice,
   type EAction,
   type ECard,
   type EKind,
@@ -16,13 +11,12 @@ import {
   type EState,
   type RpsThrow,
 } from "./engine";
-import { GameSetup } from "../../components/GameSetup";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
+import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
-import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 const RPS_CHOICES: Array<{ id: RpsThrow; label: string }> = [
   { id: "rock", label: "Rock" },
@@ -110,20 +104,15 @@ export function EcardPage() {
   const { user } = useAuth();
   const lobby = useLobby();
   const room = lobby.room?.game === "ecard" ? lobby.room : null;
-  const [local, setLocal] = useState<EState | null>(null);
   const [rpsBeat, setRpsBeat] = useState(0);
-  const state = (room?.view as EState | undefined) ?? local;
-  const practice = Boolean(local && !room);
-  const online = Boolean(room);
-  const youId = practice ? "you" : user?.id;
+  const state = room?.view as EState | undefined;
+  const youId = user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
+  const waiting = Boolean(state?.phase === "lobby");
+  const host = Boolean(user && room?.seats?.[0] === user.id);
   const myTurnPick = Boolean(state && me && state.phase === "pick" && !me.selectedId);
   const iChooseRole = Boolean(state && me && state.phase === "role" && state.roleChooserId === me.id);
-
-  useEffect(() => {
-    if (room) setLocal(null);
-  }, [room]);
 
   useEffect(() => {
     if (!state?.rpsReveal) {
@@ -141,62 +130,8 @@ export function EcardPage() {
     };
   }, [state?.rpsReveal]);
 
-  useEffect(() => {
-    if (!state?.rpsReveal || online) return;
-    const t = window.setTimeout(() => setLocal((s) => (s ? finishEcardRps(s) : s)), RPS_REVEAL_MS);
-    return () => window.clearTimeout(t);
-  }, [state?.rpsReveal, online]);
-
-  useEffect(() => {
-    if (!practice || !local || local.phase === "over") return;
-    const cpu = local.players.find((p) => !p.human);
-    if (!cpu) return;
-    if (local.phase === "rps" && (local.rpsReveal || local.rpsThrows[cpu.id])) return;
-    if (local.phase === "role" && local.roleChooserId !== cpu.id) return;
-    if (local.phase === "pick" && cpu.locked) return;
-    if (local.phase === "pick" && local.players.every((p) => p.locked)) return;
-    let stop = false;
-    void (async () => {
-      await wait(CPU_THINK_MS);
-      if (stop) return;
-      setLocal((s) => {
-        if (!s || s.phase === "over") return s;
-        const bot = s.players.find((p) => !p.human);
-        if (!bot) return s;
-        if (s.phase === "reveal") return applyEcardAction(s, bot.id, { type: "next" });
-        if (s.phase === "rps") {
-          if (s.rpsReveal || s.rpsThrows[bot.id]) return s;
-          return applyEcardAction(s, bot.id, aiEcard(s, bot.id));
-        }
-        if (s.phase === "role") {
-          if (s.roleChooserId !== bot.id) return s;
-          return applyEcardAction(s, bot.id, aiEcard(s, bot.id));
-        }
-        if (s.phase === "pick") {
-          let next = s;
-          if (!bot.locked) {
-            if (!bot.selectedId) next = applyEcardAction(next, bot.id, aiEcard(next, bot.id));
-            const after = next.players.find((p) => p.id === bot.id);
-            if (after?.selectedId && !after.locked) {
-              next = applyEcardAction(next, bot.id, { type: "lock" });
-            }
-          }
-          return next;
-        }
-        return s;
-      });
-    })();
-    return () => {
-      stop = true;
-    };
-  }, [practice, local]);
-
   function act(action: EAction) {
-    if (room) {
-      void lobby.sendAction(action);
-      return;
-    }
-    setLocal((s) => (s && me ? applyEcardAction(s, me.id, action) : s));
+    if (room) void lobby.sendAction(action);
   }
 
   function playCard(card: ECard) {
@@ -231,11 +166,6 @@ export function EcardPage() {
           <h1>E-Card</h1>
         </div>
         <div className="row-actions">
-          {practice ? (
-            <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
-              RESET
-            </button>
-          ) : null}
           <button className="btn btn-ghost" type="button" onClick={() => void lobby.leaveHome()}>
             LEAVE
           </button>
@@ -243,18 +173,42 @@ export function EcardPage() {
       </div>
       <div className="game-layout">
         <div className="table table-ecard">
-          {!state || !me || !rival ? (
+          {!state || !me || waiting ? (
             <>
               <LobbyDecor game="ecard" />
-              <GameSetup
-                kicker="E-CARD"
-                title="Emperor · Citizen · Slave"
-                blurb="Invite one friend for 1v1. RPS picks the opening side. 12 rounds · roles swap every 3 · Slave win pays 5×."
-                game="ecard"
-                onPractice={() => setLocal(startEcardPractice())}
-              />
+              <div className="coda-deal">
+                <p className="kicker">{waiting ? "TABLE" : "E-CARD"}</p>
+                <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Emperor · Citizen · Slave"}</h2>
+                <p>
+                  {waiting
+                    ? "Add a CPU or invite one friend, then start. RPS picks the opening side."
+                    : "Open a table, add a CPU or invite, then start. 12 rounds · roles swap every 3 · Slave win pays 5×."}
+                </p>
+                {waiting && state ? (
+                  <ul className="lobby-roster">
+                    {state.players.map((p, i) => (
+                      <li key={p.id}>
+                        <b>{p.name}</b>
+                        <span>{seatTag(p, i, state.players[0]?.id)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <MixedCpuBar game="ecard" />
+                <div className="row-actions" style={{ justifyContent: "center" }}>
+                  {waiting ? (
+                    host && (state?.players.length ?? 0) >= 2 ? (
+                      <button className="btn" type="button" onClick={() => act({ type: "start" })}>
+                        Start
+                      </button>
+                    ) : (
+                      <p>{host ? "Need 2 players to start." : "Waiting for the host to start."}</p>
+                    )
+                  ) : null}
+                </div>
+              </div>
             </>
-          ) : state.phase === "rps" ? (
+          ) : !rival ? null : state.phase === "rps" ? (
             <div className="coda-deal coda-rps">
               <p className="kicker">Rock paper scissors</p>
               <div className="rps-arena">

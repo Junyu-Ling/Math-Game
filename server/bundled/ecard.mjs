@@ -27,9 +27,34 @@ function seat(p) {
     locked: false
   };
 }
-function startEcardDuel(a, b) {
+function startEcardLobby(people) {
+  const players = people.slice(0, 2).map(seat);
   return {
-    players: [seat(a), seat(b)],
+    players,
+    phase: "lobby",
+    round: 1,
+    set: 1,
+    rpsThrows: {},
+    rpsReveal: null,
+    roleChooserId: null,
+    last: null,
+    winnerId: null,
+    score: Object.fromEntries(players.map((p) => [p.id, 0])),
+    log: [
+      {
+        id: uid("l"),
+        text: `Table ${players.length}/2. Open table, add a CPU or invite, then start.`
+      }
+    ]
+  };
+}
+function startEcardDuel(a, b) {
+  return beginEcardMatch([a, b]);
+}
+function beginEcardMatch(people) {
+  const players = people.slice(0, 2).map(seat);
+  return {
+    players,
     phase: "rps",
     round: 1,
     set: 1,
@@ -38,7 +63,7 @@ function startEcardDuel(a, b) {
     roleChooserId: null,
     last: null,
     winnerId: null,
-    score: { [a.id]: 0, [b.id]: 0 },
+    score: Object.fromEntries(players.map((p) => [p.id, 0])),
     log: [
       {
         id: uid("l"),
@@ -46,9 +71,6 @@ function startEcardDuel(a, b) {
       }
     ]
   };
-}
-function startEcardPractice() {
-  return startEcardDuel({ id: "you", name: "YOU", human: true }, { id: "cpu", name: "CPU", human: false });
 }
 function cardLabel(kind) {
   if (kind === "emperor") return "EMPEROR";
@@ -172,6 +194,12 @@ function applyEcardAction(state, actorId, action) {
   if (state.phase === "over") return state;
   const me = state.players.find((p) => p.id === actorId);
   if (!me) return state;
+  if (state.phase === "lobby") {
+    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 2) {
+      return beginEcardMatch(state.players);
+    }
+    return state;
+  }
   if (state.phase === "rps") {
     if (action.type === "rps") return playRps(state, actorId, action.throw);
     return state;
@@ -448,6 +476,6 @@ export {
   clash,
   finishEcardRps,
   startEcardDuel,
-  startEcardPractice,
+  startEcardLobby,
   viewEcard
 };

@@ -1,22 +1,10 @@
 import { useEffect, useState } from "react";
-import {
-  RPS_REVEAL_MS,
-  SIZE,
-  aiGomoku,
-  applyGomokuAction,
-  finishGomokuRps,
-  foulLabel,
-  startGomokuPractice,
-  type GAction,
-  type GState,
-  type RpsThrow,
-} from "./engine";
-import { GameSetup } from "../../components/GameSetup";
+import { SIZE, foulLabel, type GAction, type GState, type RpsThrow } from "./engine";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
+import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
-import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 const RPS_CHOICES: Array<{ id: RpsThrow; label: string }> = [
   { id: "rock", label: "Rock" },
@@ -88,19 +76,14 @@ export function GomokuPage() {
   const { user } = useAuth();
   const lobby = useLobby();
   const room = lobby.room?.game === "gomoku" ? lobby.room : null;
-  const [local, setLocal] = useState<GState | null>(null);
   const [rpsBeat, setRpsBeat] = useState(0);
-  const state = (room?.view as GState | undefined) ?? local;
-  const practice = Boolean(local && !room);
-  const online = Boolean(room);
-  const youId = practice ? "you" : user?.id;
+  const state = room?.view as GState | undefined;
+  const youId = user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
+  const waiting = Boolean(state?.phase === "lobby");
+  const host = Boolean(user && room?.seats?.[0] === user.id);
   const myTurn = Boolean(state && me && state.players[state.turn]?.id === me.id && state.phase === "play");
-
-  useEffect(() => {
-    if (room) setLocal(null);
-  }, [room]);
 
   useEffect(() => {
     if (!state?.rpsReveal) {
@@ -118,50 +101,8 @@ export function GomokuPage() {
     };
   }, [state?.rpsReveal]);
 
-  useEffect(() => {
-    if (!state?.rpsReveal || online) return;
-    const t = window.setTimeout(() => setLocal((s) => (s ? finishGomokuRps(s) : s)), RPS_REVEAL_MS);
-    return () => window.clearTimeout(t);
-  }, [state?.rpsReveal, online]);
-
-  useEffect(() => {
-    if (!practice || !local || local.phase === "over") return;
-    const cpu = local.players.find((p) => !p.human);
-    if (!cpu) return;
-    if (local.phase === "rps" && (local.rpsReveal || local.rpsThrows?.[cpu.id])) return;
-    if (local.phase === "play") {
-      const actor = local.players[local.turn];
-      if (!actor || actor.human) return;
-    } else if (local.phase !== "rps") {
-      return;
-    }
-    let stop = false;
-    void (async () => {
-      await wait(CPU_THINK_MS);
-      if (stop) return;
-      setLocal((s) => {
-        if (!s || s.phase === "over") return s;
-        if (s.phase === "rps") {
-          const bot = s.players.find((p) => !p.human);
-          if (!bot || s.rpsReveal || s.rpsThrows?.[bot.id]) return s;
-          return applyGomokuAction(s, bot.id, aiGomoku(s));
-        }
-        const bot = s.players[s.turn];
-        if (!bot || bot.human) return s;
-        return applyGomokuAction(s, bot.id, aiGomoku(s));
-      });
-    })();
-    return () => {
-      stop = true;
-    };
-  }, [practice, local]);
-
   function act(action: GAction) {
-    if (room) {
-      void lobby.sendAction(action);
-      return;
-    }
-    setLocal((s) => (s && me ? applyGomokuAction(s, me.id, action) : s));
+    if (room) void lobby.sendAction(action);
   }
 
   const rpsReveal = state?.rpsReveal ?? null;
@@ -188,11 +129,6 @@ export function GomokuPage() {
           <h1>Gomoku</h1>
         </div>
         <div className="row-actions">
-          {practice ? (
-            <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
-              RESET
-            </button>
-          ) : null}
           <button className="btn btn-ghost" type="button" onClick={() => void lobby.leaveHome()}>
             LEAVE
           </button>
@@ -200,14 +136,38 @@ export function GomokuPage() {
       </div>
       <div className="game-layout">
         <div className="table table-gomoku">
-          {!state || !me ? (
-            <GameSetup
-              kicker="GOMOKU"
-              title="Five in a row"
-              blurb="15×15. RPS winner plays black. Five wins. Black fouls: double open three, double open four, overline."
-              game="gomoku"
-              onPractice={() => setLocal(startGomokuPractice())}
-            />
+          {!state || !me || waiting ? (
+            <div className="coda-deal">
+              <p className="kicker">{waiting ? "TABLE" : "GOMOKU"}</p>
+              <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Five in a row"}</h2>
+              <p>
+                {waiting
+                  ? "Add a CPU or invite one friend, then start. RPS winner plays black."
+                  : "15×15. Open a table, add a CPU or invite, then start. Black fouls: double open three, double open four, overline."}
+              </p>
+              {waiting && state ? (
+                <ul className="lobby-roster">
+                  {state.players.map((p, i) => (
+                    <li key={p.id}>
+                      <b>{p.name}</b>
+                      <span>{seatTag(p, i, state.players[0]?.id)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <MixedCpuBar game="gomoku" />
+              <div className="row-actions" style={{ justifyContent: "center" }}>
+                {waiting ? (
+                  host && (state?.players.length ?? 0) >= 2 ? (
+                    <button className="btn" type="button" onClick={() => act({ type: "start" })}>
+                      Start
+                    </button>
+                  ) : (
+                    <p>{host ? "Need 2 players to start." : "Waiting for the host to start."}</p>
+                  )
+                ) : null}
+              </div>
+            </div>
           ) : state.phase === "rps" ? (
             <div className="coda-deal coda-rps">
               <p className="status-line">Winner plays black</p>

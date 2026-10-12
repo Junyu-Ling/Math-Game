@@ -7,7 +7,6 @@ import {
   activePlayers,
   currentFlip,
   liveTotal,
-  startFlip7,
   type FlipAction,
   type FlipPlayer,
   type FlipState,
@@ -347,19 +346,7 @@ export function Flip7Page() {
                     ) : (
                       <p>{host ? "Need at least 2 players to start." : "Waiting for the host to start."}</p>
                     )
-                  ) : (
-                    <>
-                      <button className="btn btn-ghost" type="button" onClick={() => setLocal(startFlip7(1))}>
-                        Practice solo
-                      </button>
-                      <button className="btn" type="button" onClick={() => setLocal(startFlip7(2))}>
-                        Practice vs CPU
-                      </button>
-                      <button className="btn btn-ghost" type="button" onClick={() => setLocal(startFlip7(5))}>
-                        Practice 5P
-                      </button>
-                    </>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </>

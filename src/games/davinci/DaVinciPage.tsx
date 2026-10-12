@@ -18,7 +18,6 @@ import {
   payPenalty,
   playRps,
   finishRps,
-  startCoda,
   stay,
   applyAction,
   openingCount,
@@ -610,15 +609,6 @@ export function DaVinciPage() {
     if (codaRoom) void lobby.leave();
   }
 
-  function beginPractice() {
-    if (codaRoom) void lobby.leave();
-    setFlash(null);
-    setYouId("you");
-    endsAtRef.current = null;
-    setRemain(ARRANGE_MS / 1000);
-    setState(startCoda(jokers, blackN, whiteN, seats));
-  }
-
   useEffect(() => {
     if (!codaRoom) return;
     const view = codaRoom.view as CodaState;
@@ -759,11 +749,7 @@ export function DaVinciPage() {
                       <button className="btn" type="button" disabled={Boolean(you?.ready)} onClick={() => dispatch({ type: "ready" })}>
                         {you?.ready ? "Waiting for others" : "Ready"}
                       </button>
-                    ) : (
-                      <button className="btn" type="button" onClick={beginPractice}>
-                        Practice vs CPU
-                      </button>
-                    )}
+                    ) : null}
                   </div>
                 </>
               ) : (

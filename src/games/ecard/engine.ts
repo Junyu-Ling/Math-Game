@@ -25,7 +25,7 @@ export type EPlayer = {
   locked: boolean;
 };
 
-export type EPhase = "rps" | "role" | "pick" | "reveal" | "over";
+export type EPhase = "lobby" | "rps" | "role" | "pick" | "reveal" | "over";
 
 export type EState = {
   players: EPlayer[];
@@ -74,12 +74,39 @@ function seat(p: { id: string; name: string; human?: boolean }): EPlayer {
   };
 }
 
+export function startEcardLobby(people: Array<{ id: string; name: string; human?: boolean }>): EState {
+  const players = people.slice(0, 2).map(seat);
+  return {
+    players,
+    phase: "lobby",
+    round: 1,
+    set: 1,
+    rpsThrows: {},
+    rpsReveal: null,
+    roleChooserId: null,
+    last: null,
+    winnerId: null,
+    score: Object.fromEntries(players.map((p) => [p.id, 0])),
+    log: [
+      {
+        id: uid("l"),
+        text: `Table ${players.length}/2. Open table, add a CPU or invite, then start.`,
+      },
+    ],
+  };
+}
+
 export function startEcardDuel(
   a: { id: string; name: string; human?: boolean },
   b: { id: string; name: string; human?: boolean },
 ): EState {
+  return beginEcardMatch([a, b]);
+}
+
+function beginEcardMatch(people: Array<{ id: string; name: string; human?: boolean }>): EState {
+  const players = people.slice(0, 2).map(seat);
   return {
-    players: [seat(a), seat(b)],
+    players,
     phase: "rps",
     round: 1,
     set: 1,
@@ -88,7 +115,7 @@ export function startEcardDuel(
     roleChooserId: null,
     last: null,
     winnerId: null,
-    score: { [a.id]: 0, [b.id]: 0 },
+    score: Object.fromEntries(players.map((p) => [p.id, 0])),
     log: [
       {
         id: uid("l"),
@@ -96,10 +123,6 @@ export function startEcardDuel(
       },
     ],
   };
-}
-
-export function startEcardPractice(): EState {
-  return startEcardDuel({ id: "you", name: "YOU", human: true }, { id: "cpu", name: "CPU", human: false });
 }
 
 export function cardLabel(kind: EKind) {
@@ -243,6 +266,7 @@ function playRps(state: EState, actorId: string, you: RpsThrow): EState {
 }
 
 export type EAction =
+  | { type: "start" }
   | { type: "rps"; throw: RpsThrow }
   | { type: "role"; role: ERole }
   | { type: "select"; cardId: string }
@@ -253,6 +277,13 @@ export function applyEcardAction(state: EState, actorId: string, action: EAction
   if (state.phase === "over") return state;
   const me = state.players.find((p) => p.id === actorId);
   if (!me) return state;
+
+  if (state.phase === "lobby") {
+    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 2) {
+      return beginEcardMatch(state.players);
+    }
+    return state;
+  }
 
   if (state.phase === "rps") {
     if (action.type === "rps") return playRps(state, actorId, action.throw);

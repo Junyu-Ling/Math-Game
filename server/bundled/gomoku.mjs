@@ -238,10 +238,34 @@ function inBoard2(r, c) {
 function seat(p) {
   return { id: p.id, name: p.name, human: p.human !== false, stone: null };
 }
-function startGomokuDuel(a, b) {
+function startGomokuLobby(people) {
+  const players = people.slice(0, 2).map(seat);
   return {
     board: emptyBoard(),
-    players: [seat(a), seat(b)],
+    players,
+    turn: 0,
+    phase: "lobby",
+    rpsThrows: {},
+    rpsReveal: null,
+    winnerId: null,
+    foul: null,
+    last: null,
+    log: [
+      {
+        id: uid("l"),
+        text: `Table ${players.length}/2. Open table, add a CPU or invite, then start. RPS winner plays black.`
+      }
+    ]
+  };
+}
+function startGomokuDuel(a, b) {
+  return beginGomokuMatch([a, b]);
+}
+function beginGomokuMatch(people) {
+  const players = people.slice(0, 2).map(seat);
+  return {
+    board: emptyBoard(),
+    players,
     turn: 0,
     phase: "rps",
     rpsThrows: {},
@@ -256,9 +280,6 @@ function startGomokuDuel(a, b) {
       }
     ]
   };
-}
-function startGomokuPractice() {
-  return startGomokuDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });
 }
 function rpsWins(a, b) {
   return a === "rock" && b === "scissors" || a === "paper" && b === "rock" || a === "scissors" && b === "paper";
@@ -325,7 +346,7 @@ function normalizeGomoku(state) {
   }));
   const hasColors = players.every((p) => p.stone === 1 || p.stone === 2);
   let phase = state.phase;
-  if (phase !== "rps" && phase !== "play" && phase !== "over") {
+  if (phase !== "lobby" && phase !== "rps" && phase !== "play" && phase !== "over") {
     phase = hasColors ? "play" : "rps";
   } else if (phase === "play" && !hasColors) {
     phase = "rps";
@@ -472,6 +493,12 @@ function blackFoulAt(board, r, c) {
 function applyGomokuAction(state, actorId, action) {
   state = normalizeGomoku(state);
   if (state.phase === "over") return state;
+  if (state.phase === "lobby") {
+    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 2) {
+      return beginGomokuMatch(state.players);
+    }
+    return state;
+  }
   if (state.phase === "rps") {
     if (action.type === "rps") return playRps(state, actorId, action.throw);
     return state;
@@ -564,7 +591,7 @@ export {
   foulLabel,
   normalizeGomoku,
   startGomokuDuel,
-  startGomokuPractice,
+  startGomokuLobby,
   viewGomoku,
   winsAt
 };

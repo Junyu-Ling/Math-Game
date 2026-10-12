@@ -7,8 +7,11 @@ import { Avatar } from "./Avatar";
 export function InviteList({ game, meta }: { game: string; meta?: Record<string, unknown> }) {
   const { user } = useAuth();
   const { online, error, invite, room, store, inviteCooldownMs } = useLobby();
-  const tableWait =
-    Boolean(room && ["coda", "uno", "flip7", "halli"].includes(room.game) && (room.view as { phase?: string } | undefined)?.phase === "lobby");
+  const tableWait = Boolean(
+    room &&
+      ["coda", "uno", "flip7", "halli", "gomoku", "ecard"].includes(room.game) &&
+      (room.view as { phase?: string } | undefined)?.phase === "lobby",
+  );
   const host = Boolean(user && room?.seats?.[0] === user.id);
   const seated = new Set(room?.seats || []);
   const cooling = inviteCooldownMs > 0;
@@ -37,9 +40,11 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       {game === "flip7" ? <p>Flip 7 has no fixed seat count. Add CPUs or invite, then start with 2+.</p> : null}
       {game === "halli" ? <p>Halli Galli is 2–4. Open a table, add CPUs or invite, then start. Ring on five.</p> : null}
       {game === "ecard" ? (
-        <p>E-Card is invite-only 1v1. Invite one friend. RPS picks the opening side · 12 rounds · Slave win ×5.</p>
+        <p>E-Card is heads-up. Open a table, add a CPU or invite one friend, then start. RPS · 12 rounds · Slave win ×5.</p>
       ) : null}
-      {game === "gomoku" ? <p>Gomoku is invite-only heads-up. Practice vs CPU, or challenge someone online.</p> : null}
+      {game === "gomoku" ? (
+        <p>Gomoku is heads-up. Open a table, add a CPU or invite one friend, then start. RPS winner plays black.</p>
+      ) : null}
       {tableWait ? <p>Seated {seated.size}{max < 16 ? `/${max}` : ""}.</p> : null}
       {online.length === 0 ? (
         <p>No other accounts yet. Anyone who registers or logs in will appear here, even when they are offline.</p>

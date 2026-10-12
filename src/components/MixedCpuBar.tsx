@@ -13,16 +13,24 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
   const full = seats.length >= max;
   const waiting = Boolean(here && (room?.view as { phase?: string } | undefined)?.phase === "lobby");
   const canEdit = Boolean(user && host && (!here || waiting));
-  const unlimited = game === "flip7";
+  const duel = max <= 2;
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="cpu-bar">
+        <p>Sign in to open a table, add a CPU or invite someone, then start.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="cpu-bar">
       <p>
-        {unlimited
-          ? "Open a table with yourself, add as many CPUs as you want, invite humans, then start with 2+."
-          : `Open a table with yourself. Add CPUs or invite humans, then start with 2–${max}.`}
+        {duel
+          ? "Open a table, add a CPU or invite one friend, then start."
+          : max >= 16
+            ? "Open a table with yourself, add CPUs or invite humans, then start with 2+."
+            : `Open a table with yourself. Add CPUs or invite humans, then start with 2–${max}.`}
       </p>
       <div className="row-actions" style={{ justifyContent: "center" }}>
         {!here ? (
@@ -43,14 +51,16 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
         >
           Add CPU
         </button>
-        <button
-          className="btn btn-ghost"
-          type="button"
-          disabled={!here || !canEdit || full}
-          onClick={() => void adjustCpu(game, "fill", meta).catch((ex) => alert(ex.message))}
-        >
-          {unlimited ? "Add 3 CPUs" : "Fill with CPU"}
-        </button>
+        {!duel ? (
+          <button
+            className="btn btn-ghost"
+            type="button"
+            disabled={!here || !canEdit || full}
+            onClick={() => void adjustCpu(game, "fill", meta).catch((ex) => alert(ex.message))}
+          >
+            {max >= 16 ? "Add 3 CPUs" : "Fill with CPU"}
+          </button>
+        ) : null}
         <button
           className="btn btn-ghost"
           type="button"
