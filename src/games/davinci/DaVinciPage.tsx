@@ -22,6 +22,7 @@ import {
   applyAction,
   openingCount,
   RPS_REVEAL_MS,
+  startCoda,
   type CodaAction,
   type CodaState,
   type CodaTile,
@@ -35,6 +36,7 @@ import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 import { measureFit } from "../../components/FitCards";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
+import { GameSetup } from "../../components/GameSetup";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
 import { LobbyDecor } from "../../components/LobbyDecor";
@@ -660,6 +662,21 @@ export function DaVinciPage() {
           <div className="coda-lamp" />
           <div className="coda-ring" />
           {!playing || !you || !state || others.length < 1 ? (
+            !user && !waiting ? (
+              <>
+                <LobbyDecor game="coda" />
+                <GameSetup
+                  kicker="DA VINCI"
+                  title="Opening draw"
+                  blurb="Practice vs CPU. Guess tiles in order. Toggle JOKER in the header first if you want. Sign in to open a table or invite."
+                  game="coda"
+                  onPractice={() => {
+                    setYouId("you");
+                    setState(startCoda(jokers, blackN, whiteN, seats));
+                  }}
+                />
+              </>
+            ) : (
             <>
             <LobbyDecor game="coda" />
             <div className="coda-deal">
@@ -759,6 +776,7 @@ export function DaVinciPage() {
               )}
             </div>
             </>
+            )
           ) : (
             <>
           {seated.partner ? (

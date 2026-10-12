@@ -156,6 +156,11 @@ export function startFlip7(seats = 2): FlipState {
   );
 }
 
+/** Local guest practice — you vs one CPU. */
+export function startFlip7Practice(): FlipState {
+  return startFlip7(2);
+}
+
 export function viewFlip7(state: FlipState, _viewerId: string): FlipState {
   return state;
 }

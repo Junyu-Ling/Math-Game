@@ -34,7 +34,7 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
   if (!user) {
     return (
       <div className="cpu-bar">
-        <p>Sign in to open a table, then add a CPU or invite someone.</p>
+        <p>Guests play Practice vs CPU on this page. Sign in to open a table or invite.</p>
       </div>
     );
   }
