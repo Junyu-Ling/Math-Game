@@ -54,7 +54,7 @@ function statusText(state: CodaState, myTurn: boolean, remain: number, matching:
   }
   if (state.phase === "over") {
     const w = state.players.find((p) => p.id === state.winnerId);
-    return w ? `${w.name} wins` : "Game over";
+    return w ? `Showdown — all codes revealed. ${w.name} wins.` : "Showdown — all codes revealed.";
   }
   if (state.phase === "rps") {
     return "Rock-paper-scissors. The loser guesses first.";
@@ -257,20 +257,14 @@ function OppSeat({
   );
 }
 
-function outcomeFlash(next: CodaState, youId: string): Flash | null {
-  if (next.phase !== "over" || !next.winnerId) return null;
-  return { kind: next.winnerId === youId ? "win" : "lose" };
-}
-
-function applyGuess(state: CodaState, value: CodaValue, youId: string): { next: CodaState; flash: Flash | null } {
+function applyGuess(state: CodaState, value: CodaValue, _youId: string): { next: CodaState; flash: Flash | null } {
   const sel = state.selected;
   const next = guessTile(state, value);
   if (!sel || next.log.length === state.log.length) return { next, flash: null };
-  const end = outcomeFlash(next, youId);
-  if (end) return { next, flash: { ...end, playerId: sel.playerId, index: sel.index } };
   const added = next.log.slice(state.log.length);
   const hit = added.some((l) => l.text.includes("guessed"));
   const miss = added.some((l) => l.text.includes("missed"));
+  // Win/lose overlay waits for the showdown flip; only flash the last hit/miss here.
   const kind = hit ? "hit" : miss ? "miss" : null;
   return { next, flash: kind ? { kind, playerId: sel.playerId, index: sel.index } : null };
 }
@@ -498,11 +492,12 @@ export function DaVinciPage() {
 
   useEffect(() => {
     if (!state || state.phase !== "over" || !state.winnerId || !you) return;
-    setFlash((cur) => {
-      if (cur?.kind === "win" || cur?.kind === "lose") return cur;
-      return { kind: state.winnerId === you.id ? "win" : "lose" };
-    });
-  }, [state, you]);
+    // Let the table flip every code before the win/lose banner.
+    const t = window.setTimeout(() => {
+      setFlash({ kind: state.winnerId === you.id ? "win" : "lose" });
+    }, 2200);
+    return () => window.clearTimeout(t);
+  }, [state?.phase, state?.winnerId, you?.id]);
 
   useEffect(() => {
     if (!state || online) return;
@@ -656,7 +651,11 @@ export function DaVinciPage() {
         </div>
       </div>
       <div className="game-layout">
-        <div className={`table table-coda ${flash ? `table-${flash.kind}` : ""} ${playing && state && state.players.length > 2 ? "coda-multi" : ""}`}>
+        <div
+          className={`table table-coda ${flash ? `table-${flash.kind}` : ""}${
+            playing && state?.phase === "over" && flash?.kind !== "win" && flash?.kind !== "lose" ? " table-showdown" : ""
+          } ${playing && state && state.players.length > 2 ? "coda-multi" : ""}`}
+        >
           <div className="coda-lamp" />
           <div className="coda-ring" />
           {!playing || !you || !state || others.length < 1 ? (
