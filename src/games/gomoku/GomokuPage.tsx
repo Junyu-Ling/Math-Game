@@ -330,11 +330,12 @@ export function GomokuPage() {
                       (r === 7 && c === 7);
                     const last = state.last?.r === r && state.last?.c === c;
                     const foulCell = state.foul?.r === r && state.foul?.c === c;
+                    const onWin = Boolean(state.winLine?.some((p) => p.r === r && p.c === c));
                     return (
                       <button
                         key={`${r}-${c}`}
                         type="button"
-                        className={`gomoku-cell${hoshi ? " star" : ""}${v ? " filled" : ""}${last ? " last" : ""}${foulCell ? " foul" : ""}${!myTurn && state.phase === "play" && !v ? " waiting" : ""}`}
+                        className={`gomoku-cell${hoshi ? " star" : ""}${v ? " filled" : ""}${last ? " last" : ""}${foulCell ? " foul" : ""}${onWin ? " win" : ""}${!myTurn && state.phase === "play" && !v ? " waiting" : ""}`}
                         disabled={Boolean(v) || state.phase !== "play"}
                         onClick={() => {
                           if (!myTurn) return;
@@ -347,6 +348,17 @@ export function GomokuPage() {
                     );
                   }),
                 )}
+                {state.winLine && state.winLine.length >= 2 ? (
+                  <svg className="gomoku-win-svg" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden>
+                    <line
+                      className="gomoku-win-stroke"
+                      x1={state.winLine[0]!.c + 0.5}
+                      y1={state.winLine[0]!.r + 0.5}
+                      x2={state.winLine[state.winLine.length - 1]!.c + 0.5}
+                      y2={state.winLine[state.winLine.length - 1]!.r + 0.5}
+                    />
+                  </svg>
+                ) : null}
               </div>
             </div>
           )}
