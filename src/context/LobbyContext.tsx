@@ -230,12 +230,17 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       },
       async adjustCpu(game, mode, meta = {}) {
         if (!token) throw new Error("Sign in first");
+        // Opening / seating always accepts the returned table (ignore prior leave dismiss).
+        if (mode === "open" || mode === "add" || mode === "fill") {
+          dismissedRoomId.current = null;
+          roomSeq.current = 0;
+        }
         const next = await lobbyApi.cpu(token, game, mode, meta);
         acceptRoom(next.room);
         setSnap((prev) => ({
           ...next,
           online: next.online?.length ? next.online : prev.online,
-          room: takeRoom(next.room, prev.room),
+          room: takeRoom(next.room as RoomSnap | null | undefined, prev.room),
         }));
       },
       async leave() {

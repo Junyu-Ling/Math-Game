@@ -1230,6 +1230,25 @@ function publicRoom(room, viewerId) {
   };
 }
 
+/** Drop this user from a seat; close the room if they were host or last human. */
+async function vacateSeat(userId, rec) {
+  if (!rec) return;
+  const id = String(userId);
+  await kvDel(`axiom:seat:${id}`);
+  const hostLeft = rec.seats[0] === id;
+  const humansLeft = humanSeatIds(rec.seats).filter((x) => x !== id);
+  if (hostLeft || humansLeft.length < 1) {
+    for (const hid of humanSeatIds(rec.seats)) await kvDel(`axiom:seat:${hid}`);
+    await kvDel(`axiom:room:${rec.id}`);
+    await wakeUsers(humanSeatIds(rec.seats));
+    return;
+  }
+  rec.seats = rec.seats.filter((x) => x !== id);
+  rec.state = rebuildLobby(rec, null, rec.mods);
+  rec.seq = (rec.seq || 0) + 1;
+  await saveRoom(rec);
+}
+
 export async function adjustCpu(user, game, mode, mods, meta = {}) {
   mods = mods || (await getMods());
   game = String(game || "");
@@ -1242,32 +1261,51 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
   const add = mode === "add" || mode === "fill";
   const fill = mode === "fill";
   const open = mode === "open";
-  if (!rec) {
-    if (!add && !open) throw new Error("No table yet");
+  const inLobbyHere = Boolean(rec && rec.game === game && rec.state?.phase === "lobby");
+
+  // Open table / start fresh: leave any stuck finished/other-game seat first.
+  if (open) {
+    if (inLobbyHere && rec.seats[0] === userId) {
+      return { ok: true, room: publicRoom(rec, userId) };
+    }
+    if (rec) await vacateSeat(userId, rec);
     const host = { id: userId, name: playerName(user), human: true };
-    const state = newLobbyState(game, [host], mods, meta);
-    rec = {
+    const fresh = {
       id: uid("room"),
       game,
       seats: [host.id],
-      state,
+      state: newLobbyState(game, [host], mods, meta),
       endsAt: null,
       seq: 1,
       mods,
     };
-    if (mode === "add") {
-      const cpu = nextCpu(rec.seats);
-      rec.seats = [...rec.seats, cpu.id];
-      rec.state = rebuildLobby(rec, cpu, mods);
-    }
+    armCpuThink(fresh);
+    await saveRoom(fresh);
+    return { ok: true, room: publicRoom(fresh, userId) };
+  }
+
+  if (!rec || !inLobbyHere) {
+    if (!add) throw new Error("Open a table first");
+    // Add CPU with no lobby → open table then seat one CPU.
+    if (rec) await vacateSeat(userId, rec);
+    const host = { id: userId, name: playerName(user), human: true };
+    rec = {
+      id: uid("room"),
+      game,
+      seats: [host.id],
+      state: newLobbyState(game, [host], mods, meta),
+      endsAt: null,
+      seq: 1,
+      mods,
+    };
+    const cpu = nextCpu(rec.seats);
+    rec.seats = [...rec.seats, cpu.id];
+    rec.state = rebuildLobby(rec, cpu, mods);
     armCpuThink(rec);
     await saveRoom(rec);
     return { ok: true, room: publicRoom(rec, userId) };
   }
 
-  if (rec.game !== game) throw new Error("This table is already another game");
-  if (open) return { ok: true, room: publicRoom(rec, userId) };
-  if (rec.state?.phase !== "lobby") throw new Error("The game already started");
   if (rec.seats[0] !== userId) throw new Error("Only the host can add CPUs");
 
   if (add) {
