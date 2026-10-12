@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   RPS_REVEAL_MS,
   SIZE,
@@ -82,6 +82,40 @@ function RpsHand({
     <div className={`rps-hand ${side} ${pose}${winClass}`}>
       <HandShape kind={kind} />
     </div>
+  );
+}
+
+/** Red strike that grows along the five winning stones. */
+function WinStrike({ line }: { line: Array<{ r: number; c: number }> }) {
+  const pathRef = useRef<SVGLineElement | null>(null);
+  const a = line[0]!;
+  const b = line[line.length - 1]!;
+  // Extend a bit past the end stones so the tip sits over the stones.
+  const dx = b.c - a.c;
+  const dy = b.r - a.r;
+  const len = Math.hypot(dx, dy) || 1;
+  const pad = 0.12;
+  const x1 = a.c + 0.5 - (dx / len) * pad;
+  const y1 = a.r + 0.5 - (dy / len) * pad;
+  const x2 = b.c + 0.5 + (dx / len) * pad;
+  const y2 = b.r + 0.5 + (dy / len) * pad;
+
+  useEffect(() => {
+    const el = pathRef.current;
+    if (!el) return;
+    const total = el.getTotalLength();
+    el.style.strokeDasharray = `${total}`;
+    el.style.strokeDashoffset = `${total}`;
+    // Force layout so the transition starts from the hidden state.
+    void el.getBoundingClientRect();
+    el.style.transition = "stroke-dashoffset 0.95s ease-out";
+    el.style.strokeDashoffset = "0";
+  }, [x1, y1, x2, y2]);
+
+  return (
+    <svg className="gomoku-win-svg" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden>
+      <line ref={pathRef} className="gomoku-win-stroke" x1={x1} y1={y1} x2={x2} y2={y2} />
+    </svg>
   );
 }
 
@@ -348,17 +382,7 @@ export function GomokuPage() {
                     );
                   }),
                 )}
-                {state.winLine && state.winLine.length >= 2 ? (
-                  <svg className="gomoku-win-svg" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden>
-                    <line
-                      className="gomoku-win-stroke"
-                      x1={state.winLine[0]!.c + 0.5}
-                      y1={state.winLine[0]!.r + 0.5}
-                      x2={state.winLine[state.winLine.length - 1]!.c + 0.5}
-                      y2={state.winLine[state.winLine.length - 1]!.r + 0.5}
-                    />
-                  </svg>
-                ) : null}
+                {state.winLine && state.winLine.length >= 2 ? <WinStrike line={state.winLine} /> : null}
               </div>
             </div>
           )}
