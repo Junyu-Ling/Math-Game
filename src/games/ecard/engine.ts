@@ -103,6 +103,11 @@ export function startEcardDuel(
   return beginEcardMatch([a, b]);
 }
 
+/** Local guest practice — no lobby / Open table. */
+export function startEcardPractice(): EState {
+  return startEcardDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });
+}
+
 function beginEcardMatch(people: Array<{ id: string; name: string; human?: boolean }>): EState {
   const players = people.slice(0, 2).map(seat);
   return {

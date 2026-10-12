@@ -1,10 +1,23 @@
 import { useEffect, useState } from "react";
-import { SIZE, foulLabel, type GAction, type GState, type RpsThrow } from "./engine";
+import {
+  RPS_REVEAL_MS,
+  SIZE,
+  aiGomoku,
+  applyGomokuAction,
+  finishGomokuRps,
+  foulLabel,
+  startGomokuPractice,
+  type GAction,
+  type GState,
+  type RpsThrow,
+} from "./engine";
+import { GameSetup } from "../../components/GameSetup";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
+import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 const RPS_CHOICES: Array<{ id: RpsThrow; label: string }> = [
   { id: "rock", label: "Rock" },
@@ -76,14 +89,20 @@ export function GomokuPage() {
   const { user } = useAuth();
   const lobby = useLobby();
   const room = lobby.room?.game === "gomoku" ? lobby.room : null;
+  const [local, setLocal] = useState<GState | null>(null);
   const [rpsBeat, setRpsBeat] = useState(0);
-  const state = room?.view as GState | undefined;
-  const youId = user?.id;
+  const state = (room?.view as GState | undefined) ?? local;
+  const practice = Boolean(local && !room);
+  const youId = practice ? "you" : user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
   const waiting = Boolean(state?.phase === "lobby");
   const host = Boolean(user && room?.seats?.[0] === user.id);
   const myTurn = Boolean(state && me && state.players[state.turn]?.id === me.id && state.phase === "play");
+
+  useEffect(() => {
+    if (room) setLocal(null);
+  }, [room]);
 
   useEffect(() => {
     if (!state?.rpsReveal) {
@@ -101,8 +120,52 @@ export function GomokuPage() {
     };
   }, [state?.rpsReveal]);
 
+  useEffect(() => {
+    if (!practice || !local?.rpsReveal) return;
+    const t = window.setTimeout(() => {
+      setLocal((s) => (s?.rpsReveal ? finishGomokuRps(s) : s));
+    }, RPS_REVEAL_MS);
+    return () => window.clearTimeout(t);
+  }, [practice, local?.rpsReveal]);
+
+  useEffect(() => {
+    if (!practice || !local || local.phase === "over" || local.rpsReveal) return;
+    let stop = false;
+    void (async () => {
+      if (local.phase === "rps") {
+        const cpu = local.players.find((p) => !p.human && !local.rpsThrows?.[p.id]);
+        if (!cpu) return;
+        await wait(CPU_THINK_MS);
+        if (stop) return;
+        setLocal((s) => {
+          if (!s || s.phase !== "rps" || s.rpsReveal) return s;
+          const c = s.players.find((p) => !p.human && !s.rpsThrows?.[p.id]);
+          return c ? applyGomokuAction(s, c.id, aiGomoku(s)) : s;
+        });
+        return;
+      }
+      if (local.phase !== "play") return;
+      const actor = local.players[local.turn];
+      if (!actor || actor.human) return;
+      await wait(CPU_THINK_MS);
+      if (stop) return;
+      setLocal((s) => {
+        if (!s || s.phase !== "play") return s;
+        const cur = s.players[s.turn];
+        return cur && !cur.human ? applyGomokuAction(s, cur.id, aiGomoku(s)) : s;
+      });
+    })();
+    return () => {
+      stop = true;
+    };
+  }, [practice, local]);
+
   function act(action: GAction) {
-    if (room) void lobby.sendAction(action);
+    if (room) {
+      void lobby.sendAction(action);
+      return;
+    }
+    setLocal((s) => (s ? applyGomokuAction(s, "you", action) : s));
   }
 
   const rpsReveal = state?.rpsReveal ?? null;
@@ -129,6 +192,11 @@ export function GomokuPage() {
           <h1>Gomoku</h1>
         </div>
         <div className="row-actions">
+          {practice ? (
+            <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
+              RESET
+            </button>
+          ) : null}
           <button className="btn btn-ghost" type="button" onClick={() => void lobby.leaveHome()}>
             LEAVE
           </button>
@@ -137,6 +205,15 @@ export function GomokuPage() {
       <div className="game-layout">
         <div className="table table-gomoku">
           {!state || !me || waiting ? (
+            !user && !waiting ? (
+              <GameSetup
+                kicker="GOMOKU"
+                title="Five in a row"
+                blurb="15×15 Renju. Practice vs CPU — RPS winner plays black. Sign in to open a table or invite."
+                game="gomoku"
+                onPractice={() => setLocal(startGomokuPractice())}
+              />
+            ) : (
             <div className="coda-deal">
               <p className="kicker">{waiting ? "TABLE" : "GOMOKU"}</p>
               <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Five in a row"}</h2>
@@ -168,6 +245,7 @@ export function GomokuPage() {
                 ) : null}
               </div>
             </div>
+            )
           ) : state.phase === "rps" ? (
             <div className="coda-deal coda-rps">
               <p className="status-line">Winner plays black</p>

@@ -97,6 +97,11 @@ export function startGomokuDuel(
   return beginGomokuMatch([a, b]);
 }
 
+/** Local guest practice — no lobby / Open table. */
+export function startGomokuPractice(): GState {
+  return startGomokuDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });
+}
+
 function beginGomokuMatch(people: Array<{ id: string; name: string; human?: boolean }>): GState {
   const players = people.slice(0, 2).map(seat);
   return {

@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import {
+  RPS_REVEAL_MS,
   TOTAL_ROUNDS,
+  aiEcard,
+  applyEcardAction,
   cardArt,
   cardBack,
   cardLabel,
+  finishEcardRps,
+  startEcardPractice,
   type EAction,
   type ECard,
   type EKind,
@@ -11,12 +16,14 @@ import {
   type EState,
   type RpsThrow,
 } from "./engine";
+import { GameSetup } from "../../components/GameSetup";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
+import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 const RPS_CHOICES: Array<{ id: RpsThrow; label: string }> = [
   { id: "rock", label: "Rock" },
@@ -104,15 +111,21 @@ export function EcardPage() {
   const { user } = useAuth();
   const lobby = useLobby();
   const room = lobby.room?.game === "ecard" ? lobby.room : null;
+  const [local, setLocal] = useState<EState | null>(null);
   const [rpsBeat, setRpsBeat] = useState(0);
-  const state = room?.view as EState | undefined;
-  const youId = user?.id;
+  const state = (room?.view as EState | undefined) ?? local;
+  const practice = Boolean(local && !room);
+  const youId = practice ? "you" : user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
   const waiting = Boolean(state?.phase === "lobby");
   const host = Boolean(user && room?.seats?.[0] === user.id);
   const myTurnPick = Boolean(state && me && state.phase === "pick" && !me.selectedId);
   const iChooseRole = Boolean(state && me && state.phase === "role" && state.roleChooserId === me.id);
+
+  useEffect(() => {
+    if (room) setLocal(null);
+  }, [room]);
 
   useEffect(() => {
     if (!state?.rpsReveal) {
@@ -130,8 +143,83 @@ export function EcardPage() {
     };
   }, [state?.rpsReveal]);
 
+  useEffect(() => {
+    if (!practice || !local?.rpsReveal) return;
+    const t = window.setTimeout(() => {
+      setLocal((s) => (s?.rpsReveal ? finishEcardRps(s) : s));
+    }, RPS_REVEAL_MS);
+    return () => window.clearTimeout(t);
+  }, [practice, local?.rpsReveal]);
+
+  useEffect(() => {
+    if (!practice || !local || local.phase === "over" || local.rpsReveal) return;
+    let stop = false;
+    void (async () => {
+      const s0 = local;
+      if (s0.phase === "rps") {
+        const cpu = s0.players.find((p) => !p.human && !s0.rpsThrows?.[p.id]);
+        if (!cpu) return;
+        await wait(CPU_THINK_MS);
+        if (stop) return;
+        setLocal((s) => {
+          if (!s || s.phase !== "rps" || s.rpsReveal) return s;
+          const c = s.players.find((p) => !p.human && !s.rpsThrows?.[p.id]);
+          return c ? applyEcardAction(s, c.id, aiEcard(s, c.id)) : s;
+        });
+        return;
+      }
+      if (s0.phase === "role") {
+        const cpu = s0.players.find((p) => p.id === s0.roleChooserId && !p.human);
+        if (!cpu) return;
+        await wait(CPU_THINK_MS);
+        if (stop) return;
+        setLocal((s) => {
+          if (!s || s.phase !== "role") return s;
+          const c = s.players.find((p) => p.id === s.roleChooserId && !p.human);
+          return c ? applyEcardAction(s, c.id, aiEcard(s, c.id)) : s;
+        });
+        return;
+      }
+      if (s0.phase === "reveal") {
+        const cpu = s0.players.find((p) => !p.human);
+        if (!cpu) return;
+        await wait(CPU_THINK_MS);
+        if (stop) return;
+        setLocal((s) => {
+          if (!s || s.phase !== "reveal") return s;
+          const c = s.players.find((p) => !p.human);
+          return c ? applyEcardAction(s, c.id, { type: "next" }) : s;
+        });
+        return;
+      }
+      if (s0.phase !== "pick") return;
+      const cpu = s0.players.find((p) => !p.human && !p.locked);
+      if (!cpu) return;
+      await wait(CPU_THINK_MS);
+      if (stop) return;
+      setLocal((s) => {
+        if (!s || s.phase !== "pick") return s;
+        const c = s.players.find((p) => !p.human && !p.locked);
+        if (!c) return s;
+        let next = applyEcardAction(s, c.id, aiEcard(s, c.id));
+        const after = next.players.find((p) => p.id === c.id);
+        if (after && after.selectedId && !after.locked) {
+          next = applyEcardAction(next, c.id, { type: "lock" });
+        }
+        return next;
+      });
+    })();
+    return () => {
+      stop = true;
+    };
+  }, [practice, local]);
+
   function act(action: EAction) {
-    if (room) void lobby.sendAction(action);
+    if (room) {
+      void lobby.sendAction(action);
+      return;
+    }
+    setLocal((s) => (s ? applyEcardAction(s, "you", action) : s));
   }
 
   function playCard(card: ECard) {
@@ -166,6 +254,11 @@ export function EcardPage() {
           <h1>E-Card</h1>
         </div>
         <div className="row-actions">
+          {practice ? (
+            <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
+              RESET
+            </button>
+          ) : null}
           <button className="btn btn-ghost" type="button" onClick={() => void lobby.leaveHome()}>
             LEAVE
           </button>
@@ -174,6 +267,18 @@ export function EcardPage() {
       <div className="game-layout">
         <div className="table table-ecard">
           {!state || !me || waiting ? (
+            !user && !waiting ? (
+              <>
+                <LobbyDecor game="ecard" />
+                <GameSetup
+                  kicker="E-CARD"
+                  title="Emperor · Citizen · Slave"
+                  blurb="Practice vs CPU — RPS picks the opening side. Sign in to open a table or invite."
+                  game="ecard"
+                  onPractice={() => setLocal(startEcardPractice())}
+                />
+              </>
+            ) : (
             <>
               <LobbyDecor game="ecard" />
               <div className="coda-deal">
@@ -208,6 +313,7 @@ export function EcardPage() {
                 </div>
               </div>
             </>
+            )
           ) : !rival ? null : state.phase === "rps" ? (
             <div className="coda-deal coda-rps">
               <p className="kicker">Rock paper scissors</p>
