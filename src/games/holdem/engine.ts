@@ -1,12 +1,21 @@
 import { holdemRank, makeDeck, type PokerCard } from "../../lib/poker";
 import { uid } from "../../lib/shuffle";
 
-export type Seat = { id: string; name: string; chips: number; bet: number; hole: PokerCard[]; folded: boolean; allIn: boolean };
-export type Street = "preflop" | "flop" | "turn" | "river" | "showdown" | "over";
+export type Seat = {
+  id: string;
+  name: string;
+  human: boolean;
+  chips: number;
+  bet: number;
+  hole: PokerCard[];
+  folded: boolean;
+  allIn: boolean;
+};
+export type Street = "lobby" | "preflop" | "flop" | "turn" | "river" | "showdown" | "over";
 
 export type HoldemState = {
   id: string;
-  players: [Seat, Seat];
+  players: Seat[];
   dealer: 0 | 1;
   deck: PokerCard[];
   community: PokerCard[];
@@ -22,6 +31,7 @@ export type HoldemState = {
 };
 
 export type HoldemAction =
+  | { type: "start" }
   | { type: "fold" }
   | { type: "check" }
   | { type: "call" }
@@ -108,7 +118,7 @@ export function bestHand(hole: PokerCard[], board: PokerCard[]): number {
 }
 
 function post(s: HoldemState, i: 0 | 1, amt: number) {
-  const p = s.players[i];
+  const p = s.players[i]!;
   const n = Math.min(amt, p.chips);
   p.chips -= n;
   p.bet += n;
@@ -139,13 +149,46 @@ function dealHand(s: HoldemState) {
   s.message = "Preflop. Small blind acts.";
 }
 
-export function startHoldemDuel(a: { id: string; name: string }, b: { id: string; name: string }): HoldemState {
+function emptyHoldemSeat(p: { id: string; name: string; human?: boolean }): Seat {
+  return {
+    id: p.id,
+    name: p.name,
+    human: p.human !== false,
+    chips: 1000,
+    bet: 0,
+    hole: [],
+    folded: false,
+    allIn: false,
+  };
+}
+
+export function startHoldemLobby(people: Array<{ id: string; name: string; human?: boolean }>): HoldemState {
+  const players = people.slice(0, 2).map(emptyHoldemSeat);
+  return {
+    id: uid("he"),
+    players,
+    dealer: 0,
+    deck: [],
+    community: [],
+    pot: 0,
+    street: "lobby",
+    turn: 0,
+    currentBet: 0,
+    lastRaise: 0,
+    toAct: 0,
+    winnerId: null,
+    message: `Table ${players.length}/2. Open a table, add a CPU or invite, then start.`,
+    bb: BB,
+  };
+}
+
+export function startHoldemDuel(
+  a: { id: string; name: string; human?: boolean },
+  b: { id: string; name: string; human?: boolean },
+): HoldemState {
   const s: HoldemState = {
     id: uid("he"),
-    players: [
-      { id: a.id, name: a.name, chips: 1000, bet: 0, hole: [], folded: false, allIn: false },
-      { id: b.id, name: b.name, chips: 1000, bet: 0, hole: [], folded: false, allIn: false },
-    ],
+    players: [emptyHoldemSeat(a), emptyHoldemSeat(b)],
     dealer: 0,
     deck: [],
     community: [],
@@ -164,7 +207,7 @@ export function startHoldemDuel(a: { id: string; name: string }, b: { id: string
 }
 
 export function startHoldemPractice(): HoldemState {
-  return startHoldemDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU" });
+  return startHoldemDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });
 }
 
 function nextStreet(s: HoldemState) {
@@ -207,24 +250,24 @@ function showdown(s: HoldemState) {
   } else {
     const scores = s.players.map((p) => (p.folded ? -1 : bestHand(p.hole, s.community)));
     if (scores[0] === scores[1]) {
-      s.players[0].chips += Math.floor(s.pot / 2);
-      s.players[1].chips += Math.ceil(s.pot / 2);
+      s.players[0]!.chips += Math.floor(s.pot / 2);
+      s.players[1]!.chips += Math.ceil(s.pot / 2);
       s.winnerId = null;
       s.message = "Split pot.";
     } else {
       const w = (scores[0] ?? 0) > (scores[1] ?? 0) ? 0 : 1;
-      const winner = s.players[w];
-      if (winner) {
-        winner.chips += s.pot;
-        s.winnerId = winner.id;
-        s.message = `${winner.name} wins the pot.`;
-      }
+      const winner = s.players[w]!;
+      winner.chips += s.pot;
+      s.winnerId = winner.id;
+      s.message = `${winner.name} wins the pot.`;
     }
   }
   s.pot = 0;
   if (s.players.some((p) => p.chips <= 0)) {
     s.street = "over";
-    const w = s.players[0].chips > s.players[1].chips ? s.players[0] : s.players[1];
+    const a = s.players[0]!;
+    const b = s.players[1]!;
+    const w = a.chips > b.chips ? a : b;
     s.winnerId = w.id;
     s.message = `${w.name} takes the table.`;
   }
@@ -243,7 +286,8 @@ function afterAct(s: HoldemState) {
   }
   let n = other(s.turn);
   for (let k = 0; k < 2; k++) {
-    if (!s.players[n].folded && !s.players[n].allIn) {
+    const seat = s.players[n]!;
+    if (!seat.folded && !seat.allIn) {
       s.turn = n;
       return;
     }
@@ -254,6 +298,14 @@ function afterAct(s: HoldemState) {
 
 export function applyHoldemAction(s: HoldemState, playerId: string, action: HoldemAction): HoldemState {
   const next: HoldemState = structuredClone(s);
+  if (next.street === "lobby") {
+    if (action.type === "start" && next.players[0]?.id === playerId && next.players.length >= 2) {
+      const [a, b] = next.players;
+      return startHoldemDuel(a!, b!);
+    }
+    return next;
+  }
+  if (action.type === "start") return next;
   if (action.type === "next") {
     if (next.street !== "showdown") return next;
     if (next.players.some((p) => p.chips <= 0)) {
@@ -267,7 +319,7 @@ export function applyHoldemAction(s: HoldemState, playerId: string, action: Hold
   if (next.street === "showdown" || next.street === "over") return next;
   const i = idxOf(next, playerId);
   if (next.turn !== i) throw new Error("Not your turn");
-  const p = next.players[i];
+  const p = next.players[i]!;
   const toCall = next.currentBet - p.bet;
   if (action.type === "fold") {
     p.folded = true;
@@ -327,7 +379,7 @@ export function viewHoldem(s: HoldemState, viewerId: string): HoldemState {
 
 export function holdemBotAct(s: HoldemState, botId: string): HoldemAction {
   const i = idxOf(s, botId);
-  const p = s.players[i];
+  const p = s.players[i]!;
   const toCall = s.currentBet - p.bet;
   const score = bestHand(p.hole, s.community);
   if (toCall > 0 && score < 15 ** 5 && Math.random() < 0.35) return { type: "fold" };

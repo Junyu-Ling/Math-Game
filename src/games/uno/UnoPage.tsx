@@ -6,7 +6,6 @@ import {
   currentUno,
   legalCards,
   needsUnoCall,
-  startUnoPractice,
   topCard,
   type UnoAction,
   type UnoColor,
@@ -15,7 +14,6 @@ import {
 } from "./engine";
 import { DeckStack, UnoColorPick, UnoFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
-import { GameSetup } from "../../components/GameSetup";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
@@ -253,18 +251,6 @@ export function UnoPage() {
       <div className="game-layout">
         <div className={`table table-uno ${multi ? "uno-multi" : ""}`}>
           {!playing || !state || !me || !seated ? (
-            !user && !waiting ? (
-              <>
-                <LobbyDecor game="uno" />
-                <GameSetup
-                  kicker="UNO"
-                  title="Empty your hand"
-                  blurb="Practice vs CPU. Match color, number, or action. Sign in to open a table or invite."
-                  game="uno"
-                  onPractice={() => setLocal(startUnoPractice())}
-                />
-              </>
-            ) : (
             <>
             <LobbyDecor game="uno" />
             <div className="coda-deal">
@@ -299,7 +285,6 @@ export function UnoPage() {
               </div>
             </div>
             </>
-            )
           ) : (
             <>
               {seated.partner ? (

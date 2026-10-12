@@ -8,7 +8,6 @@ import {
   cardBack,
   cardLabel,
   finishEcardRps,
-  startEcardPractice,
   type EAction,
   type ECard,
   type EKind,
@@ -16,7 +15,6 @@ import {
   type EState,
   type RpsThrow,
 } from "./engine";
-import { GameSetup } from "../../components/GameSetup";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
@@ -267,18 +265,6 @@ export function EcardPage() {
       <div className="game-layout">
         <div className="table table-ecard">
           {!state || !me || waiting ? (
-            !user && !waiting ? (
-              <>
-                <LobbyDecor game="ecard" />
-                <GameSetup
-                  kicker="E-CARD"
-                  title="Emperor · Citizen · Slave"
-                  blurb="Practice vs CPU — RPS picks the opening side. Sign in to open a table or invite."
-                  game="ecard"
-                  onPractice={() => setLocal(startEcardPractice())}
-                />
-              </>
-            ) : (
             <>
               <LobbyDecor game="ecard" />
               <div className="coda-deal">
@@ -313,7 +299,6 @@ export function EcardPage() {
                 </div>
               </div>
             </>
-            )
           ) : !rival ? null : state.phase === "rps" ? (
             <div className="coda-deal coda-rps">
               <p className="kicker">Rock paper scissors</p>

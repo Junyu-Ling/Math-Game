@@ -21,8 +21,12 @@ const CPU_NAMES = ["CPU", "CPU 2", "CPU 3", "CPU 4", "CPU 5", "CPU 6", "CPU 7", 
 
 function tableMax(game) {
   if (game === "flip7") return 16;
-  if (game === "gomoku" || game === "ecard") return 2;
+  if (game === "gomoku" || game === "ecard" || game === "bj" || game === "m24" || game === "holdem") return 2;
   return 4;
+}
+
+function isLobbyState(state) {
+  return Boolean(state && (state.phase === "lobby" || state.street === "lobby"));
 }
 
 function isCpuId(id) {
@@ -747,7 +751,7 @@ export async function createInvite(from, toId, game, meta = {}) {
   if (toSeat) throw new Error("Someone is already in a game");
   if (fromSeat) {
     const rec = await getRoomRecord(fromSeat);
-    const lobby = rec && OPEN_TABLES.has(rec.game) && rec.state?.phase === "lobby";
+    const lobby = rec && OPEN_TABLES.has(rec.game) && isLobbyState(rec.state);
     if (!lobby) throw new Error("Someone is already in a game");
     if (rec.seats[0] !== fromId) throw new Error("Only the host can invite");
     if (rec.seats.length >= tableMax(rec.game)) throw new Error("The table is full");
@@ -849,7 +853,7 @@ async function joinOpenTable(user, invite, mods) {
   let rec = hostSeat ? await getRoomRecord(hostSeat) : null;
   const host = await readJson(`axiom:p:${hostId}`);
   if (!host) throw new Error("They went offline");
-  if (rec && rec.game === game && rec.state?.phase === "lobby") {
+  if (rec && rec.game === game && isLobbyState(rec.state)) {
     if (rec.seats.includes(joiner.id)) throw new Error("Already seated");
     if (rec.seats.length >= tableMax(game)) throw new Error("The table is full");
     rec.seats = [...rec.seats, joiner.id];
@@ -882,6 +886,9 @@ function newLobbyState(game, people, mods, meta) {
   if (game === "halli") return mods.halli.startHalliLobby(people);
   if (game === "gomoku") return mods.gomoku.startGomokuLobby(people);
   if (game === "ecard") return mods.ecard.startEcardLobby(people);
+  if (game === "bj") return mods.bj.startBjLobby(people);
+  if (game === "m24") return mods.m24.startM24Lobby(people);
+  if (game === "holdem") return mods.holdem.startHoldemLobby(people);
   throw new Error("Unknown table game");
 }
 
@@ -892,6 +899,9 @@ function rebuildLobby(rec, joiner, mods) {
   if (rec.game === "halli") return mods.halli.startHalliLobby(people);
   if (rec.game === "gomoku") return mods.gomoku.startGomokuLobby(people);
   if (rec.game === "ecard") return mods.ecard.startEcardLobby(people);
+  if (rec.game === "bj") return mods.bj.startBjLobby(people);
+  if (rec.game === "m24") return mods.m24.startM24Lobby(people);
+  if (rec.game === "holdem") return mods.holdem.startHoldemLobby(people);
   if (rec.game === "coda") {
     let state = mods.coda.startCodaLobby(people, Boolean(rec.state?.useJokers));
     for (const p of rec.state.players || []) {
@@ -918,7 +928,21 @@ const CPU_THINK_MS = 1000;
 
 function cpuIsToAct(room) {
   const s = room?.state;
-  if (!s || s.phase === "over" || s.phase === "lobby" || s.phase === "arrange") return false;
+  if (!s || s.phase === "over" || isLobbyState(s) || s.phase === "arrange" || s.street === "over") return false;
+  if (room.game === "holdem") {
+    if (s.street === "lobby" || s.street === "over" || s.street === "showdown") return false;
+    const cur = s.players[s.turn];
+    return Boolean(isCpuPlayer(cur));
+  }
+  if (room.game === "bj") {
+    if (s.phase !== "play") return false;
+    const cur = s.players[s.turn];
+    return Boolean(isCpuPlayer(cur));
+  }
+  if (room.game === "m24") {
+    if (s.phase !== "play") return false;
+    return s.players.some((p) => isCpuPlayer(p));
+  }
   if (room.game === "coda") {
     if (s.phase === "rps" && !s.rpsReveal) {
       return s.players.some((p) => isCpuPlayer(p) && !s.rpsThrows?.[p.id]);
@@ -965,6 +989,20 @@ function cpuIsToAct(room) {
       return s.players.some((p) => isCpuPlayer(p) && !p.locked);
     }
   }
+  if (room.game === "bj") {
+    if (s.phase !== "play") return false;
+    const cur = s.players[s.turn];
+    return Boolean(isCpuPlayer(cur) && !cur.stood);
+  }
+  if (room.game === "m24") {
+    if (s.phase !== "play") return false;
+    return s.players.some((p) => isCpuPlayer(p));
+  }
+  if (room.game === "holdem") {
+    if (s.street === "lobby" || s.street === "over" || s.street === "showdown") return false;
+    const cur = s.players[s.turn];
+    return Boolean(isCpuPlayer(cur));
+  }
   return false;
 }
 
@@ -974,7 +1012,9 @@ function armCpuThink(room) {
     return;
   }
   // RAPFI already spends wall-clock time thinking; don't add a full extra second.
-  const delay = room.game === "gomoku" && rapfiAvailable() ? 180 : CPU_THINK_MS;
+  // Make 24 races humans �?give the CPU a few seconds like local practice.
+  const delay =
+    room.game === "gomoku" && rapfiAvailable() ? 180 : room.game === "m24" ? 8000 : CPU_THINK_MS;
   room.cpuReadyAt = Date.now() + delay;
 }
 
@@ -1133,10 +1173,43 @@ async function playOneCpuTurn(room) {
       return true;
     }
   }
+
+  if (room.game === "bj") {
+    const cur = s.players[s.turn];
+    if (!isCpuPlayer(cur)) return false;
+    room.state = mods.bj.applyBjDuelAction(s, cur.id, mods.bj.aiBjAction(s));
+    return true;
+  }
+
+  if (room.game === "m24") {
+    const cpu = s.players.find((p) => isCpuPlayer(p));
+    if (!cpu || !s.solution) return false;
+    room.state = mods.m24.applyM24Action(s, cpu.id, { type: "submit", expr: s.solution });
+    return true;
+  }
+
+  if (room.game === "holdem") {
+    const cur = s.players[s.turn];
+    if (!isCpuPlayer(cur)) return false;
+    try {
+      room.state = mods.holdem.applyHoldemAction(s, cur.id, mods.holdem.holdemBotAct(s, cur.id));
+    } catch {
+      try {
+        room.state = mods.holdem.applyHoldemAction(s, cur.id, { type: "call" });
+      } catch {
+        try {
+          room.state = mods.holdem.applyHoldemAction(s, cur.id, { type: "check" });
+        } catch {
+          room.state = mods.holdem.applyHoldemAction(s, cur.id, { type: "fold" });
+        }
+      }
+    }
+    return true;
+  }
   return false;
 }
 
-const OPEN_TABLES = new Set(["coda", "uno", "flip7", "halli", "gomoku", "ecard"]);
+const OPEN_TABLES = new Set(["coda", "uno", "flip7", "halli", "gomoku", "ecard", "bj", "m24", "holdem"]);
 
 export async function applyRoomAction(user, roomId, action, mods) {
   mods = mods || (await getMods());
@@ -1191,7 +1264,7 @@ export async function leaveRoom(userId) {
   const rid = await getSeat(userId);
   if (!rid) return snapshot(userId);
   const rec = await attachMods(await getRoomRecord(rid));
-  if (rec?.game && OPEN_TABLES.has(rec.game) && rec.state?.phase === "lobby") {
+  if (rec?.game && OPEN_TABLES.has(rec.game) && isLobbyState(rec.state)) {
     const hostLeft = rec.seats[0] === userId;
     await kvDel(`axiom:seat:${userId}`);
     const humansLeft = humanSeatIds(rec.seats).filter((id) => id !== userId);
@@ -1281,7 +1354,7 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
   const add = mode === "add" || mode === "fill";
   const fill = mode === "fill";
   const open = mode === "open";
-  const inLobbyHere = Boolean(rec && rec.game === game && rec.state?.phase === "lobby");
+  const inLobbyHere = Boolean(rec && rec.game === game && isLobbyState(rec.state));
 
   // Open table / start fresh: leave any stuck finished/other-game seat first.
   if (open) {
@@ -1306,7 +1379,7 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
 
   if (!rec || !inLobbyHere) {
     if (!add) throw new Error("Open a table first");
-    // Add CPU with no lobby → open table then seat one CPU.
+    // Add CPU with no lobby �?open table then seat one CPU.
     if (rec) await vacateSeat(userId, rec);
     const host = { id: userId, name: playerName(user), human: true };
     rec = {

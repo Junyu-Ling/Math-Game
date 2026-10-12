@@ -6,12 +6,10 @@ import {
   applyGomokuAction,
   finishGomokuRps,
   foulLabel,
-  startGomokuPractice,
   type GAction,
   type GState,
   type RpsThrow,
 } from "./engine";
-import { GameSetup } from "../../components/GameSetup";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
@@ -239,15 +237,6 @@ export function GomokuPage() {
       <div className="game-layout">
         <div className="table table-gomoku">
           {!state || !me || waiting ? (
-            !user && !waiting ? (
-              <GameSetup
-                kicker="GOMOKU"
-                title="Five in a row"
-                blurb="15×15 Renju. Practice vs CPU — RPS winner plays black. Sign in to open a table or invite."
-                game="gomoku"
-                onPractice={() => setLocal(startGomokuPractice())}
-              />
-            ) : (
             <div className="coda-deal">
               <p className="kicker">{waiting ? "TABLE" : "GOMOKU"}</p>
               <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Five in a row"}</h2>
@@ -279,7 +268,6 @@ export function GomokuPage() {
                 ) : null}
               </div>
             </div>
-            )
           ) : state.phase === "rps" ? (
             <div className="coda-deal coda-rps">
               <p className="status-line">Winner plays black</p>

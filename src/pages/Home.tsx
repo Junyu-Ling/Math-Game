@@ -231,7 +231,7 @@ export function Home() {
           </Link>
         ))}
       </div>
-      <p className="section-note">Practice needs no account. Duels are invite-only, two players.</p>
+      <p className="section-note">Sign in to open a table, add CPUs or invite, then start. All games support online play.</p>
     </div>
   );
 }

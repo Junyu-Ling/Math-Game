@@ -222,6 +222,7 @@ export function nextRound(state: BjState): BjState {
 export type BjDuelPlayer = {
   id: string;
   name: string;
+  human: boolean;
   cards: BjCard[];
   stood: boolean;
 };
@@ -231,16 +232,32 @@ export type BjDuelState = {
   players: BjDuelPlayer[];
   deck: BjCard[];
   turn: number;
-  phase: "play" | "over";
+  phase: "lobby" | "play" | "over";
   winnerId: string | null;
   message: string;
 };
 
-function emptySeat(p: { id: string; name: string }): BjDuelPlayer {
-  return { id: p.id, name: p.name, cards: [], stood: false };
+function emptySeat(p: { id: string; name: string; human?: boolean }): BjDuelPlayer {
+  return { id: p.id, name: p.name, human: p.human !== false, cards: [], stood: false };
 }
 
-export function startBjDuel(a: { id: string; name: string }, b: { id: string; name: string }): BjDuelState {
+export function startBjLobby(people: Array<{ id: string; name: string; human?: boolean }>): BjDuelState {
+  const players = people.slice(0, 2).map(emptySeat);
+  return {
+    mode: "duel",
+    players,
+    deck: [],
+    turn: 0,
+    phase: "lobby",
+    winnerId: null,
+    message: `Table ${players.length}/2. Open a table, add a CPU or invite, then start.`,
+  };
+}
+
+export function startBjDuel(
+  a: { id: string; name: string; human?: boolean },
+  b: { id: string; name: string; human?: boolean },
+): BjDuelState {
   let deck = freshShoe(2);
   const take = (): BjCard => {
     const card = deck[0]!;
@@ -289,10 +306,10 @@ function settleDuel(state: BjDuelState): BjDuelState {
   return { ...state, phase: "over", winnerId, message };
 }
 
-export type BjDuelAction = { type: "hit" } | { type: "stand" };
+export type BjDuelAction = { type: "start" } | { type: "hit" } | { type: "stand" };
 
 export function startBjPractice(): BjDuelState {
-  return startBjDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU" });
+  return startBjDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });
 }
 
 export function aiBjAction(state: BjDuelState): BjDuelAction {
@@ -302,7 +319,14 @@ export function aiBjAction(state: BjDuelState): BjDuelAction {
 }
 
 export function applyBjDuelAction(state: BjDuelState, actorId: string, action: BjDuelAction): BjDuelState {
-  if (state.phase !== "play") return state;
+  if (state.phase === "lobby") {
+    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 2) {
+      const [a, b] = state.players;
+      return startBjDuel(a!, b!);
+    }
+    return state;
+  }
+  if (state.phase !== "play" || action.type === "start") return state;
   const me = state.players[state.turn];
   if (!me || me.id !== actorId || me.stood) return state;
   let players = state.players;

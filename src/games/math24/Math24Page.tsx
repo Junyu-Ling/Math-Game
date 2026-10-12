@@ -1,47 +1,37 @@
 import { useEffect, useState } from "react";
-import { applyM24Action, startM24Practice, type M24DuelState } from "./engine";
+import { type M24DuelState } from "./engine";
 import { PokerFace } from "../../components/PlayingCard";
-import { GameSetup } from "../../components/GameSetup";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
+import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 
-const OPS = ["+", "-", "×", "÷", "(", ")"];
+const OPS = ["+", "-", "\u00d7", "\u00f7", "(", ")"];
 
 export function Math24Page() {
   const { user } = useAuth();
   const lobby = useLobby();
   const room = lobby.room?.game === "m24" ? lobby.room : null;
-  const [local, setLocal] = useState<M24DuelState | null>(null);
-  const state = (room?.view as M24DuelState | undefined) ?? local;
-  const practice = Boolean(local && !room);
+  const state = room?.view as M24DuelState | undefined;
   const [used, setUsed] = useState<boolean[]>([false, false, false, false]);
   const [expr, setExpr] = useState("");
-  const youId = practice ? "you" : user?.id;
-  const myScore = youId && state ? state.scores[youId] || 0 : 0;
+  const youId = user?.id;
+  const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
-
-  useEffect(() => {
-    if (room) setLocal(null);
-  }, [room]);
+  const waiting = Boolean(state?.phase === "lobby");
+  const host = Boolean(user && room?.seats?.[0] === user.id);
+  const myScore = youId && state ? state.scores[youId] || 0 : 0;
+  const playing = Boolean(state && me && !waiting);
 
   useEffect(() => {
     setUsed([false, false, false, false]);
     setExpr("");
   }, [state?.round]);
 
-  useEffect(() => {
-    if (!practice || !local || local.phase !== "play") return;
-    const t = window.setTimeout(() => {
-      setLocal((s) => (s && s.phase === "play" && s.solution ? applyM24Action(s, "cpu", { type: "submit", expr: s.solution }) : s));
-    }, 8000);
-    return () => window.clearTimeout(t);
-  }, [practice, local?.round, local?.phase, local?.solution]);
-
   function tapNum(i: number) {
-    if (!state || used[i] || state.phase === "over") return;
+    if (!state || used[i] || state.phase !== "play") return;
     const n = state.nums[i];
     if (n === undefined) return;
     setExpr((e) => e + String(n));
@@ -49,13 +39,14 @@ export function Math24Page() {
   }
 
   async function submit() {
-    if (room) {
-      await lobby.sendAction({ type: "submit", expr });
-    } else {
-      setLocal((s) => (s ? applyM24Action(s, "you", { type: "submit", expr }) : s));
-    }
+    if (!room) return;
+    await lobby.sendAction({ type: "submit", expr });
     setExpr("");
     setUsed([false, false, false, false]);
+  }
+
+  function actStart() {
+    if (room) void lobby.sendAction({ type: "start" });
   }
 
   return (
@@ -63,16 +54,12 @@ export function Math24Page() {
       <div className="game-head">
         <div>
           <p className="kicker">
-            04 / M24 · Duel · {state ? `${myScore} : ${rival && youId ? state.scores[rival.id] || 0 : 0}` : "0 : 0"}
+            04 / M24 · Duel ·{" "}
+            {playing && state ? `${myScore} : ${rival && youId ? state.scores[rival.id] || 0 : 0}` : "0 : 0"}
           </p>
           <h1>Make 24</h1>
         </div>
         <div className="row-actions">
-          {practice ? (
-            <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
-              RESET
-            </button>
-          ) : null}
           <button className="btn btn-ghost" type="button" onClick={() => void lobby.leaveHome()}>
             LEAVE
           </button>
@@ -80,16 +67,40 @@ export function Math24Page() {
       </div>
       <div className="game-layout">
         <div className="table table-m24">
-          {!state ? (
+          {!playing || !state || !me ? (
             <>
-            <LobbyDecor game="m24" />
-            <GameSetup
-              kicker="MATH 24"
-              title="First to make 24"
-              blurb="Same four cards. First to 3 points wins. In practice, the CPU submits in about 8 seconds."
-              game="m24"
-              onPractice={() => setLocal(startM24Practice())}
-            />
+              <LobbyDecor game="m24" />
+              <div className="coda-deal">
+                <p className="kicker">{waiting ? "TABLE" : "MATH 24"}</p>
+                <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "First to make 24"}</h2>
+                <p>
+                  {waiting
+                    ? "Add a CPU or invite one friend, then start. First to 3 points wins."
+                    : "Open a table, add a CPU or invite, then start. Same four cards — first to make 24 scores."}
+                </p>
+                {waiting && state ? (
+                  <ul className="lobby-roster">
+                    {state.players.map((p, i) => (
+                      <li key={p.id}>
+                        <b>{p.name}</b>
+                        <span>{seatTag(p, i, state.players[0]?.id)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <MixedCpuBar game="m24" />
+                <div className="row-actions" style={{ justifyContent: "center" }}>
+                  {waiting ? (
+                    host && (state?.players.length ?? 0) >= 2 ? (
+                      <button className="btn" type="button" onClick={() => actStart()}>
+                        Start
+                      </button>
+                    ) : (
+                      <p>{host ? "Need 2 players to start." : "Waiting for the host to start."}</p>
+                    )
+                  ) : null}
+                </div>
+              </div>
             </>
           ) : (
             <>
@@ -103,7 +114,7 @@ export function Math24Page() {
                   </div>
                 ))}
               </div>
-              <div className="expr">{expr || "—"}</div>
+              <div className="expr">{expr || "-"}</div>
               <div className="ops">
                 {OPS.map((op) => (
                   <button key={op} type="button" onClick={() => setExpr((e) => e + op)}>

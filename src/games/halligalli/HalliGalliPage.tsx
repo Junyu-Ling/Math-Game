@@ -8,7 +8,6 @@ import {
   HALLI_FRUITS,
   HALLI_LABEL,
   ringingFruit,
-  startHalliPractice,
   topOpen,
   type HalliAction,
   type HalliCard,
@@ -16,7 +15,6 @@ import {
   type HalliPlayer,
   type HalliState,
 } from "./engine";
-import { GameSetup } from "../../components/GameSetup";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
@@ -186,18 +184,6 @@ export function HalliGalliPage() {
       <div className="game-layout">
         <div className={`table table-hg ${multi ? "hg-multi" : ""}`}>
           {!playing || !state || !me || !seated ? (
-            !user && !waiting ? (
-              <>
-                <LobbyDecor game="halli" />
-                <GameSetup
-                  kicker="HALLI GALLI"
-                  title="Ring on five"
-                  blurb="Practice vs CPU. Flip fruit; ring when five of one fruit show. Sign in to open a table or invite."
-                  game="halli"
-                  onPractice={() => setLocal(startHalliPractice())}
-                />
-              </>
-            ) : (
             <>
               <LobbyDecor game="halli" />
               <div className="coda-deal">
@@ -232,7 +218,6 @@ export function HalliGalliPage() {
                 </div>
               </div>
             </>
-            )
           ) : (
             <>
               {seated.partner ? (

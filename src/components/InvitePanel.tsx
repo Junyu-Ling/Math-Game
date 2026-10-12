@@ -7,10 +7,11 @@ import { Avatar } from "./Avatar";
 export function InviteList({ game, meta }: { game: string; meta?: Record<string, unknown> }) {
   const { user } = useAuth();
   const { online, error, invite, room, store, inviteCooldownMs } = useLobby();
+  const view = room?.view as { phase?: string; street?: string } | undefined;
   const tableWait = Boolean(
     room &&
-      ["coda", "uno", "flip7", "halli", "gomoku", "ecard"].includes(room.game) &&
-      (room.view as { phase?: string } | undefined)?.phase === "lobby",
+      ["coda", "uno", "flip7", "halli", "gomoku", "ecard", "bj", "m24", "holdem"].includes(room.game) &&
+      (view?.phase === "lobby" || view?.street === "lobby"),
   );
   const host = Boolean(user && room?.seats?.[0] === user.id);
   const seated = new Set(room?.seats || []);
@@ -44,6 +45,15 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       ) : null}
       {game === "gomoku" ? (
         <p>Gomoku is heads-up. Open a table, add a CPU or invite one friend, then start. RPS winner plays black.</p>
+      ) : null}
+      {game === "bj" ? (
+        <p>Blackjack is heads-up. Open a table, add a CPU or invite one friend, then start.</p>
+      ) : null}
+      {game === "m24" ? (
+        <p>Make 24 is heads-up. Open a table, add a CPU or invite one friend, then start. First to 3 points.</p>
+      ) : null}
+      {game === "holdem" ? (
+        <p>Hold’em is heads-up. Open a table, add a CPU or invite one friend, then start. Blinds 5 / 10.</p>
       ) : null}
       {tableWait ? <p>Seated {seated.size}{max < 16 ? `/${max}` : ""}.</p> : null}
       {online.length === 0 ? (

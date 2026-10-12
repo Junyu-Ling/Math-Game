@@ -7,14 +7,12 @@ import {
   activePlayers,
   currentFlip,
   liveTotal,
-  startFlip7Practice,
   type FlipAction,
   type FlipPlayer,
   type FlipState,
 } from "./engine";
 import { DeckStack, FlipFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
-import { GameSetup } from "../../components/GameSetup";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
@@ -318,18 +316,6 @@ export function Flip7Page() {
           style={useRing ? ({ ["--flip-card-scale"]: String(cardScale) } as CSSProperties) : undefined}
         >
           {!ready || !state || !me ? (
-            !user && !waiting ? (
-              <>
-                <LobbyDecor game="flip7" />
-                <GameSetup
-                  kicker="FLIP 7"
-                  title="First to 200"
-                  blurb="Practice vs CPU. Hit or stay — Freeze and Flip Three can target anyone. Sign in to open a table or invite."
-                  game="flip7"
-                  onPractice={() => setLocal(startFlip7Practice())}
-                />
-              </>
-            ) : (
             <>
               <LobbyDecor game="flip7" />
               <div className="coda-deal">
@@ -364,7 +350,6 @@ export function Flip7Page() {
                 </div>
               </div>
             </>
-            )
           ) : useRing && ring ? (
             <>
               {freezeFx ? (

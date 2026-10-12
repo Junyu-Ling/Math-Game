@@ -13,7 +13,8 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
   const cpuN = seats.filter(isCpuId).length;
   const max = tableMax(game);
   const full = seats.length >= max;
-  const waiting = Boolean(here && (room?.view as { phase?: string } | undefined)?.phase === "lobby");
+  const view = here ? (room?.view as { phase?: string; street?: string } | undefined) : undefined;
+  const waiting = Boolean(here && (view?.phase === "lobby" || view?.street === "lobby"));
   const duel = max <= 2;
   /** Only show add/remove after a live lobby table exists. */
   const atTable = here && waiting && host;
@@ -34,7 +35,7 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
   if (!user) {
     return (
       <div className="cpu-bar">
-        <p>Guests play Practice vs CPU on this page. Sign in to open a table or invite.</p>
+        <p>Sign in to open a table, then add a CPU or invite someone.</p>
       </div>
     );
   }
