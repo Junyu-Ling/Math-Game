@@ -18,7 +18,7 @@ const RULES: Record<string, string[]> = {
     "2–4 players. Match color or number/symbol. Empty your hand to win.",
     "When you have no legal play, draw one card only. If it is playable you may play it or keep it; you cannot draw again.",
     "Before playing down to one card (or your last card), tap UNO first.",
-    "+2 and +4 can stack. Wilds pick the next color.",
+    "+2 can be stacked with +2 or +4; +4 can only be stacked with +4. Draw totals add up. Wilds pick the next color.",
   ],
   halli: [
     "2–4 players. Flip one fruit card on your turn.",

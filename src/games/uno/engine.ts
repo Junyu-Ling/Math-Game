@@ -109,10 +109,10 @@ export function topCard(state: UnoState): UnoCard | undefined {
 export function canPlay(state: UnoState, card: UnoCard): boolean {
   if (state.justDrawnId && card.id !== state.justDrawnId) return false;
   if (state.pendingDraw > 0) {
-    if (state.stackKind === "wild4") {
-      return card.kind === "wild4" || (card.kind === "draw2" && card.color === state.color);
-    }
-    return card.kind === "draw2";
+    // Stacking: +2 may be answered with +2 or +4; +4 may only be answered with +4.
+    // Draw totals accumulate (pendingDraw keeps summing).
+    if (state.stackKind === "wild4") return card.kind === "wild4";
+    return card.kind === "draw2" || card.kind === "wild4";
   }
   if (card.kind === "wild" || card.kind === "wild4") return true;
   const top = topCard(state);
@@ -341,7 +341,8 @@ export function applyUnoAction(state: UnoState, actorId: string, action: UnoActi
   if (card.color !== "black") next.color = card.color;
   if (card.kind === "draw2") {
     next.pendingDraw += 2;
-    next.stackKind = state.stackKind === "wild4" ? "wild4" : "draw2";
+    // Playing +2 can only start or continue a +2 stack (never answer a +4).
+    next.stackKind = "draw2";
     next = burst(next, next.pendingDraw, next.players[nextIndex(next)]?.id ?? me.id);
   }
   if (card.kind === "reverse") {

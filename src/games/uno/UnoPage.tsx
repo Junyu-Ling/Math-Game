@@ -113,18 +113,21 @@ const DIR_INK: Record<UnoColor, { light: string; mid: string; deep: string }> = 
   blue: { light: "#6aa8ff", mid: "#2a6fd6", deep: "#1848b0" },
 };
 
-function dirArc(cx: number, cy: number, r: number, startDeg: number, endDeg: number) {
+function dirArc(cx: number, cy: number, r: number, startDeg: number, endDeg: number, clockwise: boolean) {
   const rad = (d: number) => ((d - 90) * Math.PI) / 180;
-  const x1 = cx + r * Math.cos(rad(startDeg));
-  const y1 = cy + r * Math.sin(rad(startDeg));
-  const x2 = cx + r * Math.cos(rad(endDeg));
-  const y2 = cy + r * Math.sin(rad(endDeg));
+  // Travel along the short arc in the play direction.
+  const from = clockwise ? startDeg : endDeg;
+  const to = clockwise ? endDeg : startDeg;
+  const x1 = cx + r * Math.cos(rad(from));
+  const y1 = cy + r * Math.sin(rad(from));
+  const x2 = cx + r * Math.cos(rad(to));
+  const y2 = cy + r * Math.sin(rad(to));
+  const sweep = clockwise ? 1 : 0;
   return {
-    d: `M${x1.toFixed(1)} ${y1.toFixed(1)}A${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`,
-    tip: { x: x2, y: y2 },
-    // Tangent at end for clockwise arc (perpendicular to radius, +90°)
+    d: `M${x1.toFixed(1)} ${y1.toFixed(1)}A${r} ${r} 0 0 ${sweep} ${x2.toFixed(1)} ${y2.toFixed(1)}`,
+    // Tangent at tip: +90° for CW, -90° for CCW so the arrowhead points along travel.
     head: (() => {
-      const t = rad(endDeg + 90);
+      const t = rad(to + (clockwise ? 90 : -90));
       const nx = Math.cos(t);
       const ny = Math.sin(t);
       const px = -ny;
@@ -139,16 +142,16 @@ function dirArc(cx: number, cy: number, r: number, startDeg: number, endDeg: num
 }
 
 function DirMark({ dir, color }: { dir: 1 | -1; color: UnoColor }) {
-  const cw = dir === -1;
+  // dir 1 seats left → counterclockwise on the table; dir -1 → clockwise.
+  const clockwise = dir === -1;
   const ink = DIR_INK[color] ?? DIR_INK.green;
   const gradId = `unoRefresh-${useId().replace(/:/g, "")}`;
-  // Two ~75° arcs with ~105° gaps — clearly separate like 🔄
-  const a = dirArc(60, 60, 44, 5, 80);
-  const b = dirArc(60, 60, 44, 185, 260);
+  const a = dirArc(60, 60, 44, 5, 80, clockwise);
+  const b = dirArc(60, 60, 44, 185, 260, clockwise);
   return (
     <div
-      className={`uno-dir-ring ${cw ? "cw" : "ccw"} color-${color}`}
-      aria-label="Play direction"
+      className={`uno-dir-ring ${clockwise ? "cw" : "ccw"} color-${color}`}
+      aria-label={clockwise ? "Clockwise" : "Counterclockwise"}
     >
       <svg viewBox="0 0 120 120" aria-hidden>
         <defs>
@@ -347,8 +350,8 @@ export function UnoPage() {
                       : state.log.at(-1)?.text || "Game over"
                     : state.pendingDraw > 0
                       ? state.stackKind === "wild4"
-                        ? `+${state.pendingDraw} · stack ${state.color} +2 or +4`
-                        : `+${state.pendingDraw} · stack any +2`
+                        ? `+${state.pendingDraw} · stack +4 only`
+                        : `+${state.pendingDraw} · stack +2 or +4`
                       : shoutArmed && myTurn
                         ? drewPlayable
                           ? "Tap UNO, then play or keep"
