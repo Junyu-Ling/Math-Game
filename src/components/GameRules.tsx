@@ -34,8 +34,11 @@ const RULES: Record<string, string[]> = {
     "Use each card once. First correct answer scores.",
   ],
   holdem: [
-    "Heads-up Texas Hold’em. Blinds, then flop / turn / river, then showdown.",
-    "Best five-card hand using hole cards and the board wins the pot.",
+    "Heads-up Texas Hold’em. Blinds 5/10, then flop / turn / river, then showdown. Best five cards from your 2 hole cards + the board wins the pot.",
+    "Rank high → low (examples). Royal flush: A♠ K♠ Q♠ J♠ 10♠. Straight flush: 9♥ 8♥ 7♥ 6♥ 5♥. Four of a kind: K♣ K♦ K♥ K♠ 2♦ (four Kings).",
+    "Full house: A♠ A♥ A♦ 8♣ 8♠ (three Aces + pair of 8s) beats three of a kind: 7♠ 7♥ 7♦ K♣ 2♠. Flush: A♦ J♦ 9♦ 6♦ 3♦ (same suit, not in sequence).",
+    "Straight: 10♣ 9♦ 8♠ 7♥ 6♣ (any suits, in sequence). A-2-3-4-5 is the lowest straight; 10-J-Q-K-A is the highest. Two pair: A♠ A♦ 5♣ 5♥ K♠ beats one pair: Q♥ Q♣ A♠ 9♦ 4♣.",
+    "High card: if nobody has a pair or better, highest card wins — e.g. A♠ J♦ 8♣ 6♥ 2♠ beats K♥ Q♦ 9♣ 7♠ 3♥. Same hand type: compare the key cards (then kickers) until one side is higher.",
   ],
   ecard: [
     "Heads-up. Open a table, add a CPU or invite one friend, then start. RPS winner picks the opening side. 12 rounds in 4 sets of 3; roles swap every 3.",
