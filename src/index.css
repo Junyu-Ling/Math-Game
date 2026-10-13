@@ -925,7 +925,7 @@ h1 {
 .side ul { margin: 0; padding-left: 16px; }
 
 .rule-holdem .rule-lead {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.55;
@@ -936,13 +936,13 @@ h1 {
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .rule-rank {
   display: grid;
-  gap: 6px;
-  padding-bottom: 10px;
+  gap: 8px;
+  padding: 10px 0 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--line, #e5e7eb) 80%, transparent);
 }
 
@@ -957,7 +957,7 @@ h1 {
 }
 
 .rule-rank-text b {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink);
   letter-spacing: 0.01em;
@@ -970,17 +970,21 @@ h1 {
 }
 
 .rule-hand {
-  --cw: 34px;
-  --ch: 48px;
+  --cw: 52px;
+  --ch: 74px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-wrap: nowrap;
+  gap: 5px;
   align-items: center;
+  overflow-x: auto;
+  padding: 2px 0 4px;
 }
 
-.rule-hand .poker-svg {
-  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.12);
-  border-radius: 4px;
+.rule-hand .poker-svg,
+.rule-hand .card-svg {
+  flex: 0 0 auto;
+  filter: drop-shadow(0 2px 4px rgba(17, 17, 17, 0.16));
+  border-radius: 5px;
 }
 
 .log {

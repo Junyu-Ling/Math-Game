@@ -1,5 +1,5 @@
-import { MiniPoker } from "./PlayingCard";
-import type { Rank, Suit } from "../lib/poker";
+import { PokerFace } from "./PlayingCard";
+import type { PokerCard, Rank, Suit } from "../lib/poker";
 
 const RULES: Record<string, string[]> = {
   coda: [
@@ -174,13 +174,17 @@ const HOLDEM_RANKS: Array<{ name: string; tip: string; cards: Sample[] }> = [
   },
 ];
 
+function sampleCard(rank: Rank, suit: Suit, i: number): PokerCard {
+  return { id: `${rank}${suit}${i}`, rank, suit };
+}
+
 function HoldemRules() {
   return (
     <div className="rule-holdem">
       <h3>RULE</h3>
       <p className="rule-lead">
         Heads-up Texas Hold’em. Blinds 5/10 → flop / turn / river → showdown. Best five cards from your 2 hole cards +
-        the board wins. Rank high → low:
+        the board wins. Rank high → low — same cards as on the table:
       </p>
       <ol className="rule-rank-list">
         {HOLDEM_RANKS.map((row) => (
@@ -191,7 +195,7 @@ function HoldemRules() {
             </div>
             <div className="rule-hand" aria-label={row.name}>
               {row.cards.map((c, i) => (
-                <MiniPoker key={`${row.name}-${i}`} rank={c.rank} suit={c.suit} />
+                <PokerFace key={`${row.name}-${i}`} card={sampleCard(c.rank, c.suit, i)} />
               ))}
             </div>
           </li>
