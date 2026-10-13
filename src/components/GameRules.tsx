@@ -1,3 +1,6 @@
+import { MiniPoker } from "./PlayingCard";
+import type { Rank, Suit } from "../lib/poker";
+
 const RULES: Record<string, string[]> = {
   coda: [
     "2–4 players. Each player picks their own black/white opening mix, then ready. The deal waits until everyone is ready.",
@@ -33,13 +36,6 @@ const RULES: Record<string, string[]> = {
     "Same four poker cards for both players. Build an expression that equals 24.",
     "Use each card once. First correct answer scores.",
   ],
-  holdem: [
-    "Heads-up Texas Hold’em. Blinds 5/10, then flop / turn / river, then showdown. Best five cards from your 2 hole cards + the board wins the pot.",
-    "Rank high → low (examples). Royal flush: A♠ K♠ Q♠ J♠ 10♠. Straight flush: 9♥ 8♥ 7♥ 6♥ 5♥. Four of a kind: K♣ K♦ K♥ K♠ 2♦ (four Kings).",
-    "Full house: A♠ A♥ A♦ 8♣ 8♠ (three Aces + pair of 8s) beats three of a kind: 7♠ 7♥ 7♦ K♣ 2♠. Flush: A♦ J♦ 9♦ 6♦ 3♦ (same suit, not in sequence).",
-    "Straight: 10♣ 9♦ 8♠ 7♥ 6♣ (any suits, in sequence). A-2-3-4-5 is the lowest straight; 10-J-Q-K-A is the highest. Two pair: A♠ A♦ 5♣ 5♥ K♠ beats one pair: Q♥ Q♣ A♠ 9♦ 4♣.",
-    "High card: if nobody has a pair or better, highest card wins — e.g. A♠ J♦ 8♣ 6♥ 2♠ beats K♥ Q♦ 9♣ 7♠ 3♥. Same hand type: compare the key cards (then kickers) until one side is higher.",
-  ],
   ecard: [
     "Heads-up. Open a table, add a CPU or invite one friend, then start. RPS winner picks the opening side. 12 rounds in 4 sets of 3; roles swap every 3.",
     "Emperor: E + 4C. Slave: S + 4C. E beats C (Emperor side wins the round). C beats S (Emperor side wins the round). S beats E (Slave side wins). C vs C cancel and stay out.",
@@ -63,7 +59,150 @@ const RULES: Record<string, string[]> = {
   ],
 };
 
+type Sample = { rank: Rank; suit: Suit };
+
+const HOLDEM_RANKS: Array<{ name: string; tip: string; cards: Sample[] }> = [
+  {
+    name: "Royal flush",
+    tip: "A–10 same suit — the top hand.",
+    cards: [
+      { rank: "A", suit: "S" },
+      { rank: "K", suit: "S" },
+      { rank: "Q", suit: "S" },
+      { rank: "J", suit: "S" },
+      { rank: "10", suit: "S" },
+    ],
+  },
+  {
+    name: "Straight flush",
+    tip: "Five in a row, same suit.",
+    cards: [
+      { rank: "9", suit: "H" },
+      { rank: "8", suit: "H" },
+      { rank: "7", suit: "H" },
+      { rank: "6", suit: "H" },
+      { rank: "5", suit: "H" },
+    ],
+  },
+  {
+    name: "Four of a kind",
+    tip: "Four cards of one rank.",
+    cards: [
+      { rank: "K", suit: "C" },
+      { rank: "K", suit: "D" },
+      { rank: "K", suit: "H" },
+      { rank: "K", suit: "S" },
+      { rank: "2", suit: "D" },
+    ],
+  },
+  {
+    name: "Full house",
+    tip: "Three of a kind + a pair. Beats trips.",
+    cards: [
+      { rank: "A", suit: "S" },
+      { rank: "A", suit: "H" },
+      { rank: "A", suit: "D" },
+      { rank: "8", suit: "C" },
+      { rank: "8", suit: "S" },
+    ],
+  },
+  {
+    name: "Flush",
+    tip: "Five same suit, not in sequence.",
+    cards: [
+      { rank: "A", suit: "D" },
+      { rank: "J", suit: "D" },
+      { rank: "9", suit: "D" },
+      { rank: "6", suit: "D" },
+      { rank: "3", suit: "D" },
+    ],
+  },
+  {
+    name: "Straight",
+    tip: "Five in a row, mixed suits. A-5 lowest; 10-A highest.",
+    cards: [
+      { rank: "10", suit: "C" },
+      { rank: "9", suit: "D" },
+      { rank: "8", suit: "S" },
+      { rank: "7", suit: "H" },
+      { rank: "6", suit: "C" },
+    ],
+  },
+  {
+    name: "Three of a kind",
+    tip: "Three cards of one rank.",
+    cards: [
+      { rank: "7", suit: "S" },
+      { rank: "7", suit: "H" },
+      { rank: "7", suit: "D" },
+      { rank: "K", suit: "C" },
+      { rank: "2", suit: "S" },
+    ],
+  },
+  {
+    name: "Two pair",
+    tip: "Two different pairs + a kicker.",
+    cards: [
+      { rank: "A", suit: "S" },
+      { rank: "A", suit: "D" },
+      { rank: "5", suit: "C" },
+      { rank: "5", suit: "H" },
+      { rank: "K", suit: "S" },
+    ],
+  },
+  {
+    name: "One pair",
+    tip: "Two cards of one rank.",
+    cards: [
+      { rank: "Q", suit: "H" },
+      { rank: "Q", suit: "C" },
+      { rank: "A", suit: "S" },
+      { rank: "9", suit: "D" },
+      { rank: "4", suit: "C" },
+    ],
+  },
+  {
+    name: "High card",
+    tip: "Nothing else — highest card wins (then kickers).",
+    cards: [
+      { rank: "A", suit: "S" },
+      { rank: "J", suit: "D" },
+      { rank: "8", suit: "C" },
+      { rank: "6", suit: "H" },
+      { rank: "2", suit: "S" },
+    ],
+  },
+];
+
+function HoldemRules() {
+  return (
+    <div className="rule-holdem">
+      <h3>RULE</h3>
+      <p className="rule-lead">
+        Heads-up Texas Hold’em. Blinds 5/10 → flop / turn / river → showdown. Best five cards from your 2 hole cards +
+        the board wins. Rank high → low:
+      </p>
+      <ol className="rule-rank-list">
+        {HOLDEM_RANKS.map((row) => (
+          <li key={row.name} className="rule-rank">
+            <div className="rule-rank-text">
+              <b>{row.name}</b>
+              <span>{row.tip}</span>
+            </div>
+            <div className="rule-hand" aria-label={row.name}>
+              {row.cards.map((c, i) => (
+                <MiniPoker key={`${row.name}-${i}`} rank={c.rank} suit={c.suit} />
+              ))}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 export function GameRules({ game }: { game: string }) {
+  if (game === "holdem") return <HoldemRules />;
   const items = RULES[game];
   if (!items?.length) return null;
   return (
