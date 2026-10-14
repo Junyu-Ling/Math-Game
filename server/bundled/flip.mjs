@@ -121,6 +121,9 @@ function startFlip7(seats = 2) {
     }))
   );
 }
+function startFlip7Practice() {
+  return startFlip7(2);
+}
 function viewFlip7(state, _viewerId) {
   return state;
 }
@@ -408,6 +411,7 @@ export {
   startFlip7,
   startFlip7Duel,
   startFlip7Lobby,
+  startFlip7Practice,
   startFlip7Table,
   stay,
   viewFlip7

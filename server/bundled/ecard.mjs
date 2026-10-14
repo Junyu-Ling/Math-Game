@@ -51,6 +51,9 @@ function startEcardLobby(people) {
 function startEcardDuel(a, b) {
   return beginEcardMatch([a, b]);
 }
+function startEcardPractice() {
+  return startEcardDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });
+}
 function beginEcardMatch(people) {
   const players = people.slice(0, 2).map(seat);
   return {
@@ -477,5 +480,6 @@ export {
   finishEcardRps,
   startEcardDuel,
   startEcardLobby,
+  startEcardPractice,
   viewEcard
 };

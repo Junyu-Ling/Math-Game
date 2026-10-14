@@ -249,6 +249,7 @@ function startGomokuLobby(people) {
     rpsReveal: null,
     winnerId: null,
     foul: null,
+    winLine: null,
     last: null,
     log: [
       {
@@ -261,6 +262,9 @@ function startGomokuLobby(people) {
 function startGomokuDuel(a, b) {
   return beginGomokuMatch([a, b]);
 }
+function startGomokuPractice() {
+  return startGomokuDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });
+}
 function beginGomokuMatch(people) {
   const players = people.slice(0, 2).map(seat);
   return {
@@ -272,6 +276,7 @@ function beginGomokuMatch(people) {
     rpsReveal: null,
     winnerId: null,
     foul: null,
+    winLine: null,
     last: null,
     log: [
       {
@@ -358,6 +363,7 @@ function normalizeGomoku(state) {
     rpsThrows: state.rpsThrows || {},
     rpsReveal: state.rpsReveal ?? null,
     foul: state.foul ?? null,
+    winLine: state.winLine ?? null,
     last: state.last ?? null,
     winnerId: state.winnerId ?? null,
     board: state.board || emptyBoard(),
@@ -402,12 +408,35 @@ function axisLen(board, r, c, dr, dc, stone) {
   return 1 + lineLen(board, r, c, dr, dc, stone) + lineLen(board, r, c, -dr, -dc, stone);
 }
 function winsAt(board, r, c) {
+  return Boolean(winLineAt(board, r, c));
+}
+function winLineAt(board, r, c) {
   const stone = board[r][c];
-  if (!stone) return false;
-  return DIRS2.some(([dr, dc]) => {
+  if (!stone) return null;
+  for (const [dr, dc] of DIRS2) {
     const n = axisLen(board, r, c, dr, dc, stone);
-    return stone === 1 ? n === 5 : n >= 5;
-  });
+    const win = stone === 1 ? n === 5 : n >= 5;
+    if (!win) continue;
+    let sr = r;
+    let sc = c;
+    while (inBoard2(sr - dr, sc - dc) && board[sr - dr][sc - dc] === stone) {
+      sr -= dr;
+      sc -= dc;
+    }
+    const run = [];
+    let rr = sr;
+    let cc = sc;
+    while (inBoard2(rr, cc) && board[rr][cc] === stone) {
+      run.push({ r: rr, c: cc });
+      rr += dr;
+      cc += dc;
+    }
+    if (run.length < 5) continue;
+    const hit = run.findIndex((p) => p.r === r && p.c === c);
+    const start = Math.max(0, Math.min(hit - 2, run.length - 5));
+    return run.slice(start, start + 5);
+  }
+  return null;
 }
 function isOverline(board, r, c) {
   const stone = board[r][c];
@@ -521,6 +550,7 @@ function applyGomokuAction(state, actorId, action) {
         phase: "over",
         winnerId: opp.id,
         foul: { kind: foul, r, c },
+        winLine: null,
         last: { r, c },
         log: [
           ...state.log,
@@ -532,13 +562,15 @@ function applyGomokuAction(state, actorId, action) {
       };
     }
   }
-  if (winsAt(board, r, c)) {
+  const line = winLineAt(board, r, c);
+  if (line) {
     return {
       ...state,
       board,
       phase: "over",
       winnerId: me.id,
       foul: null,
+      winLine: line,
       last: { r, c },
       log: [...state.log, { id: uid("l"), text: `${me.name} wins with five in a row.` }]
     };
@@ -551,6 +583,7 @@ function applyGomokuAction(state, actorId, action) {
       phase: "over",
       winnerId: null,
       foul: null,
+      winLine: null,
       last: { r, c },
       log: [...state.log, { id: uid("l"), text: "Draw \u2014 board full." }]
     };
@@ -560,6 +593,7 @@ function applyGomokuAction(state, actorId, action) {
     board,
     turn: (state.turn + 1) % 2,
     foul: null,
+    winLine: null,
     last: { r, c },
     log: [...state.log, { id: uid("l"), text: `${me.name} plays (${r + 1},${c + 1}).` }]
   };
@@ -592,6 +626,8 @@ export {
   normalizeGomoku,
   startGomokuDuel,
   startGomokuLobby,
+  startGomokuPractice,
   viewGomoku,
+  winLineAt,
   winsAt
 };

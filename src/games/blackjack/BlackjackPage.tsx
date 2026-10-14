@@ -1,4 +1,12 @@
-import { hardSoft, type BjDuelAction, type BjDuelState } from "./engine";
+import { useEffect, useState } from "react";
+import {
+  aiBjAction,
+  applyBjDuelAction,
+  hardSoft,
+  startBjPractice,
+  type BjDuelAction,
+  type BjDuelState,
+} from "./engine";
 import { PokerFace } from "../../components/PlayingCard";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
@@ -6,21 +14,47 @@ import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
+import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 export function BlackjackPage() {
   const { user } = useAuth();
   const lobby = useLobby();
   const room = lobby.room?.game === "bj" ? lobby.room : null;
-  const state = room?.view as BjDuelState | undefined;
-  const youId = user?.id;
+  const [local, setLocal] = useState<BjDuelState | null>(null);
+  const state = (room?.view as BjDuelState | undefined) ?? local;
+  const practice = Boolean(local && !room);
+  const youId = practice ? "you" : user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
   const waiting = Boolean(state?.phase === "lobby");
   const host = Boolean(user && room?.seats?.[0] === user.id);
   const myTurn = Boolean(state && me && state.players[state.turn]?.id === me.id && state.phase === "play");
 
+  useEffect(() => {
+    if (room) setLocal(null);
+  }, [room]);
+
+  useEffect(() => {
+    if (!practice || !local || local.phase === "over") return;
+    const actor = local.players[local.turn];
+    if (!actor || actor.id === "you") return;
+    let stop = false;
+    void (async () => {
+      await wait(CPU_THINK_MS);
+      if (stop) return;
+      setLocal((s) => (s && s.players[s.turn]?.id === "cpu" ? applyBjDuelAction(s, "cpu", aiBjAction(s)) : s));
+    })();
+    return () => {
+      stop = true;
+    };
+  }, [practice, local]);
+
   function act(action: BjDuelAction) {
-    if (room) void lobby.sendAction(action);
+    if (room) {
+      void lobby.sendAction(action);
+      return;
+    }
+    setLocal((s) => (s ? applyBjDuelAction(s, "you", action) : s));
   }
 
   return (
@@ -31,6 +65,11 @@ export function BlackjackPage() {
           <h1>Blackjack</h1>
         </div>
         <div className="row-actions">
+          {practice ? (
+            <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
+              RESET
+            </button>
+          ) : null}
           <button className="btn btn-ghost" type="button" onClick={() => void lobby.leaveHome()}>
             LEAVE
           </button>
@@ -47,7 +86,7 @@ export function BlackjackPage() {
                 <p>
                   {waiting
                     ? "Add a CPU or invite one friend, then start. Rival hole card stays hidden until they stand."
-                    : "Open a table, add a CPU or invite, then start."}
+                    : "Practice vs CPU, or open a table to invite. Rival hole card stays hidden until they stand."}
                 </p>
                 {waiting && state ? (
                   <ul className="lobby-roster">
@@ -59,7 +98,7 @@ export function BlackjackPage() {
                     ))}
                   </ul>
                 ) : null}
-                <MixedCpuBar game="bj" />
+                <MixedCpuBar game="bj" onPractice={() => setLocal(startBjPractice())} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
                   {waiting ? (
                     host && (state?.players.length ?? 0) >= 2 ? (
@@ -81,8 +120,11 @@ export function BlackjackPage() {
                   {state.players[state.turn]?.id === rival.id ? " · TURN" : ""}
                 </div>
                 <div className="pcards">
-                  {rival.cards.map((c) => (
-                    <PokerFace key={c.id} card={c} />
+                  {rival.cards.map((c, i) => (
+                    <PokerFace
+                      key={c.id}
+                      card={practice && !rival.stood && state.phase !== "over" && i > 0 ? { ...c, hidden: true } : c}
+                    />
                   ))}
                 </div>
               </div>

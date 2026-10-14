@@ -6,6 +6,7 @@ import {
   currentUno,
   legalCards,
   needsUnoCall,
+  startUnoPractice,
   topCard,
   type UnoAction,
   type UnoColor,
@@ -262,7 +263,7 @@ export function UnoPage() {
               <p>
                 {waiting
                   ? "Open a table, add CPUs or invite, then start with 2–4. No need to pick a seat count first."
-                  : "Match color, number, or action. Tap UNO before you go down to one card. Miss it and draw two."}
+                  : "Practice vs CPU, or open a table. Match color, number, or action. Tap UNO before one card."}
               </p>
               {waiting && state ? (
                 <ul className="lobby-roster">
@@ -274,7 +275,7 @@ export function UnoPage() {
                   ))}
                 </ul>
               ) : null}
-              <MixedCpuBar game="uno" />
+              <MixedCpuBar game="uno" onPractice={() => setLocal(startUnoPractice())} />
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {waiting ? (
                   host && (state?.players.length ?? 0) >= 2 ? (

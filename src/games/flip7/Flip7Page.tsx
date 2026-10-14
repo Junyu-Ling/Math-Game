@@ -7,6 +7,7 @@ import {
   activePlayers,
   currentFlip,
   liveTotal,
+  startFlip7Practice,
   type FlipAction,
   type FlipPlayer,
   type FlipState,
@@ -324,7 +325,7 @@ export function Flip7Page() {
                 <p>
                   {waiting
                     ? "Open a table, add CPUs or invite people, then start with 2 or more. No fixed seat count."
-                    : "Hit or stay. Freeze and Flip Three can target any active player, including you."}
+                    : "Practice vs CPU, or open a table. Hit or stay — Freeze and Flip Three can target anyone."}
                 </p>
                 {waiting && state ? (
                   <ul className="lobby-roster">
@@ -336,7 +337,7 @@ export function Flip7Page() {
                     ))}
                   </ul>
                 ) : null}
-                <MixedCpuBar game="flip7" />
+                <MixedCpuBar game="flip7" onPractice={() => setLocal(startFlip7Practice())} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
                   {waiting ? (
                     host && (state?.players.length ?? 0) >= 2 ? (

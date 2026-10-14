@@ -8,6 +8,7 @@ import {
   cardBack,
   cardLabel,
   finishEcardRps,
+  startEcardPractice,
   type EAction,
   type ECard,
   type EKind,
@@ -273,7 +274,7 @@ export function EcardPage() {
                 <p>
                   {waiting
                     ? "Add a CPU or invite one friend, then start. RPS picks the opening side."
-                    : "Open a table, add a CPU or invite, then start. 12 rounds · roles swap every 3 · Slave win pays 5×."}
+                    : "Practice vs CPU, or open a table to invite. 12 rounds · roles swap every 3 · Slave win pays 5×."}
                 </p>
                 {waiting && state ? (
                   <ul className="lobby-roster">
@@ -285,7 +286,7 @@ export function EcardPage() {
                     ))}
                   </ul>
                 ) : null}
-                <MixedCpuBar game="ecard" />
+                <MixedCpuBar game="ecard" onPractice={() => setLocal(startEcardPractice())} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
                   {waiting ? (
                     host && (state?.players.length ?? 0) >= 2 ? (

@@ -135,13 +135,41 @@ function dealHand(s) {
   s.toAct = 2;
   s.message = "Preflop. Small blind acts.";
 }
+function emptyHoldemSeat(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    human: p.human !== false,
+    chips: 1e3,
+    bet: 0,
+    hole: [],
+    folded: false,
+    allIn: false
+  };
+}
+function startHoldemLobby(people) {
+  const players = people.slice(0, 2).map(emptyHoldemSeat);
+  return {
+    id: uid("he"),
+    players,
+    dealer: 0,
+    deck: [],
+    community: [],
+    pot: 0,
+    street: "lobby",
+    turn: 0,
+    currentBet: 0,
+    lastRaise: 0,
+    toAct: 0,
+    winnerId: null,
+    message: `Table ${players.length}/2. Open a table, add a CPU or invite, then start.`,
+    bb: BB
+  };
+}
 function startHoldemDuel(a, b) {
   const s = {
     id: uid("he"),
-    players: [
-      { id: a.id, name: a.name, chips: 1e3, bet: 0, hole: [], folded: false, allIn: false },
-      { id: b.id, name: b.name, chips: 1e3, bet: 0, hole: [], folded: false, allIn: false }
-    ],
+    players: [emptyHoldemSeat(a), emptyHoldemSeat(b)],
     dealer: 0,
     deck: [],
     community: [],
@@ -159,7 +187,7 @@ function startHoldemDuel(a, b) {
   return s;
 }
 function startHoldemPractice() {
-  return startHoldemDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU" });
+  return startHoldemDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });
 }
 function nextStreet(s) {
   for (const p of s.players) p.bet = 0;
@@ -207,17 +235,17 @@ function showdown(s) {
     } else {
       const w = (scores[0] ?? 0) > (scores[1] ?? 0) ? 0 : 1;
       const winner = s.players[w];
-      if (winner) {
-        winner.chips += s.pot;
-        s.winnerId = winner.id;
-        s.message = `${winner.name} wins the pot.`;
-      }
+      winner.chips += s.pot;
+      s.winnerId = winner.id;
+      s.message = `${winner.name} wins the pot.`;
     }
   }
   s.pot = 0;
   if (s.players.some((p) => p.chips <= 0)) {
     s.street = "over";
-    const w = s.players[0].chips > s.players[1].chips ? s.players[0] : s.players[1];
+    const a = s.players[0];
+    const b = s.players[1];
+    const w = a.chips > b.chips ? a : b;
     s.winnerId = w.id;
     s.message = `${w.name} takes the table.`;
   }
@@ -235,7 +263,8 @@ function afterAct(s) {
   }
   let n = other(s.turn);
   for (let k = 0; k < 2; k++) {
-    if (!s.players[n].folded && !s.players[n].allIn) {
+    const seat = s.players[n];
+    if (!seat.folded && !seat.allIn) {
       s.turn = n;
       return;
     }
@@ -245,6 +274,14 @@ function afterAct(s) {
 }
 function applyHoldemAction(s, playerId, action) {
   const next = structuredClone(s);
+  if (next.street === "lobby") {
+    if (action.type === "start" && next.players[0]?.id === playerId && next.players.length >= 2) {
+      const [a, b] = next.players;
+      return startHoldemDuel(a, b);
+    }
+    return next;
+  }
+  if (action.type === "start") return next;
   if (action.type === "next") {
     if (next.street !== "showdown") return next;
     if (next.players.some((p2) => p2.chips <= 0)) {
@@ -329,6 +366,7 @@ export {
   bestHand,
   holdemBotAct,
   startHoldemDuel,
+  startHoldemLobby,
   startHoldemPractice,
   viewHoldem
 };

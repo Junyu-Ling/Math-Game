@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { type M24DuelState } from "./engine";
+import { applyM24Action, startM24Practice, type M24DuelState } from "./engine";
 import { PokerFace } from "../../components/PlayingCard";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { InvitePanel } from "../../components/InvitePanel";
@@ -14,10 +14,12 @@ export function Math24Page() {
   const { user } = useAuth();
   const lobby = useLobby();
   const room = lobby.room?.game === "m24" ? lobby.room : null;
-  const state = room?.view as M24DuelState | undefined;
+  const [local, setLocal] = useState<M24DuelState | null>(null);
+  const state = (room?.view as M24DuelState | undefined) ?? local;
+  const practice = Boolean(local && !room);
   const [used, setUsed] = useState<boolean[]>([false, false, false, false]);
   const [expr, setExpr] = useState("");
-  const youId = user?.id;
+  const youId = practice ? "you" : user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
   const waiting = Boolean(state?.phase === "lobby");
@@ -26,9 +28,23 @@ export function Math24Page() {
   const playing = Boolean(state && me && !waiting);
 
   useEffect(() => {
+    if (room) setLocal(null);
+  }, [room]);
+
+  useEffect(() => {
     setUsed([false, false, false, false]);
     setExpr("");
   }, [state?.round]);
+
+  useEffect(() => {
+    if (!practice || !local || local.phase !== "play") return;
+    const t = window.setTimeout(() => {
+      setLocal((s) =>
+        s && s.phase === "play" && s.solution ? applyM24Action(s, "cpu", { type: "submit", expr: s.solution }) : s,
+      );
+    }, 8000);
+    return () => window.clearTimeout(t);
+  }, [practice, local?.round, local?.phase, local?.solution]);
 
   function tapNum(i: number) {
     if (!state || used[i] || state.phase !== "play") return;
@@ -39,8 +55,11 @@ export function Math24Page() {
   }
 
   async function submit() {
-    if (!room) return;
-    await lobby.sendAction({ type: "submit", expr });
+    if (room) {
+      await lobby.sendAction({ type: "submit", expr });
+    } else {
+      setLocal((s) => (s ? applyM24Action(s, "you", { type: "submit", expr }) : s));
+    }
     setExpr("");
     setUsed([false, false, false, false]);
   }
@@ -60,6 +79,11 @@ export function Math24Page() {
           <h1>Make 24</h1>
         </div>
         <div className="row-actions">
+          {practice ? (
+            <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
+              RESET
+            </button>
+          ) : null}
           <button className="btn btn-ghost" type="button" onClick={() => void lobby.leaveHome()}>
             LEAVE
           </button>
@@ -76,7 +100,7 @@ export function Math24Page() {
                 <p>
                   {waiting
                     ? "Add a CPU or invite one friend, then start. First to 3 points wins."
-                    : "Open a table, add a CPU or invite, then start. Same four cards — first to make 24 scores."}
+                    : "Practice vs CPU (CPU submits in ~8s), or open a table. Same four cards — first to 3 wins."}
                 </p>
                 {waiting && state ? (
                   <ul className="lobby-roster">
@@ -88,7 +112,7 @@ export function Math24Page() {
                     ))}
                   </ul>
                 ) : null}
-                <MixedCpuBar game="m24" />
+                <MixedCpuBar game="m24" onPractice={() => setLocal(startM24Practice())} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
                   {waiting ? (
                     host && (state?.players.length ?? 0) >= 2 ? (

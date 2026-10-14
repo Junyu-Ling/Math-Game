@@ -3,7 +3,16 @@ import { useAuth } from "../context/AuthContext";
 import { useLobby } from "../context/LobbyContext";
 import { isCpuId, tableMax } from "../lib/lobby";
 
-export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string, unknown> }) {
+export function MixedCpuBar({
+  game,
+  meta,
+  onPractice,
+}: {
+  game: string;
+  meta?: Record<string, unknown>;
+  /** Local Practice vs CPU — no login / Open table required. */
+  onPractice?: () => void;
+}) {
   const { user } = useAuth();
   const { room, error, adjustCpu } = useLobby();
   const [busy, setBusy] = useState(false);
@@ -19,6 +28,7 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
   /** Only show add/remove after a live lobby table exists. */
   const atTable = here && waiting && host;
   const canOpen = Boolean(user && !busy && (!here || !waiting || host));
+  const showPractice = Boolean(onPractice && !atTable && !waiting);
 
   async function run(mode: "open" | "add" | "remove" | "fill") {
     if (busy) return;
@@ -35,7 +45,18 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
   if (!user) {
     return (
       <div className="cpu-bar">
-        <p>Sign in to open a table, then add a CPU or invite someone.</p>
+        <p>
+          {onPractice
+            ? "Practice vs CPU anytime. Sign in to open a table or invite someone."
+            : "Sign in to open a table, then add a CPU or invite someone."}
+        </p>
+        {onPractice ? (
+          <div className="row-actions" style={{ justifyContent: "center" }}>
+            <button className="btn" type="button" onClick={onPractice}>
+              Practice vs CPU
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -44,7 +65,9 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
     <div className="cpu-bar">
       <p>
         {!atTable
-          ? "Open a table first. Then you can add a CPU or invite from the player list."
+          ? showPractice
+            ? "Practice locally vs CPU, or open a table to add a CPU / invite."
+            : "Open a table first. Then you can add a CPU or invite from the player list."
           : duel
             ? "Add a CPU or invite one friend from the player list, then start."
             : max >= 16
@@ -52,6 +75,11 @@ export function MixedCpuBar({ game, meta }: { game: string; meta?: Record<string
               : `Add CPUs or invite humans, then start with 2–${max}.`}
       </p>
       <div className="row-actions" style={{ justifyContent: "center" }}>
+        {showPractice ? (
+          <button className="btn btn-ghost" type="button" onClick={onPractice}>
+            Practice vs CPU
+          </button>
+        ) : null}
         {!atTable ? (
           <button className="btn" type="button" disabled={!canOpen} onClick={() => void run("open")}>
             {busy ? "Opening…" : here && !waiting ? "New table" : "Open table"}

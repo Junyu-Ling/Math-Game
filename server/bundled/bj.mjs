@@ -217,7 +217,19 @@ function nextRound(state) {
   };
 }
 function emptySeat(p) {
-  return { id: p.id, name: p.name, cards: [], stood: false };
+  return { id: p.id, name: p.name, human: p.human !== false, cards: [], stood: false };
+}
+function startBjLobby(people) {
+  const players = people.slice(0, 2).map(emptySeat);
+  return {
+    mode: "duel",
+    players,
+    deck: [],
+    turn: 0,
+    phase: "lobby",
+    winnerId: null,
+    message: `Table ${players.length}/2. Open a table, add a CPU or invite, then start.`
+  };
 }
 function startBjDuel(a, b) {
   let deck = freshShoe(2);
@@ -267,7 +279,7 @@ function settleDuel(state) {
   return { ...state, phase: "over", winnerId, message };
 }
 function startBjPractice() {
-  return startBjDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU" });
+  return startBjDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });
 }
 function aiBjAction(state) {
   const me = state.players[state.turn];
@@ -275,7 +287,14 @@ function aiBjAction(state) {
   return hardSoft(me.cards).total < 17 ? { type: "hit" } : { type: "stand" };
 }
 function applyBjDuelAction(state, actorId, action) {
-  if (state.phase !== "play") return state;
+  if (state.phase === "lobby") {
+    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 2) {
+      const [a, b] = state.players;
+      return startBjDuel(a, b);
+    }
+    return state;
+  }
+  if (state.phase !== "play" || action.type === "start") return state;
   const me = state.players[state.turn];
   if (!me || me.id !== actorId || me.stood) return state;
   let players = state.players;
@@ -335,6 +354,7 @@ export {
   stand,
   startBj,
   startBjDuel,
+  startBjLobby,
   startBjPractice,
   suitGlyph,
   viewBjDuel

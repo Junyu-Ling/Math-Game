@@ -22,6 +22,7 @@ import {
   applyAction,
   openingCount,
   RPS_REVEAL_MS,
+  startCoda,
   type CodaAction,
   type CodaState,
   type CodaTile,
@@ -742,7 +743,14 @@ export function DaVinciPage() {
                       ))}
                     </div>
                   ) : null}
-                  <MixedCpuBar game="coda" meta={{ useJokers: jokers }} />
+                  <MixedCpuBar
+                    game="coda"
+                    meta={{ useJokers: jokers }}
+                    onPractice={() => {
+                      setYouId("you");
+                      setState(startCoda(jokers, blackN, whiteN, seats));
+                    }}
+                  />
                   <div className="row-actions" style={{ justifyContent: "center" }}>
                     {waiting ? (
                       <button className="btn" type="button" disabled={Boolean(you?.ready)} onClick={() => dispatch({ type: "ready" })}>

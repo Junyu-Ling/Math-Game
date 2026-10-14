@@ -81,10 +81,8 @@ function topCard(state) {
 function canPlay(state, card) {
   if (state.justDrawnId && card.id !== state.justDrawnId) return false;
   if (state.pendingDraw > 0) {
-    if (state.stackKind === "wild4") {
-      return card.kind === "wild4" || card.kind === "draw2" && card.color === state.color;
-    }
-    return card.kind === "draw2";
+    if (state.stackKind === "wild4") return card.kind === "wild4";
+    return card.kind === "draw2" || card.kind === "wild4";
   }
   if (card.kind === "wild" || card.kind === "wild4") return true;
   const top = topCard(state);
@@ -281,7 +279,7 @@ function applyUnoAction(state, actorId, action) {
   if (card.color !== "black") next.color = card.color;
   if (card.kind === "draw2") {
     next.pendingDraw += 2;
-    next.stackKind = state.stackKind === "wild4" ? "wild4" : "draw2";
+    next.stackKind = "draw2";
     next = burst(next, next.pendingDraw, next.players[nextIndex(next)]?.id ?? me.id);
   }
   if (card.kind === "reverse") {

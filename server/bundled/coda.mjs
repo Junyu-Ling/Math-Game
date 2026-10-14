@@ -367,12 +367,24 @@ function checkEliminations(state) {
   }));
   const remaining = players.filter((p) => !p.out);
   if (remaining.length === 1 && remaining[0]) {
+    const shown = players.map((p) => ({
+      ...p,
+      tiles: p.tiles.map((t) => t.revealed ? t : { ...t, revealed: true }),
+      stash: p.stash && !p.stash.revealed ? { ...p.stash, revealed: true } : p.stash
+    }));
     return {
       ...state,
-      players,
+      players: shown,
       phase: "over",
       winnerId: remaining[0].id,
-      log: [...state.log, { id: uid("l"), text: `${remaining[0].name} still has a hidden code and wins.`, tone: "you" }]
+      log: [
+        ...state.log,
+        {
+          id: uid("l"),
+          text: `${remaining[0].name} still has a hidden code and wins. Showdown \u2014 all codes revealed.`,
+          tone: "you"
+        }
+      ]
     };
   }
   return { ...state, players };
@@ -931,8 +943,9 @@ function viewFor(state, viewerId) {
     frozenRival: state.frozenRival ? state.frozenRival.map(maskTile) : null,
     players: state.players.map((p) => ({
       ...p,
-      tiles: p.id === viewerId ? p.tiles : p.tiles.map(maskTile),
-      stash: p.id === viewerId ? p.stash : null,
+      // On showdown / over, every seat sees every code.
+      tiles: p.id === viewerId || state.phase === "over" ? p.tiles : p.tiles.map(maskTile),
+      stash: p.id === viewerId || state.phase === "over" ? p.stash : null,
       queue: p.id === viewerId ? p.queue ?? [] : []
     })),
     drawn: !state.drawn ? null : showDrawn ? state.drawn : openingArrange ? null : maskTile(state.drawn),

@@ -177,19 +177,40 @@ function shuffleDeck() {
   const deck = shuffle(Array.from({ length: 40 }, (_, i) => i % 10 + 1));
   return deck;
 }
+function seatM24(p) {
+  return { id: p.id, name: p.name, human: p.human !== false };
+}
+function startM24Lobby(people) {
+  const players = people.slice(0, 2).map(seatM24);
+  return {
+    mode: "duel",
+    players,
+    nums: [],
+    cards: [],
+    solution: "",
+    scores: Object.fromEntries(players.map((p) => [p.id, 0])),
+    phase: "lobby",
+    round: 0,
+    goal: 3,
+    winnerId: null,
+    message: `Table ${players.length}/2. Open a table, add a CPU or invite, then start.`
+  };
+}
 function startM24Practice() {
-  const state = startM24Duel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU" });
+  const state = startM24Duel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });
   return { ...state, message: "Practice vs CPU. The CPU submits in about 8 seconds. Make 24 first." };
 }
 function startM24Duel(a, b) {
   const puzzle = newPuzzle();
+  const pa = seatM24(a);
+  const pb = seatM24(b);
   return {
     mode: "duel",
-    players: [a, b],
+    players: [pa, pb],
     nums: puzzle.nums,
     cards: puzzle.cards,
     solution: puzzle.solution,
-    scores: { [a.id]: 0, [b.id]: 0 },
+    scores: { [pa.id]: 0, [pb.id]: 0 },
     phase: "play",
     round: 1,
     goal: 3,
@@ -198,6 +219,13 @@ function startM24Duel(a, b) {
   };
 }
 function applyM24Action(state, actorId, action) {
+  if (state.phase === "lobby") {
+    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 2) {
+      const [a, b] = state.players;
+      return startM24Duel(a, b);
+    }
+    return state;
+  }
   if (state.phase !== "play") return state;
   if (!state.players.some((p) => p.id === actorId)) return state;
   if (action.type !== "submit") return state;
@@ -238,6 +266,7 @@ export {
   shuffleDeck,
   solve24,
   startM24Duel,
+  startM24Lobby,
   startM24Practice,
   tokenize,
   viewM24

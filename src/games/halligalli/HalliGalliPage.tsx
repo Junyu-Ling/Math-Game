@@ -8,6 +8,7 @@ import {
   HALLI_FRUITS,
   HALLI_LABEL,
   ringingFruit,
+  startHalliPractice,
   topOpen,
   type HalliAction,
   type HalliCard,
@@ -192,7 +193,7 @@ export function HalliGalliPage() {
                 <p>
                   {waiting
                     ? "Open a table, add CPUs or invite people, then start with 2–4. No need to pick a seat count first."
-                    : "Flip fruit cards. When the open tops add up to five of one fruit, ring the bell first."}
+                    : "Practice vs CPU, or open a table. Flip fruit cards — ring when five of one fruit show."}
                 </p>
                 {waiting && state ? (
                   <ul className="lobby-roster">
@@ -204,7 +205,7 @@ export function HalliGalliPage() {
                     ))}
                   </ul>
                 ) : null}
-                <MixedCpuBar game="halli" />
+                <MixedCpuBar game="halli" onPractice={() => setLocal(startHalliPractice())} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
                   {waiting ? (
                     host && (state?.players.length ?? 0) >= 2 ? (

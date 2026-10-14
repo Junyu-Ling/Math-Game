@@ -6,6 +6,7 @@ import {
   applyGomokuAction,
   finishGomokuRps,
   foulLabel,
+  startGomokuPractice,
   type GAction,
   type GState,
   type RpsThrow,
@@ -243,7 +244,7 @@ export function GomokuPage() {
               <p>
                 {waiting
                   ? "Add a CPU or invite one friend, then start. RPS winner plays black."
-                  : "15×15. Open a table, add a CPU or invite, then start. Black fouls: double open three, double open four, overline."}
+                  : "15×15 Renju. Practice vs CPU, or open a table to invite. Black fouls: double open three, double open four, overline."}
               </p>
               {waiting && state ? (
                 <ul className="lobby-roster">
@@ -255,7 +256,7 @@ export function GomokuPage() {
                   ))}
                 </ul>
               ) : null}
-              <MixedCpuBar game="gomoku" />
+              <MixedCpuBar game="gomoku" onPractice={() => setLocal(startGomokuPractice())} />
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {waiting ? (
                   host && (state?.players.length ?? 0) >= 2 ? (
