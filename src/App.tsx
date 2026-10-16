@@ -16,6 +16,8 @@ import { UnoPage } from "./games/uno/UnoPage";
 import { HalliGalliPage } from "./games/halligalli/HalliGalliPage";
 import { EcardPage } from "./games/ecard/EcardPage";
 import { GomokuPage } from "./games/gomoku/GomokuPage";
+import { WerewolfPage } from "./games/werewolf/WerewolfPage";
+import { RoulettePage } from "./games/roulette/RoulettePage";
 // Deferred: Flying Chess / Animal Chess / Army Chess
 // import { LudoPage } from "./games/ludo/LudoPage";
 // import { AnimalPage } from "./games/animal/AnimalPage";
@@ -42,6 +44,8 @@ export function App() {
             <Route path="/play/halli" element={<HalliGalliPage />} />
             <Route path="/play/ecard" element={<EcardPage />} />
             <Route path="/play/gomoku" element={<GomokuPage />} />
+            <Route path="/play/werewolf" element={<WerewolfPage />} />
+            <Route path="/play/roulette" element={<RoulettePage />} />
             {/* Deferred: /play/ludo, /play/animal, /play/army */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

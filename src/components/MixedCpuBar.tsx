@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useLobby } from "../context/LobbyContext";
-import { isCpuId, tableMax } from "../lib/lobby";
+import { isCpuId, minStart, tableMax } from "../lib/lobby";
 
 export function MixedCpuBar({
   game,
@@ -72,7 +72,7 @@ export function MixedCpuBar({
             ? "Add a CPU or invite one friend from the player list, then start."
             : max >= 16
               ? "Add CPUs or invite humans, then start with 2+."
-              : `Add CPUs or invite humans, then start with 2–${max}.`}
+              : `Add CPUs or invite humans, then start with ${minStart(game)}–${max}.`}
       </p>
       <div className="row-actions" style={{ justifyContent: "center" }}>
         {showPractice ? (

@@ -75,10 +75,26 @@ const games = [
     blurb: "15×15. Place stones. First five in a row wins.",
     preview: "gomoku" as const,
   },
+  {
+    to: "/play/werewolf",
+    idx: "10",
+    code: "WOLF",
+    name: "Werewolf",
+    blurb: "Night kills, day votes. Werewolves, Seer, Witch, and villagers.",
+    preview: "werewolf" as const,
+  },
+  {
+    to: "/play/roulette",
+    idx: "11",
+    code: "SPIN",
+    name: "Russian Roulette",
+    blurb: "Six chambers, one live. Spin optional — pull and hope for a click.",
+    preview: "roulette" as const,
+  },
   // Deferred — Flying Chess / Animal Chess / Army Chess
   // {
   //   to: "/play/ludo",
-  //   idx: "10",
+  //   idx: "12",
   //   code: "LUDO",
   //   name: "Flying Chess",
   //   blurb: "Roll, race four pieces home. Six opens the gate.",
@@ -86,7 +102,7 @@ const games = [
   // },
   // {
   //   to: "/play/animal",
-  //   idx: "11",
+  //   idx: "13",
   //   code: "ANIMAL",
   //   name: "Animal Chess",
   //   blurb: "Jungle ranks, rivers, and dens. Enter the rival den to win.",
@@ -94,7 +110,7 @@ const games = [
   // },
   // {
   //   to: "/play/army",
-  //   idx: "12",
+  //   idx: "14",
   //   code: "ARMY",
   //   name: "Army Chess",
   //   blurb: "Open 军棋. Bombs, mines, and the flag. Capture 军旗 to win.",
@@ -187,6 +203,22 @@ function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
       </div>
     );
   }
+  if (kind === "werewolf") {
+    return (
+      <div className="preview-row">
+        <span className="wolf-preview tone-wolf">W</span>
+        <span className="wolf-preview tone-seer">S</span>
+        <span className="wolf-preview tone-witch">K</span>
+      </div>
+    );
+  }
+  if (kind === "roulette") {
+    return (
+      <div className="preview-row">
+        <span className="roulette-preview" aria-hidden />
+      </div>
+    );
+  }
   return (
     <div className="preview-row">
       <button className="m24-num" type="button" style={{ width: 52, height: 70, fontSize: 24 }}>
@@ -204,7 +236,7 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="kicker">Nine tables · Invite play</p>
+          <p className="kicker">Eleven tables · Invite play</p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
             Card art follows the physical decks. Practice against the CPU, or sign in and invite someone who is online.

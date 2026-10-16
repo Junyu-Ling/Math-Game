@@ -4,7 +4,17 @@ import type { FlipCard } from "../games/flip7/engine";
 import type { UnoCard } from "../games/uno/engine";
 import type { PokerCard } from "../lib/poker";
 
-export type LobbyGame = "coda" | "flip7" | "uno" | "bj" | "holdem" | "m24" | "halli" | "ecard";
+export type LobbyGame =
+  | "coda"
+  | "flip7"
+  | "uno"
+  | "bj"
+  | "holdem"
+  | "m24"
+  | "halli"
+  | "ecard"
+  | "werewolf"
+  | "roulette";
 
 const poker = (id: string, suit: PokerCard["suit"], rank: PokerCard["rank"]): PokerCard => ({ id, suit, rank });
 
@@ -82,6 +92,22 @@ export function LobbyDecor({ game }: { game: LobbyGame }) {
           <span className="decor-card b"><img className="ecard-decor" src="/ecard-citizen.png" alt="" /></span>
           <span className="decor-card c"><img className="ecard-decor" src="/ecard-slave.png" alt="" /></span>
           <span className="decor-card d"><img className="ecard-decor" src="/ecard-citizen.png" alt="" /></span>
+        </>
+      ) : null}
+      {game === "werewolf" ? (
+        <>
+          <span className="decor-card a"><span className="wolf-preview tone-wolf">W</span></span>
+          <span className="decor-card b"><span className="wolf-preview tone-seer">S</span></span>
+          <span className="decor-card c"><span className="wolf-preview tone-witch">K</span></span>
+          <span className="decor-card d"><span className="wolf-preview tone-villager">V</span></span>
+        </>
+      ) : null}
+      {game === "roulette" ? (
+        <>
+          <span className="decor-card a"><span className="roulette-preview" /></span>
+          <span className="decor-card b"><span className="roulette-preview" /></span>
+          <span className="decor-card c"><span className="roulette-preview" /></span>
+          <span className="decor-card d"><span className="roulette-preview" /></span>
         </>
       ) : null}
     </div>

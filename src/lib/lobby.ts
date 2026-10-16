@@ -55,6 +55,8 @@ export const GAME_LABEL: Record<string, string> = {
   halli: "Halli Galli",
   ecard: "E-Card",
   gomoku: "Gomoku",
+  werewolf: "Werewolf",
+  roulette: "Russian Roulette",
   // Deferred
   // ludo: "Flying Chess",
   // animal: "Animal Chess",
@@ -64,11 +66,14 @@ export const GAME_LABEL: Record<string, string> = {
 /** Soft seat cap for open tables. Flip 7 is effectively unlimited. */
 export function tableMax(game: string) {
   if (game === "flip7") return 16;
-  if (game === "gomoku" || game === "ecard" || game === "bj" || game === "m24" || game === "holdem") return 2;
+  if (game === "werewolf") return 8;
+  if (game === "gomoku" || game === "ecard" || game === "bj" || game === "m24" || game === "holdem" || game === "roulette")
+    return 2;
   return 4;
 }
 
-export function minStart(_game?: string) {
+export function minStart(game?: string) {
+  if (game === "werewolf") return 4;
   return 2;
 }
 
@@ -125,6 +130,8 @@ export const GAME_PATH: Record<string, string> = {
   halli: "/play/halli",
   ecard: "/play/ecard",
   gomoku: "/play/gomoku",
+  werewolf: "/play/werewolf",
+  roulette: "/play/roulette",
   // Deferred
   // ludo: "/play/ludo",
   // animal: "/play/animal",

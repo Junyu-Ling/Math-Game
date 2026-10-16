@@ -57,6 +57,15 @@ const RULES: Record<string, string[]> = {
     "Simplified open 军棋. Higher rank wins clashes; equal ranks both fall.",
     "Bomb trades with anything. Only Engineer clears mines. Capture the rival 军旗 to win.",
   ],
+  werewolf: [
+    "4–8 players. Roles: Werewolf(s), Villager, Seer, Witch. Night: wolves kill, Seer checks one, Witch may save and/or poison once each.",
+    "Dawn shows who died. Day vote eliminates one. Wolves win if they equal or outnumber the living village; village wins when all wolves are dead.",
+    "Simplified party rules — no Hunter, Guard, or speech timer. Practice seats you with five CPUs.",
+  ],
+  roulette: [
+    "Heads-up. Six chambers, one live round. Open a table, add a CPU or invite, then start.",
+    "On your turn you may spin (reshuffle the cylinder) or pull the trigger. Click passes to the rival; bang and you lose the match.",
+  ],
 };
 
 type Sample = { rank: Rank; suit: Suit };

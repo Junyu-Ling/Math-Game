@@ -221,8 +221,8 @@ var DIRS2 = [
   [1, -1]
 ];
 var FOUL_LABEL = {
-  "double-three": "double open three",
-  "double-four": "double open four",
+  "double-three": "double three",
+  "double-four": "double four",
   overline: "overline"
 };
 var RPS_LABEL = { rock: "rock", paper: "paper", scissors: "scissors" };
@@ -281,7 +281,7 @@ function beginGomokuMatch(people) {
     log: [
       {
         id: uid("l"),
-        text: `Rock-paper-scissors. Winner plays black. Five in a row wins. Black fouls: double open three, double open four, overline.`
+        text: `Rock-paper-scissors. Winner plays black. Five in a row wins. Black fouls (RIF): double three, double four, overline.`
       }
     ]
   };
@@ -477,37 +477,43 @@ function onSameSegment(board, r, c, rr, cc, dr, dc, stone) {
   }
   return found && len === 5;
 }
-function isOpenFourOnAxis(board, r, c, dr, dc, stone) {
-  return fivePointsOnAxis(board, r, c, dr, dc, stone) >= 2;
+function isStraightFourOnAxis(board, r, c, dr, dc, stone) {
+  return axisLen(board, r, c, dr, dc, stone) === 4 && fivePointsOnAxis(board, r, c, dr, dc, stone) >= 2;
 }
 function isFourOnAxis(board, r, c, dr, dc, stone) {
   return fivePointsOnAxis(board, r, c, dr, dc, stone) >= 1;
 }
-function isOpenThreeOnAxis(board, r, c, dr, dc, stone) {
+function countFours(board, r, c, stone) {
+  let n = 0;
+  for (const [dr, dc] of DIRS2) {
+    if (isFourOnAxis(board, r, c, dr, dc, stone)) n += 1;
+  }
+  return n;
+}
+function isThreeOnAxis(board, r, c, dr, dc, stone, depth) {
   if (isFourOnAxis(board, r, c, dr, dc, stone)) return false;
-  for (let i = -4; i <= 4; i++) {
+  for (let i = -5; i <= 5; i++) {
     if (i === 0) continue;
     const rr = r + i * dr;
     const cc = c + i * dc;
     if (!inBoard2(rr, cc) || board[rr][cc] !== 0) continue;
     board[rr][cc] = stone;
-    const becameOpenFour = isOpenFourOnAxis(board, r, c, dr, dc, stone);
+    const madeFiveOrMore = axisLen(board, rr, cc, dr, dc, stone) >= 5;
+    const becameStraight = !madeFiveOrMore && (isStraightFourOnAxis(board, r, c, dr, dc, stone) || isStraightFourOnAxis(board, rr, cc, dr, dc, stone));
+    let illegalMake = false;
+    if (becameStraight && stone === 1) {
+      if (isOverline(board, rr, cc) || countFours(board, rr, cc, 1) >= 2) illegalMake = true;
+      else if (depth < 4 && countThrees(board, rr, cc, 1, depth + 1) >= 2) illegalMake = true;
+    }
     board[rr][cc] = 0;
-    if (becameOpenFour) return true;
+    if (becameStraight && !illegalMake) return true;
   }
   return false;
 }
-function countOpenFours(board, r, c, stone) {
+function countThrees(board, r, c, stone, depth = 0) {
   let n = 0;
   for (const [dr, dc] of DIRS2) {
-    if (isOpenFourOnAxis(board, r, c, dr, dc, stone)) n += 1;
-  }
-  return n;
-}
-function countOpenThrees(board, r, c, stone) {
-  let n = 0;
-  for (const [dr, dc] of DIRS2) {
-    if (isOpenThreeOnAxis(board, r, c, dr, dc, stone)) n += 1;
+    if (isThreeOnAxis(board, r, c, dr, dc, stone, depth)) n += 1;
   }
   return n;
 }
@@ -515,8 +521,8 @@ function blackFoulAt(board, r, c) {
   if (board[r][c] !== 1) return null;
   if (isOverline(board, r, c)) return "overline";
   if (winsAt(board, r, c)) return null;
-  if (countOpenFours(board, r, c, 1) >= 2) return "double-four";
-  if (countOpenThrees(board, r, c, 1) >= 2) return "double-three";
+  if (countFours(board, r, c, 1) >= 2) return "double-four";
+  if (countThrees(board, r, c, 1) >= 2) return "double-three";
   return null;
 }
 function applyGomokuAction(state, actorId, action) {

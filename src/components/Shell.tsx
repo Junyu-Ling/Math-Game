@@ -23,6 +23,8 @@ export function Shell({ children }: { children: ReactNode }) {
           <NavLink to="/play/halli">Halli</NavLink>
           <NavLink to="/play/ecard">E-Card</NavLink>
           <NavLink to="/play/gomoku">Gomoku</NavLink>
+          <NavLink to="/play/werewolf">Werewolf</NavLink>
+          <NavLink to="/play/roulette">Roulette</NavLink>
           {/* Deferred: Ludo / Animal / Army */}
           {user ? (
             <>

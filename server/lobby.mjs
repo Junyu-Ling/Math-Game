@@ -21,7 +21,9 @@ const CPU_NAMES = ["CPU", "CPU 2", "CPU 3", "CPU 4", "CPU 5", "CPU 6", "CPU 7", 
 
 function tableMax(game) {
   if (game === "flip7") return 16;
-  if (game === "gomoku" || game === "ecard" || game === "bj" || game === "m24" || game === "holdem") return 2;
+  if (game === "werewolf") return 8;
+  if (game === "gomoku" || game === "ecard" || game === "bj" || game === "m24" || game === "holdem" || game === "roulette")
+    return 2;
   return 4;
 }
 
@@ -825,6 +827,10 @@ function startRoom(invite, from, to, mods) {
     state = mods.ecard.startEcardDuel(a, b);
   } else if (invite.game === "gomoku") {
     state = mods.gomoku.startGomokuDuel(a, b);
+  } else if (invite.game === "werewolf") {
+    state = mods.werewolf.startWerewolfLobby([a, b]);
+  } else if (invite.game === "roulette") {
+    state = mods.roulette.startRouletteDuel(a, b);
   } else if (invite.game === "ludo") {
     state = mods.ludo.startLudoDuel(a, b);
   } else if (invite.game === "animal") {
@@ -889,6 +895,8 @@ function newLobbyState(game, people, mods, meta) {
   if (game === "bj") return mods.bj.startBjLobby(people);
   if (game === "m24") return mods.m24.startM24Lobby(people);
   if (game === "holdem") return mods.holdem.startHoldemLobby(people);
+  if (game === "werewolf") return mods.werewolf.startWerewolfLobby(people);
+  if (game === "roulette") return mods.roulette.startRouletteLobby(people);
   throw new Error("Unknown table game");
 }
 
@@ -902,6 +910,8 @@ function rebuildLobby(rec, joiner, mods) {
   if (rec.game === "bj") return mods.bj.startBjLobby(people);
   if (rec.game === "m24") return mods.m24.startM24Lobby(people);
   if (rec.game === "holdem") return mods.holdem.startHoldemLobby(people);
+  if (rec.game === "werewolf") return mods.werewolf.startWerewolfLobby(people);
+  if (rec.game === "roulette") return mods.roulette.startRouletteLobby(people);
   if (rec.game === "coda") {
     let state = mods.coda.startCodaLobby(people, Boolean(rec.state?.useJokers));
     for (const p of rec.state.players || []) {
@@ -1000,6 +1010,29 @@ function cpuIsToAct(room) {
   }
   if (room.game === "holdem") {
     if (s.street === "lobby" || s.street === "over" || s.street === "showdown") return false;
+    const cur = s.players[s.turn];
+    return Boolean(isCpuPlayer(cur));
+  }
+  if (room.game === "werewolf") {
+    if (s.phase === "night_wolves") {
+      return s.players.some((p) => isCpuPlayer(p) && p.alive && p.role === "werewolf" && !s.wolfVotes?.[p.id]);
+    }
+    if (s.phase === "night_seer") {
+      return s.players.some((p) => isCpuPlayer(p) && p.alive && p.role === "seer" && !s.seerChecked);
+    }
+    if (s.phase === "night_witch") {
+      return s.players.some((p) => isCpuPlayer(p) && p.alive && p.role === "witch" && !s.witchDone);
+    }
+    if (s.phase === "dawn") {
+      return s.players.some((p) => isCpuPlayer(p));
+    }
+    if (s.phase === "vote") {
+      return s.players.some((p) => isCpuPlayer(p) && p.alive && !p.voteFor);
+    }
+    return false;
+  }
+  if (room.game === "roulette") {
+    if (s.phase !== "play") return false;
     const cur = s.players[s.turn];
     return Boolean(isCpuPlayer(cur));
   }
@@ -1206,10 +1239,47 @@ async function playOneCpuTurn(room) {
     }
     return true;
   }
+
+  if (room.game === "werewolf") {
+    let cpu = null;
+    if (s.phase === "night_wolves") {
+      cpu = s.players.find((p) => isCpuPlayer(p) && p.alive && p.role === "werewolf" && !s.wolfVotes?.[p.id]);
+    } else if (s.phase === "night_seer") {
+      cpu = s.players.find((p) => isCpuPlayer(p) && p.alive && p.role === "seer" && !s.seerChecked);
+    } else if (s.phase === "night_witch") {
+      cpu = s.players.find((p) => isCpuPlayer(p) && p.alive && p.role === "witch" && !s.witchDone);
+    } else if (s.phase === "dawn") {
+      cpu = s.players.find((p) => isCpuPlayer(p));
+    } else if (s.phase === "vote") {
+      cpu = s.players.find((p) => isCpuPlayer(p) && p.alive && !p.voteFor);
+    }
+    if (!cpu) return false;
+    room.state = mods.werewolf.applyWerewolfAction(s, cpu.id, mods.werewolf.aiWerewolf(s, cpu.id));
+    return true;
+  }
+
+  if (room.game === "roulette") {
+    const cur = s.players[s.turn];
+    if (!isCpuPlayer(cur)) return false;
+    room.state = mods.roulette.applyRouletteAction(s, cur.id, mods.roulette.aiRoulette(s));
+    return true;
+  }
   return false;
 }
 
-const OPEN_TABLES = new Set(["coda", "uno", "flip7", "halli", "gomoku", "ecard", "bj", "m24", "holdem"]);
+const OPEN_TABLES = new Set([
+  "coda",
+  "uno",
+  "flip7",
+  "halli",
+  "gomoku",
+  "ecard",
+  "bj",
+  "m24",
+  "holdem",
+  "werewolf",
+  "roulette",
+]);
 
 export async function applyRoomAction(user, roomId, action, mods) {
   mods = mods || (await getMods());
@@ -1247,6 +1317,10 @@ export async function applyRoomAction(user, roomId, action, mods) {
     if (room.state.rpsReveal && !before.rpsReveal) {
       room.endsAt = Date.now() + (mods.gomoku.RPS_REVEAL_MS || 2800);
     }
+  } else if (room.game === "werewolf") {
+    room.state = mods.werewolf.applyWerewolfAction(room.state, user.id, action);
+  } else if (room.game === "roulette") {
+    room.state = mods.roulette.applyRouletteAction(room.state, user.id, action);
   } else if (room.game === "ludo") {
     room.state = mods.ludo.applyLudoAction(room.state, user.id, action);
   } else if (room.game === "animal") {
@@ -1305,7 +1379,9 @@ function publicRoom(room, viewerId) {
       else if (room.game === "gomoku") {
         const st = typeof mods.gomoku.normalizeGomoku === "function" ? mods.gomoku.normalizeGomoku(room.state) : room.state;
         view = mods.gomoku.viewGomoku(st, viewerId);
-      } else if (room.game === "ludo") view = mods.ludo.viewLudo(room.state, viewerId);
+      } else if (room.game === "werewolf") view = mods.werewolf.viewWerewolf(room.state, viewerId);
+      else if (room.game === "roulette") view = mods.roulette.viewRoulette(room.state, viewerId);
+      else if (room.game === "ludo") view = mods.ludo.viewLudo(room.state, viewerId);
       else if (room.game === "animal") view = mods.animal.viewAnimal(room.state, viewerId);
       else if (room.game === "army") view = mods.army.viewArmy(room.state, viewerId);
     } catch (err) {

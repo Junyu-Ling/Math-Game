@@ -10,7 +10,9 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
   const view = room?.view as { phase?: string; street?: string } | undefined;
   const tableWait = Boolean(
     room &&
-      ["coda", "uno", "flip7", "halli", "gomoku", "ecard", "bj", "m24", "holdem"].includes(room.game) &&
+      ["coda", "uno", "flip7", "halli", "gomoku", "ecard", "bj", "m24", "holdem", "werewolf", "roulette"].includes(
+        room.game,
+      ) &&
       (view?.phase === "lobby" || view?.street === "lobby"),
   );
   const host = Boolean(user && room?.seats?.[0] === user.id);
@@ -45,6 +47,12 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       ) : null}
       {game === "gomoku" ? (
         <p>Gomoku is heads-up. Open a table, add a CPU or invite one friend, then start. RPS winner plays black.</p>
+      ) : null}
+      {game === "werewolf" ? (
+        <p>Werewolf is 4–8. Open a table, add CPUs or invite, then the host starts. Night kills, day vote.</p>
+      ) : null}
+      {game === "roulette" ? (
+        <p>Russian Roulette is heads-up. Open a table, add a CPU or invite one friend, then start.</p>
       ) : null}
       {game === "bj" ? (
         <p>Blackjack is heads-up. Open a table, add a CPU or invite one friend, then start.</p>
