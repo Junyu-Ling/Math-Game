@@ -8,7 +8,7 @@ export type Stone = 0 | 1 | 2; // 0 empty, 1 black, 2 white
 export type RpsThrow = "rock" | "paper" | "scissors";
 export type RpsReveal = { aId: string; a: RpsThrow; bId: string; b: RpsThrow };
 
-/** Double open-three, double open-four, or overline (6+). */
+/** RIF: double-three (two live threes), double-four (two fours), or overline (6+). */
 export type FoulKind = "double-three" | "double-four" | "overline";
 
 export type GPlayer = {
@@ -48,8 +48,8 @@ const DIRS: Array<[number, number]> = [
 ];
 
 const FOUL_LABEL: Record<FoulKind, string> = {
-  "double-three": "double open three",
-  "double-four": "double open four",
+  "double-three": "double three",
+  "double-four": "double four",
   overline: "overline",
 };
 
@@ -121,7 +121,7 @@ function beginGomokuMatch(people: Array<{ id: string; name: string; human?: bool
     log: [
       {
         id: uid("l"),
-        text: `Rock-paper-scissors. Winner plays black. Five in a row wins. Black fouls: double open three, double open four, overline.`,
+        text: `Rock-paper-scissors. Winner plays black. Five in a row wins. Black fouls (RIF): double three, double four, overline.`,
       },
     ],
   };
@@ -353,7 +353,11 @@ function onSameSegment(
   return found && len === 5;
 }
 
-function isOpenFourOnAxis(
+/**
+ * RIF STRAIGHT FOUR (活四): unbroken four with two distinct ways to make five.
+ * Broken shapes (e.g. ●●_●●) are not straight fours even if they threaten five.
+ */
+function isStraightFourOnAxis(
   board: Stone[][],
   r: number,
   c: number,
@@ -361,9 +365,10 @@ function isOpenFourOnAxis(
   dc: number,
   stone: Stone,
 ): boolean {
-  return fivePointsOnAxis(board, r, c, dr, dc, stone) >= 2;
+  return axisLen(board, r, c, dr, dc, stone) === 4 && fivePointsOnAxis(board, r, c, dr, dc, stone) >= 2;
 }
 
+/** RIF FOUR (四): any row that can add one stone to make five (冲四 or 活四). */
 function isFourOnAxis(
   board: Stone[][],
   r: number,
@@ -375,56 +380,70 @@ function isFourOnAxis(
   return fivePointsOnAxis(board, r, c, dr, dc, stone) >= 1;
 }
 
-/** Open three (活三): can become an open four next. */
-function isOpenThreeOnAxis(
+function countFours(board: Stone[][], r: number, c: number, stone: Stone): number {
+  let n = 0;
+  for (const [dr, dc] of DIRS) {
+    if (isFourOnAxis(board, r, c, dr, dc, stone)) n += 1;
+  }
+  return n;
+}
+
+/**
+ * RIF THREE (活三): three stones that can become a straight four by adding one stone,
+ * without that add making five. For Black, the make-four point must also avoid
+ * overline / double-four / forbidden double-three (RIF 9.3).
+ * Sleeping threes and gap shapes that only make a rush four (冲四) do not count.
+ */
+function isThreeOnAxis(
   board: Stone[][],
   r: number,
   c: number,
   dr: number,
   dc: number,
   stone: Stone,
+  depth: number,
 ): boolean {
   if (isFourOnAxis(board, r, c, dr, dc, stone)) return false;
-  for (let i = -4; i <= 4; i++) {
+  for (let i = -5; i <= 5; i++) {
     if (i === 0) continue;
     const rr = r + i * dr;
     const cc = c + i * dc;
     if (!inBoard(rr, cc) || board[rr]![cc] !== 0) continue;
     board[rr]![cc] = stone;
-    const becameOpenFour = isOpenFourOnAxis(board, r, c, dr, dc, stone);
+    const madeFiveOrMore = axisLen(board, rr, cc, dr, dc, stone) >= 5;
+    const becameStraight =
+      !madeFiveOrMore &&
+      (isStraightFourOnAxis(board, r, c, dr, dc, stone) || isStraightFourOnAxis(board, rr, cc, dr, dc, stone));
+    let illegalMake = false;
+    if (becameStraight && stone === 1) {
+      if (isOverline(board, rr, cc) || countFours(board, rr, cc, 1) >= 2) illegalMake = true;
+      else if (depth < 4 && countThrees(board, rr, cc, 1, depth + 1) >= 2) illegalMake = true;
+    }
     board[rr]![cc] = 0;
-    if (becameOpenFour) return true;
+    if (becameStraight && !illegalMake) return true;
   }
   return false;
 }
 
-function countOpenFours(board: Stone[][], r: number, c: number, stone: Stone): number {
+function countThrees(board: Stone[][], r: number, c: number, stone: Stone, depth = 0): number {
   let n = 0;
   for (const [dr, dc] of DIRS) {
-    if (isOpenFourOnAxis(board, r, c, dr, dc, stone)) n += 1;
-  }
-  return n;
-}
-
-function countOpenThrees(board: Stone[][], r: number, c: number, stone: Stone): number {
-  let n = 0;
-  for (const [dr, dc] of DIRS) {
-    if (isOpenThreeOnAxis(board, r, c, dr, dc, stone)) n += 1;
+    if (isThreeOnAxis(board, r, c, dr, dc, stone, depth)) n += 1;
   }
   return n;
 }
 
 /**
- * Black fouls after the stone is on the board at (r,c):
- * overline, double open four, double open three.
- * Exact five is a win, not a foul.
+ * Black fouls after the stone is on the board at (r,c) — RIF 9.2:
+ * overline, double-four (any two fours), double-three (two live threes).
+ * Exact five wins and is not a foul.
  */
 export function blackFoulAt(board: Stone[][], r: number, c: number): FoulKind | null {
   if (board[r]![c] !== 1) return null;
   if (isOverline(board, r, c)) return "overline";
   if (winsAt(board, r, c)) return null;
-  if (countOpenFours(board, r, c, 1) >= 2) return "double-four";
-  if (countOpenThrees(board, r, c, 1) >= 2) return "double-three";
+  if (countFours(board, r, c, 1) >= 2) return "double-four";
+  if (countThrees(board, r, c, 1) >= 2) return "double-three";
   return null;
 }
 
