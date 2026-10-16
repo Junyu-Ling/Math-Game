@@ -14,7 +14,8 @@ export type LobbyGame =
   | "halli"
   | "ecard"
   | "werewolf"
-  | "roulette";
+  | "roulette"
+  | "slots";
 
 const poker = (id: string, suit: PokerCard["suit"], rank: PokerCard["rank"]): PokerCard => ({ id, suit, rank });
 
@@ -108,6 +109,14 @@ export function LobbyDecor({ game }: { game: LobbyGame }) {
           <span className="decor-card b"><span className="roulette-preview" /></span>
           <span className="decor-card c"><span className="roulette-preview" /></span>
           <span className="decor-card d"><span className="roulette-preview" /></span>
+        </>
+      ) : null}
+      {game === "slots" ? (
+        <>
+          <span className="decor-card a"><span className="slots-preview">🍒</span></span>
+          <span className="decor-card b"><span className="slots-preview">7</span></span>
+          <span className="decor-card c"><span className="slots-preview">★</span></span>
+          <span className="decor-card d"><span className="slots-preview">BAR</span></span>
         </>
       ) : null}
     </div>

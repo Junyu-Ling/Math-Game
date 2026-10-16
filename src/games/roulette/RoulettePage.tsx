@@ -1,202 +1,372 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
-  CHAMBERS,
-  aiRoulette,
-  applyRouletteAction,
-  oddsHint,
-  startRoulettePractice,
-  type RAction,
-  type RState,
+  WHEEL_ORDER,
+  beginSpin,
+  clearBets,
+  finishSpin,
+  labelBet,
+  nextRound,
+  placeBet,
+  pocketColor,
+  resetStack,
+  setChipSize,
+  sixlineFromLow,
+  startRoulette,
+  streetOf,
+  totalStake,
+  undoBet,
+  cornerFromLow,
+  type BetKind,
+  type RouletteState,
 } from "./engine";
-import { LobbyDecor } from "../../components/LobbyDecor";
-import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
-import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
-import { useLobby } from "../../context/LobbyContext";
-import { CPU_THINK_MS, wait } from "../../lib/shuffle";
+
+const CHIP_SIZES = [1, 5, 10, 25, 50, 100];
+
+type InsideMode = "straight" | "split" | "street" | "corner" | "sixline";
 
 export function RoulettePage() {
-  const { user } = useAuth();
-  const lobby = useLobby();
-  const room = lobby.room?.game === "roulette" ? lobby.room : null;
-  const [local, setLocal] = useState<RState | null>(null);
-  const state = (room?.view as RState | undefined) ?? local;
-  const practice = Boolean(local && !room);
-  const youId = practice ? "you" : user?.id;
-  const me = state?.players.find((p) => p.id === youId);
-  const rival = state?.players.find((p) => p.id !== youId);
-  const waiting = Boolean(state?.phase === "lobby");
-  const host = Boolean(user && room?.seats?.[0] === user.id);
-  const myTurn = Boolean(state && me && state.phase === "play" && state.players[state.turn]?.id === me.id);
+  const { user, setChips } = useAuth();
+  const [state, setState] = useState<RouletteState>(() => startRoulette(user?.chips ?? 1000));
+  const [mode, setMode] = useState<InsideMode>("straight");
+  const [splitPick, setSplitPick] = useState<number | null>(null);
 
   useEffect(() => {
-    if (room) setLocal(null);
-  }, [room]);
-
-  useEffect(() => {
-    if (!practice || !local || local.phase !== "play") return;
-    const actor = local.players[local.turn];
-    if (!actor || actor.human) return;
-    let stop = false;
-    void (async () => {
-      await wait(CPU_THINK_MS + 400);
-      if (stop) return;
-      setLocal((s) => {
-        if (!s || s.phase !== "play") return s;
-        const cur = s.players[s.turn];
-        if (!cur || cur.human) return s;
-        return applyRouletteAction(s, cur.id, aiRoulette(s));
+    if (state.phase !== "spinning") return;
+    const t = window.setTimeout(() => {
+      setState((s) => {
+        const next = finishSpin(s);
+        if (user) void setChips(next.chips).catch(() => undefined);
+        return next;
       });
-    })();
-    return () => {
-      stop = true;
-    };
-  }, [practice, local]);
+    }, 4200);
+    return () => window.clearTimeout(t);
+  }, [state.phase, user, setChips]);
 
-  function act(action: RAction) {
-    if (room) {
-      void lobby.sendAction(action);
+  const wheelStyle = useMemo(
+    () =>
+      ({
+        ["--wheel-deg" as string]: `${state.wheelDeg}deg`,
+        background: conicWheel(),
+      }) as CSSProperties,
+    [state.wheelDeg],
+  );
+
+  function onNumber(n: number) {
+    if (state.phase !== "bet") return;
+    if (mode === "straight") {
+      setState((s) => placeBet(s, "straight", { numbers: [n] }));
       return;
     }
-    setLocal((s) => (s ? applyRouletteAction(s, "you", action) : s));
+    if (mode === "street") {
+      const st = n === 0 ? null : streetOf(n);
+      if (!st) {
+        setState((s) => ({ ...s, message: "Street is for 1–36 rows." }));
+        return;
+      }
+      setState((s) => placeBet(s, "street", { numbers: st }));
+      return;
+    }
+    if (mode === "sixline") {
+      const st = n === 0 ? null : streetOf(n);
+      if (!st) return;
+      const lo = st[0]! <= 31 ? st[0]! : null;
+      const six = lo != null ? sixlineFromLow(lo) : null;
+      if (!six) {
+        setState((s) => ({ ...s, message: "No six-line from the last street." }));
+        return;
+      }
+      setState((s) => placeBet(s, "sixline", { numbers: six }));
+      return;
+    }
+    if (mode === "corner") {
+      const c = n === 0 ? null : cornerFromLow(n);
+      if (!c) {
+        setState((s) => ({ ...s, message: "Corner: click the lower-left number of a 2×2." }));
+        return;
+      }
+      setState((s) => placeBet(s, "corner", { numbers: c }));
+      return;
+    }
+    if (mode === "split") {
+      if (splitPick === null) {
+        setSplitPick(n);
+        setState((s) => ({ ...s, message: `Split: now pick a neighbor of ${n}.` }));
+        return;
+      }
+      setState((s) => placeBet(s, "split", { numbers: [splitPick, n] }));
+      setSplitPick(null);
+    }
   }
 
-  const bang = state?.last === "bang";
-  const click = state?.last === "click";
+  function outside(kind: BetKind, index?: 1 | 2 | 3) {
+    setState((s) => placeBet(s, kind, { index }));
+  }
+
+  function spin() {
+    setSplitPick(null);
+    setState((s) => beginSpin(s));
+  }
+
+  function fresh() {
+    const chips = user?.chips ?? 1000;
+    setSplitPick(null);
+    setState(resetStack(state, chips));
+  }
+
+  const streets = Array.from({ length: 12 }, (_, i) => [3 * i + 1, 3 * i + 2, 3 * i + 3] as const);
 
   return (
     <div className="page-wide">
       <div className="game-head">
         <div>
-          <p className="kicker">11 / ROULETTE · Duel</p>
-          <h1>Russian Roulette</h1>
+          <p className="kicker">11 / ROULETTE · European · Solo</p>
+          <h1>European Roulette</h1>
         </div>
         <div className="row-actions">
-          {practice ? (
-            <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
-              RESET
-            </button>
-          ) : null}
-          <button className="btn btn-ghost" type="button" onClick={() => void lobby.leaveHome()}>
-            LEAVE
+          <button className="btn btn-ghost" type="button" onClick={fresh}>
+            RESET
           </button>
         </div>
       </div>
       <div className="game-layout">
         <div className="table table-roulette">
-          {!state || !me || waiting ? (
-            <>
-              <LobbyDecor game="roulette" />
-              <div className="coda-deal">
-                <p className="kicker">{waiting ? "TABLE" : "ROULETTE"}</p>
-                <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Six chambers · one live"}</h2>
-                <p>
-                  {waiting
-                    ? "Add a CPU or invite one friend, then start. Spin optional — pull to fire."
-                    : "Practice vs CPU, or open a table. Take turns. Click passes the turn; bang ends the match."}
-                </p>
-                {waiting && state ? (
-                  <ul className="lobby-roster">
-                    {state.players.map((p, i) => (
-                      <li key={p.id}>
-                        <b>{p.name}</b>
-                        <span>{seatTag(p, i, state.players[0]?.id)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                <MixedCpuBar game="roulette" onPractice={() => setLocal(startRoulettePractice())} />
-                <div className="row-actions" style={{ justifyContent: "center" }}>
-                  {waiting ? (
-                    host && (state?.players.length ?? 0) >= 2 ? (
-                      <button className="btn" type="button" onClick={() => act({ type: "start" })}>
-                        Start
-                      </button>
-                    ) : (
-                      <p>{host ? "Need 2 players to start." : "Waiting for the host to start."}</p>
-                    )
-                  ) : null}
-                </div>
-              </div>
-            </>
-          ) : !rival ? null : (
-            <>
-              <div className="seat">
-                <div className="seat-label">
-                  {rival.name}
-                  {state.players[state.turn]?.id === rival.id && state.phase === "play" ? " · TURN" : ""}
-                  {state.loserId === rival.id ? " · OUT" : ""}
-                  {state.winnerId === rival.id ? " · WINS" : ""}
-                </div>
-              </div>
-
-              <div className="center-well roulette-well">
-                <div
-                  className={`roulette-cylinder${bang ? " bang" : ""}${click ? " click" : ""}`}
-                  aria-hidden
-                >
-                  {Array.from({ length: CHAMBERS }, (_, i) => (
+          <div className="roulette-casino">
+            <div className="roulette-wheel-wrap">
+              <div className="roulette-pointer" aria-hidden />
+              <div
+                className={`roulette-wheel${state.phase === "spinning" ? " spinning" : ""}`}
+                style={wheelStyle}
+                aria-label="European roulette wheel"
+              >
+                <div className="roulette-wheel-labels">
+                  {WHEEL_ORDER.map((n, i) => (
                     <span
-                      key={i}
-                      className={`roulette-chamber${i === state.hammer ? " hammer" : ""}`}
+                      key={n}
+                      className={`rw-lab tone-${pocketColor(n)}`}
                       style={{ ["--i" as string]: i }}
-                    />
+                    >
+                      {n}
+                    </span>
                   ))}
-                  <span className="roulette-hub" />
                 </div>
-                <p className="status-line">
-                  {state.phase === "over"
-                    ? state.winnerId === me.id
-                      ? "You win."
-                      : "You lose."
-                    : bang
-                      ? "BANG."
-                      : click
-                        ? "Click. Empty."
-                        : myTurn
-                          ? "Your turn. Spin or pull."
-                          : `${rival.name}’s turn.`}
+                <span className="roulette-hub" />
+              </div>
+              <div className="roulette-result-pill">
+                {state.result != null && state.phase !== "spinning" ? (
+                  <span className={`tone-${pocketColor(state.result)}`}>{state.result}</span>
+                ) : (
+                  <span>—</span>
+                )}
+              </div>
+              <p className="roulette-status">{state.message}</p>
+              {state.history.length ? (
+                <p className="roulette-history">
+                  Recent:{" "}
+                  {state.history.map((n, i) => (
+                    <span key={`${n}-${i}`} className={`tone-${pocketColor(n)}`}>
+                      {n}
+                    </span>
+                  ))}
                 </p>
-                <p className="kicker">{oddsHint(state)}</p>
-                <div className="row-actions" style={{ justifyContent: "center" }}>
-                  <button className="btn btn-ghost" type="button" disabled={!myTurn} onClick={() => act({ type: "spin" })}>
-                    SPIN
+              ) : null}
+            </div>
+
+            <div className="roulette-board-wrap">
+              <div className="roulette-bank">
+                <span>
+                  Chips <b>{state.chips}</b>
+                </span>
+                <span>
+                  Stake <b>{totalStake(state)}</b>
+                </span>
+                {state.lastWin > 0 ? (
+                  <span>
+                    Won <b>{state.lastWin}</b>
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="roulette-chip-row">
+                {CHIP_SIZES.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`btn${state.chipSize === c ? "" : " btn-ghost"}`}
+                    disabled={state.phase !== "bet"}
+                    onClick={() => setState((s) => setChipSize(s, c))}
+                  >
+                    {c}
                   </button>
-                  <button className="btn btn-go" type="button" disabled={!myTurn} onClick={() => act({ type: "pull" })}>
-                    PULL
+                ))}
+              </div>
+
+              <div className="roulette-mode-row">
+                {(
+                  [
+                    ["straight", "Straight 35:1"],
+                    ["split", "Split 17:1"],
+                    ["street", "Street 11:1"],
+                    ["corner", "Corner 8:1"],
+                    ["sixline", "Six 5:1"],
+                  ] as const
+                ).map(([m, label]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={`btn btn-ghost${mode === m ? " on" : ""}`}
+                    disabled={state.phase !== "bet"}
+                    onClick={() => {
+                      setMode(m);
+                      setSplitPick(null);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="roulette-felt" role="grid" aria-label="Betting board">
+                <button
+                  type="button"
+                  className="rb-zero tone-green"
+                  disabled={state.phase !== "bet"}
+                  onClick={() => onNumber(0)}
+                >
+                  0
+                </button>
+                <div className="rb-grid">
+                  {streets.map((row) => (
+                    <div key={row[0]} className="rb-street">
+                      {[row[2], row[1], row[0]].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          className={`rb-num tone-${pocketColor(n)}`}
+                          disabled={state.phase !== "bet"}
+                          onClick={() => onNumber(n)}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <div className="rb-columns">
+                  {([3, 2, 1] as const).map((col) => (
+                    <button
+                      key={col}
+                      type="button"
+                      className="rb-out"
+                      disabled={state.phase !== "bet"}
+                      onClick={() => outside("column", col)}
+                    >
+                      2:1
+                    </button>
+                  ))}
+                </div>
+                <div className="rb-dozens">
+                  {([1, 2, 3] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      className="rb-out"
+                      disabled={state.phase !== "bet"}
+                      onClick={() => outside("dozen", d)}
+                    >
+                      {d === 1 ? "1st 12" : d === 2 ? "2nd 12" : "3rd 12"}
+                    </button>
+                  ))}
+                </div>
+                <div className="rb-even">
+                  <button type="button" className="rb-out" disabled={state.phase !== "bet"} onClick={() => outside("low")}>
+                    1–18
+                  </button>
+                  <button type="button" className="rb-out" disabled={state.phase !== "bet"} onClick={() => outside("even")}>
+                    Even
+                  </button>
+                  <button
+                    type="button"
+                    className="rb-out tone-red"
+                    disabled={state.phase !== "bet"}
+                    onClick={() => outside("red")}
+                  >
+                    Red
+                  </button>
+                  <button
+                    type="button"
+                    className="rb-out tone-black"
+                    disabled={state.phase !== "bet"}
+                    onClick={() => outside("black")}
+                  >
+                    Black
+                  </button>
+                  <button type="button" className="rb-out" disabled={state.phase !== "bet"} onClick={() => outside("odd")}>
+                    Odd
+                  </button>
+                  <button type="button" className="rb-out" disabled={state.phase !== "bet"} onClick={() => outside("high")}>
+                    19–36
                   </button>
                 </div>
               </div>
 
-              <div className="seat">
-                <div className="seat-label">
-                  {me.name}
-                  {myTurn ? " · TURN" : ""}
-                  {state.loserId === me.id ? " · OUT" : ""}
-                  {state.winnerId === me.id ? " · WINS" : ""}
-                </div>
+              <ul className="roulette-bet-list">
+                {state.bets.length === 0 ? <li>No bets yet.</li> : null}
+                {state.bets.map((b) => (
+                  <li key={b.id}>
+                    {b.stake} · {labelBet(b)}
+                  </li>
+                ))}
+              </ul>
+
+              <div className="row-actions" style={{ justifyContent: "center", flexWrap: "wrap" }}>
+                {state.phase === "bet" ? (
+                  <>
+                    <button className="btn btn-ghost" type="button" onClick={() => setState((s) => undoBet(s))}>
+                      Undo
+                    </button>
+                    <button className="btn btn-ghost" type="button" onClick={() => setState((s) => clearBets(s))}>
+                      Clear
+                    </button>
+                    <button className="btn" type="button" onClick={spin} disabled={!state.bets.length}>
+                      Spin
+                    </button>
+                  </>
+                ) : null}
+                {state.phase === "result" ? (
+                  <button className="btn" type="button" onClick={() => setState((s) => nextRound(s))}>
+                    Next round
+                  </button>
+                ) : null}
+                {state.phase === "spinning" ? <p>Spinning…</p> : null}
               </div>
-            </>
-          )}
+            </div>
+          </div>
         </div>
-        <div className="side-stack">
-          <InvitePanel game="roulette" />
-          <aside className="side">
-            <GameRules game="roulette" />
-            {state?.log?.length ? (
-              <div className="wolf-log">
-                <h3>LOG</h3>
-                <ul>
-                  {[...state.log].slice(-10).reverse().map((e) => (
-                    <li key={e.id}>{e.text}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </aside>
-        </div>
+        <aside className="side">
+          <div>
+            <h3>Solo casino</h3>
+            <p>
+              Practice against the house on a European single-zero wheel. Logged-in chips sync after each spin; guests
+              use a local stack.
+            </p>
+          </div>
+          <GameRules game="roulette" />
+        </aside>
       </div>
     </div>
   );
+}
+
+function conicWheel(): string {
+  const slice = 100 / WHEEL_ORDER.length;
+  const parts = WHEEL_ORDER.map((n, i) => {
+    const c = pocketColor(n);
+    const color = c === "green" ? "#0f7a3a" : c === "red" ? "#b91c1c" : "#1a1a1a";
+    const a = (i * slice).toFixed(4);
+    const b = ((i + 1) * slice).toFixed(4);
+    return `${color} ${a}% ${b}%`;
+  });
+  return `conic-gradient(from ${-180 / WHEEL_ORDER.length}deg, ${parts.join(", ")})`;
 }

@@ -63,8 +63,14 @@ const RULES: Record<string, string[]> = {
     "Simplified party rules — no Hunter, Guard, or speech timer. Practice seats you with five CPUs.",
   ],
   roulette: [
-    "Heads-up. Six chambers, one live round. Open a table, add a CPU or invite, then start.",
-    "On your turn you may spin (reshuffle the cylinder) or pull the trigger. Click passes to the rival; bang and you lose the match.",
+    "Solo European roulette (single zero 0–36) against the house. Place chips, then spin.",
+    "Payouts are net odds (win returns stake + profit): Straight 35:1 · Split 17:1 · Street 11:1 · Corner 8:1 · Six line 5:1 · Column/Dozen 2:1 · Even money 1:1.",
+    "On 0, even-money bets (Red/Black, Odd/Even, 1–18/19–36) lose. Inside bets that include 0 can still win.",
+  ],
+  slots: [
+    "Solo 3-reel practice slots. One payline. Set bet size, then spin.",
+    "WILD substitutes on three-of-a-kind. Paytable (× bet): 7s ×80 · WILD ×50 · BAR ×40 · Bell ×25 · Plum ×15 · Orange ×12 · Lemon ×10 · Cherry ×8 · two Cherries ×2.",
+    "Fixed fun paytable — not calibrated casino RTP. Practice chips sync to your account when signed in.",
   ],
 };
 

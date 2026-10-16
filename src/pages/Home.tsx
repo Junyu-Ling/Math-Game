@@ -86,15 +86,23 @@ const games = [
   {
     to: "/play/roulette",
     idx: "11",
-    code: "SPIN",
-    name: "Russian Roulette",
-    blurb: "Six chambers, one live. Spin optional — pull and hope for a click.",
+    code: "ROULETTE",
+    name: "European Roulette",
+    blurb: "Single-zero wheel 0–36. Solo bets vs the house — straight through even money.",
     preview: "roulette" as const,
+  },
+  {
+    to: "/play/slots",
+    idx: "12",
+    code: "SLOTS",
+    name: "Slot Machine",
+    blurb: "Three-reel practice slots. Pick a bet, spin, and check the paytable.",
+    preview: "slots" as const,
   },
   // Deferred — Flying Chess / Animal Chess / Army Chess
   // {
   //   to: "/play/ludo",
-  //   idx: "12",
+  //   idx: "13",
   //   code: "LUDO",
   //   name: "Flying Chess",
   //   blurb: "Roll, race four pieces home. Six opens the gate.",
@@ -102,7 +110,7 @@ const games = [
   // },
   // {
   //   to: "/play/animal",
-  //   idx: "13",
+  //   idx: "14",
   //   code: "ANIMAL",
   //   name: "Animal Chess",
   //   blurb: "Jungle ranks, rivers, and dens. Enter the rival den to win.",
@@ -110,7 +118,7 @@ const games = [
   // },
   // {
   //   to: "/play/army",
-  //   idx: "14",
+  //   idx: "15",
   //   code: "ARMY",
   //   name: "Army Chess",
   //   blurb: "Open 军棋. Bombs, mines, and the flag. Capture 军旗 to win.",
@@ -216,6 +224,15 @@ function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
     return (
       <div className="preview-row">
         <span className="roulette-preview" aria-hidden />
+      </div>
+    );
+  }
+  if (kind === "slots") {
+    return (
+      <div className="preview-row">
+        <span className="slots-preview" aria-hidden>
+          🍒 · 7 · ★
+        </span>
       </div>
     );
   }

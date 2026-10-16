@@ -2,7 +2,7 @@ let cached = null;
 
 export async function loadMods() {
   if (cached) return cached;
-  const [coda, flip, bj, m24, uno, holdem, halli, ecard, gomoku, ludo, animal, army, werewolf, roulette] =
+  const [coda, flip, bj, m24, uno, holdem, halli, ecard, gomoku, ludo, animal, army, werewolf] =
     await Promise.all([
       import("./bundled/coda.mjs"),
       import("./bundled/flip.mjs"),
@@ -17,8 +17,7 @@ export async function loadMods() {
       import("./bundled/animal.mjs"),
       import("./bundled/army.mjs"),
       import("./bundled/werewolf.mjs"),
-      import("./bundled/roulette.mjs"),
     ]);
-  cached = { coda, flip, bj, m24, uno, holdem, halli, ecard, gomoku, ludo, animal, army, werewolf, roulette };
+  cached = { coda, flip, bj, m24, uno, holdem, halli, ecard, gomoku, ludo, animal, army, werewolf };
   return cached;
 }
