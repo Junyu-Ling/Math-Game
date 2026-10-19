@@ -22,6 +22,7 @@ import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
+import { forfeitText } from "../../lib/forfeit";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 const RPS_CHOICES: Array<{ id: RpsThrow; label: string }> = [
@@ -112,8 +113,9 @@ export function EcardPage() {
   const room = lobby.room?.game === "ecard" ? lobby.room : null;
   const [local, setLocal] = useState<EState | null>(null);
   const [rpsBeat, setRpsBeat] = useState(0);
-  const state = (room?.view as EState | undefined) ?? local;
-  const practice = Boolean(local && !room);
+  const held = (!room && lobby.settlement?.game === "ecard" ? lobby.settlement.view : null) as EState | null;
+  const state = (room?.view as EState | undefined) ?? held ?? local;
+  const practice = Boolean(local && !room && !held);
   const youId = practice ? "you" : user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
@@ -425,9 +427,10 @@ export function EcardPage() {
               </div>
               <p className="status-line">
                 {state.phase === "over"
-                  ? state.winnerId
-                    ? `${state.players.find((p) => p.id === state.winnerId)?.name || ""} wins ${state.score[me.id] || 0}–${state.score[rival.id] || 0}`
-                    : `Draw ${state.score[me.id] || 0}–${state.score[rival.id] || 0}`
+                  ? forfeitText(state) ||
+                    (state.winnerId
+                      ? `${state.players.find((p) => p.id === state.winnerId)?.name || ""} wins ${state.score[me.id] || 0}–${state.score[rival.id] || 0}`
+                      : `Draw ${state.score[me.id] || 0}–${state.score[rival.id] || 0}`)
                   : state.phase === "reveal"
                     ? state.log.at(-1)?.text || "Reveal"
                     : me.locked

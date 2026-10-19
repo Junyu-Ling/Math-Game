@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { MahjongTile } from "../components/MahjongTile";
 import { FlipFace, MiniPoker, UnoFace } from "../components/PlayingCard";
+import { PlaneIcon } from "../games/ludo/LudoPage";
 
 const games = [
   {
@@ -99,15 +100,15 @@ const games = [
     blurb: "Three-reel practice slots. Pick a bet, spin, and check the paytable.",
     preview: "slots" as const,
   },
-  // Deferred — Flying Chess / Animal Chess / Army Chess
-  // {
-  //   to: "/play/ludo",
-  //   idx: "13",
-  //   code: "LUDO",
-  //   name: "Flying Chess",
-  //   blurb: "Roll, race four pieces home. Six opens the gate.",
-  //   preview: "ludo" as const,
-  // },
+  {
+    to: "/play/ludo",
+    idx: "13",
+    code: "FLY",
+    name: "Flying Chess",
+    blurb: "Four planes each. Roll a 6 to take off, then race the colored track home.",
+    preview: "ludo" as const,
+  },
+  // Deferred — Animal Chess / Army Chess
   // {
   //   to: "/play/animal",
   //   idx: "14",
@@ -236,6 +237,17 @@ function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
       </div>
     );
   }
+  if (kind === "ludo") {
+    return (
+      <div className="preview-row fly-preview">
+        {(["blue", "red", "yellow", "green"] as const).map((c) => (
+          <span key={c} className={`fly-mini ${c}`}>
+            <PlaneIcon />
+          </span>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="preview-row">
       <button className="m24-num" type="button" style={{ width: 52, height: 70, fontSize: 24 }}>
@@ -253,7 +265,7 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="kicker">Eleven tables · Invite play</p>
+          <p className="kicker">Thirteen tables · Invite play</p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
             Card art follows the physical decks. Practice against the CPU, or sign in and invite someone who is online.

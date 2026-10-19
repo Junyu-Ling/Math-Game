@@ -21,8 +21,9 @@ export function BlackjackPage() {
   const lobby = useLobby();
   const room = lobby.room?.game === "bj" ? lobby.room : null;
   const [local, setLocal] = useState<BjDuelState | null>(null);
-  const state = (room?.view as BjDuelState | undefined) ?? local;
-  const practice = Boolean(local && !room);
+  const held = (!room && lobby.settlement?.game === "bj" ? lobby.settlement.view : null) as BjDuelState | null;
+  const state = (room?.view as BjDuelState | undefined) ?? held ?? local;
+  const practice = Boolean(local && !room && !held);
   const youId = practice ? "you" : user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);

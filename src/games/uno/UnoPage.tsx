@@ -21,6 +21,7 @@ import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
+import { forfeitText } from "../../lib/forfeit";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 function aroundYou<T extends { id: string }>(players: T[], youId: string) {
@@ -176,8 +177,9 @@ export function UnoPage() {
   const room = lobby.room?.game === "uno" ? lobby.room : null;
   const [local, setLocal] = useState<UnoState | null>(null);
   const [plusFx, setPlusFx] = useState<{ n: number; key: string } | null>(null);
-  const state = (room?.view as UnoState | undefined) ?? local;
-  const practice = Boolean(local && !room);
+  const held = (!room && lobby.settlement?.game === "uno" ? lobby.settlement.view : null) as UnoState | null;
+  const state = (room?.view as UnoState | undefined) ?? held ?? local;
+  const practice = Boolean(local && !room && !held);
   const youId = practice ? "you" : user?.id;
   const waiting = Boolean(state && state.phase === "lobby");
   const me = state ? state.players.find((p) => p.id === youId) ?? (waiting ? state.players[0] : currentUno(state)) : null;
@@ -346,9 +348,10 @@ export function UnoPage() {
                 </div>
                 <div className="status-line">
                   {state.phase === "over"
-                    ? state.winnerId
-                      ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
-                      : state.log.at(-1)?.text || "Game over"
+                    ? forfeitText(state) ||
+                      (state.winnerId
+                        ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+                        : state.log.at(-1)?.text || "Game over")
                     : state.pendingDraw > 0
                       ? state.stackKind === "wild4"
                         ? `+${state.pendingDraw} · stack +4 only`

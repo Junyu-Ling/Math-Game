@@ -16,6 +16,7 @@ import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
+import { forfeitText } from "../../lib/forfeit";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 const RPS_CHOICES: Array<{ id: RpsThrow; label: string }> = [
@@ -124,8 +125,9 @@ export function GomokuPage() {
   const room = lobby.room?.game === "gomoku" ? lobby.room : null;
   const [local, setLocal] = useState<GState | null>(null);
   const [rpsBeat, setRpsBeat] = useState(0);
-  const state = (room?.view as GState | undefined) ?? local;
-  const practice = Boolean(local && !room);
+  const held = (!room && lobby.settlement?.game === "gomoku" ? lobby.settlement.view : null) as GState | null;
+  const state = (room?.view as GState | undefined) ?? held ?? local;
+  const practice = Boolean(local && !room && !held);
   const youId = practice ? "you" : user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
@@ -329,11 +331,12 @@ export function GomokuPage() {
             <div className="kaiji-board-wrap">
               <p className="status-line">
                 {state.phase === "over"
-                  ? state.foul
-                    ? `Black foul (${foulLabel(state.foul.kind)}) — ${state.players.find((p) => p.id === state.winnerId)?.name || "White"} wins`
-                    : state.winnerId
-                      ? `${state.players.find((p) => p.id === state.winnerId)?.name} wins`
-                      : "Draw"
+                  ? forfeitText(state) ||
+                    (state.foul
+                      ? `Black foul (${foulLabel(state.foul.kind)}) — ${state.players.find((p) => p.id === state.winnerId)?.name || "White"} wins`
+                      : state.winnerId
+                        ? `${state.players.find((p) => p.id === state.winnerId)?.name} wins`
+                        : "Draw")
                   : `${state.players[state.turn]?.name}'s turn · you are ${me.stone === 1 ? "black" : "white"}`}
               </p>
               {state.foul ? (

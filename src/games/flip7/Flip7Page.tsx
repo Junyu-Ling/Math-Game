@@ -20,6 +20,7 @@ import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
+import { forfeitText } from "../../lib/forfeit";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 function aroundYou<T extends { id: string }>(players: T[], youId: string) {
@@ -115,8 +116,9 @@ export function Flip7Page() {
   const lobby = useLobby();
   const room = lobby.room?.game === "flip7" ? lobby.room : null;
   const [local, setLocal] = useState<FlipState | null>(null);
-  const state = (room?.view as FlipState | undefined) ?? local;
-  const practice = Boolean(local && !room);
+  const held = (!room && lobby.settlement?.game === "flip7" ? lobby.settlement.view : null) as FlipState | null;
+  const state = (room?.view as FlipState | undefined) ?? held ?? local;
+  const practice = Boolean(local && !room && !held);
   const youId = practice ? "you" : user?.id;
   const waiting = Boolean(state && state.phase === "lobby");
   const me = state ? state.players.find((p) => p.id === youId) ?? (waiting ? state.players[0] : currentFlip(state)) : null;
@@ -230,9 +232,12 @@ export function Flip7Page() {
   const statusText = (() => {
     if (!state || !me) return "";
     if (state.phase === "over") {
-      return state.winnerId
-        ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
-        : state.log.at(-1)?.text || "Game over";
+      return (
+        forfeitText(state) ||
+        (state.winnerId
+          ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+          : state.log.at(-1)?.text || "Game over")
+      );
     }
     if (freezeFx) return "Frozen!";
     if (flip7Fx) return "Flip 7! +15";

@@ -3917,3 +3917,266 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   );
   box-shadow: inset 0 0 0 10px #c4a07a;
 }
+
+/* Flying chess — classic four-corner airplane board */
+.table-ludo {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.table-ludo:has(> .coda-deal) {
+  justify-content: center;
+  align-items: center;
+}
+
+.fly-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.fly-board {
+  --fly-blue: #3d7dff;
+  --fly-red: #f04444;
+  --fly-yellow: #ffd21a;
+  --fly-green: #35c15a;
+  width: min(100%, 64dvh, 600px);
+  padding: 10px;
+  background: #8ec8f3;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(30, 60, 110, 0.08);
+}
+
+.fly-sheet {
+  background: #fbfcff;
+  border: 1px dashed rgba(70, 110, 150, 0.45);
+  padding: 6px;
+}
+
+.fly-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  grid-template-rows: repeat(15, 1fr);
+  aspect-ratio: 1;
+  background: #fbfcff;
+}
+
+.fly-jumps {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.fly-base {
+  position: relative;
+  z-index: 1;
+  margin: 8%;
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 8%;
+  padding: 9% 8% 12%;
+}
+
+.fly-base.blue { background: var(--fly-blue); }
+.fly-base.red { background: var(--fly-red); }
+.fly-base.yellow { background: var(--fly-yellow); }
+.fly-base.green { background: var(--fly-green); }
+
+.fly-ready {
+  position: absolute;
+  z-index: 2;
+  font-size: clamp(8px, 1.35vw, 12px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  line-height: 1;
+}
+
+.fly-base.blue .fly-ready { left: 10%; bottom: 5%; }
+.fly-base.red .fly-ready { left: 6%; top: 42%; }
+.fly-base.yellow .fly-ready { top: 5%; right: 8%; color: #6a5200; text-shadow: none; }
+.fly-base.green .fly-ready { right: 6%; top: 8%; }
+
+.fly-pad {
+  position: relative;
+  background: rgba(255, 255, 255, 0.94);
+  border: 2px solid rgba(20, 20, 20, 0.14);
+  border-radius: 50%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.fly-cell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.fly-cell .sq {
+  position: absolute;
+  inset: 1px;
+  border-radius: 2px;
+}
+
+.fly-cell.track .sq::after,
+.fly-cell.home:not(.finish) .sq::after {
+  content: "";
+  position: absolute;
+  inset: 18%;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.sq.c-blue { background: var(--fly-blue); }
+.sq.c-red { background: var(--fly-red); }
+.sq.c-yellow { background: var(--fly-yellow); }
+.sq.c-green { background: var(--fly-green); }
+
+.fly-cell.finish .sq { border-radius: 0; }
+.fly-cell.finish.dir-e .sq { clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.fly-cell.finish.dir-s .sq { clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.fly-cell.finish.dir-w .sq { clip-path: polygon(100% 0, 100% 100%, 0 50%); }
+.fly-cell.finish.dir-n .sq { clip-path: polygon(0 100%, 50% 0, 100% 100%); }
+
+.tri-se { clip-path: polygon(0 100%, 100% 0, 100% 100%); }
+.tri-sw { clip-path: polygon(0 0, 0 100%, 100% 100%); }
+.tri-nw { clip-path: polygon(0 0, 100% 0, 0 100%); }
+.tri-ne { clip-path: polygon(0 0, 100% 0, 100% 100%); }
+
+.fly-cell.hub .pinwheel {
+  inset: 16%;
+  border-radius: 50%;
+  background: conic-gradient(var(--fly-red) 0 90deg, var(--fly-yellow) 90deg 180deg, var(--fly-green) 180deg 270deg, var(--fly-blue) 270deg 360deg);
+}
+
+.fly-arrow {
+  position: absolute;
+  inset: 18%;
+  z-index: 3;
+  color: rgba(20, 20, 20, 0.62);
+  pointer-events: none;
+}
+
+.fly-plane {
+  position: absolute;
+  inset: 8%;
+  z-index: 5;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  line-height: 0;
+}
+
+.fly-plane svg { width: 100%; height: 100%; display: block; }
+.fly-plane.tone-blue { color: #2f6bff; }
+.fly-plane.tone-red { color: #ef3b3b; }
+.fly-plane.tone-yellow { color: #e6b000; }
+.fly-plane.tone-green { color: #1ea83a; }
+
+.fly-plane.is-legal {
+  cursor: pointer;
+  animation: fly-pick 1s ease-in-out infinite;
+}
+
+@keyframes fly-pick {
+  50% { filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 1px #111); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fly-plane.is-legal { animation: none; filter: drop-shadow(0 0 2px #fff); }
+}
+
+.fly-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 13px;
+}
+
+.fly-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.fly-legend li.on b { color: var(--ink); }
+.fly-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.fly-legend i.c-blue { background: var(--fly-blue, #3d7dff); }
+.fly-legend i.c-red { background: var(--fly-red, #f04444); }
+.fly-legend i.c-yellow { background: var(--fly-yellow, #ffd21a); }
+.fly-legend i.c-green { background: var(--fly-green, #35c15a); }
+
+.fly-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.fly-die {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #e7e7e7;
+  box-shadow: 0 3px 0 #ececec;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8px;
+}
+
+.fly-die-row { display: flex; justify-content: space-between; height: 8px; }
+.fly-die i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: transparent;
+  display: block;
+}
+.fly-die i.on { background: #1a1a1a; }
+
+.fly-preview { gap: 8px; }
+.fly-mini {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(0, 0, 0, 0.12);
+}
+.fly-mini svg { width: 26px; height: 26px; }
+.fly-mini.blue { background: #3d7dff; color: #fff; }
+.fly-mini.red { background: #f04444; color: #fff; }
+.fly-mini.yellow { background: #ffd21a; color: #fff; }
+.fly-mini.green { background: #35c15a; color: #fff; }
+.fly-mini.blue svg,
+.fly-mini.red svg,
+.fly-mini.yellow svg,
+.fly-mini.green svg { color: #fff; }

@@ -23,12 +23,15 @@ export type RoomSnap = {
   view: unknown;
 };
 
+export type Settlement = { game: string; view: unknown };
+
 export type LobbySnap = {
   online: OnlinePlayer[];
   invites: Invite[];
   room: RoomSnap | null;
   store?: "redis" | "memory";
   light?: boolean;
+  settlement?: Settlement | null;
 };
 
 async function call(token: string, path: string, init: RequestInit = {}): Promise<LobbySnap & Record<string, unknown>> {
@@ -58,8 +61,8 @@ export const GAME_LABEL: Record<string, string> = {
   werewolf: "Werewolf",
   roulette: "European Roulette",
   slots: "Slot Machine",
+  ludo: "Flying Chess",
   // Deferred
-  // ludo: "Flying Chess",
   // animal: "Animal Chess",
   // army: "Army Chess",
 };
@@ -134,8 +137,8 @@ export const GAME_PATH: Record<string, string> = {
   werewolf: "/play/werewolf",
   roulette: "/play/roulette",
   slots: "/play/slots",
+  ludo: "/play/ludo",
   // Deferred
-  // ludo: "/play/ludo",
   // animal: "/play/animal",
   // army: "/play/army",
 };

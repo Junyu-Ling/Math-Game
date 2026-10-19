@@ -16,6 +16,7 @@ import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
+import { forfeitText } from "../../lib/forfeit";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 export function AnimalPage() {
@@ -23,8 +24,9 @@ export function AnimalPage() {
   const lobby = useLobby();
   const room = lobby.room?.game === "animal" ? lobby.room : null;
   const [local, setLocal] = useState<AState | null>(null);
-  const state = (room?.view as AState | undefined) ?? local;
-  const practice = Boolean(local && !room);
+  const held = (!room && lobby.settlement?.game === "animal" ? lobby.settlement.view : null) as AState | null;
+  const state = (room?.view as AState | undefined) ?? held ?? local;
+  const practice = Boolean(local && !room && !held);
   const youId = practice ? "you" : user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const myTurn = Boolean(state && me && state.players[state.turn]?.id === me.id && state.phase === "play");
@@ -105,7 +107,7 @@ export function AnimalPage() {
             <div className="kaiji-board-wrap">
               <p className="status-line">
                 {state.phase === "over"
-                  ? `${state.players.find((p) => p.id === state.winnerId)?.name} wins`
+                  ? forfeitText(state) || `${state.players.find((p) => p.id === state.winnerId)?.name} wins`
                   : `${state.players[state.turn]?.name}'s turn`}
               </p>
               <div className="animal-board">

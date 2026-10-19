@@ -46,8 +46,11 @@ const RULES: Record<string, string[]> = {
     "Black fouls: double live three (two live threes), double live four (two live fours with both ends open), or overline (six+). A blocked line is not live — sleeping threes and rush fours do not count. Exact five wins. White has no fouls.",
   ],
   ludo: [
-    "Two-player flying chess. Each has four pieces. Roll a die to move.",
-    "Need a 6 to leave base. Exact count to enter home. First to park all four wins. Rolling 6 grants another roll.",
+    "2–4 players. Each color has four planes. Practice is you (blue) against a red CPU. Open a table for a full set of seats.",
+    "Roll a die. A 6 takes one plane from the hangar onto your ready square, or moves a plane 6 steps. A 6 gives another roll, up to three sixes; the third six still moves, then the turn passes.",
+    "Move clockwise on the shared track, then along your own colored home stretch. You need an exact roll to land on the center. First to bring all four planes home wins.",
+    "Landing on one opponent plane sends it back to its hangar. Two or more of your own planes on a square stack into a block — opponents cannot land there, but they can move past it. Each plane still moves on its own.",
+    "Colored dotted lines are fly shortcuts. Land exactly on your color’s arrow at the start of the line and you jump to the far end, closer to home. Passing over that square does not jump. Other colors cannot use your line.",
   ],
   animal: [
     "Dou Shou Qi on a 7×9 board with rivers, traps, and dens.",

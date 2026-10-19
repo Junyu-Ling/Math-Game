@@ -1,163 +1,364 @@
 import { uid } from "../../lib/shuffle";
 
-/** Simplified 2-player Chinese flying chess / Ludo race. */
-export type LPiece = { id: string; track: number; home: boolean }; // track -1 = base, 0..47 path, home done
-export type LPlayer = { id: string; name: string; human: boolean; pieces: LPiece[]; finished: number };
+/**
+ * Chinese airplane chess (飞行棋).
+ * 15×15 cross: shared clockwise track of 52, then 6 private home squares.
+ * Relative pos: -1 hangar, 0 ready square, 1–50 rest of the outer track,
+ * 51–55 home approach, 56 center (exact roll).
+ * Landing exactly on relative 17 flies to relative 31 along that color's dotted line.
+ */
+
+export const COLORS = ["blue", "red", "yellow", "green"] as const;
+export type FlyColor = (typeof COLORS)[number];
+
+export const TRACK: ReadonlyArray<readonly [number, number]> = [
+  [0, 6], [0, 7], [0, 8],
+  [1, 8], [2, 8], [3, 8], [4, 8], [5, 8],
+  [6, 9], [6, 10], [6, 11], [6, 12], [6, 13], [6, 14],
+  [7, 14], [8, 14],
+  [8, 13], [8, 12], [8, 11], [8, 10], [8, 9],
+  [9, 8], [10, 8], [11, 8], [12, 8], [13, 8], [14, 8],
+  [14, 7], [14, 6],
+  [13, 6], [12, 6], [11, 6], [10, 6], [9, 6],
+  [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0],
+  [7, 0], [6, 0],
+  [6, 1], [6, 2], [6, 3], [6, 4], [6, 5],
+  [5, 6], [4, 6], [3, 6], [2, 6], [1, 6],
+];
+
+/** Blue, red, yellow, green — index of each ready square on TRACK. */
+export const START_AT = [42, 3, 16, 29] as const;
+
+/** Six home squares per color, last one is the center finish. */
+export const HOME: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
+  [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6]],
+  [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]],
+  [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9], [7, 8]],
+  [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7], [8, 7]],
+];
+
+export const FLY_FROM = 17;
+export const FLY_TO = 31;
+export const LAST_OUTER = 50;
+export const FINISH = 56;
+export const MAX_SIXES = 3;
+
+const PAINT: FlyColor[] = ["red", "yellow", "blue", "green"];
+
+export type LPlane = { id: string; slot: number; pos: number };
+export type LPlayer = { id: string; name: string; human: boolean; color: FlyColor; planes: LPlane[] };
 export type LState = {
   players: LPlayer[];
   turn: number;
   dice: number | null;
-  phase: "roll" | "move" | "over";
+  /** Sixes already resolved earlier in this turn. */
+  sixes: number;
+  phase: "lobby" | "roll" | "move" | "over";
   winnerId: string | null;
   log: Array<{ id: string; text: string }>;
 };
-export type LAction = { type: "roll" } | { type: "move"; pieceId: string };
+export type LAction = { type: "roll" } | { type: "move"; pieceId: string } | { type: "start" };
 
-const PATH = 48;
-const ENTRY = [0, 24] as const;
+type Landing = { pos: number; flew: boolean; captures: string[] };
+type Dir = "e" | "s" | "w" | "n";
 
-function pieces(): LPiece[] {
-  return Array.from({ length: 4 }, (_, i) => ({ id: uid(`p${i}`), track: -1, home: false }));
+function trackCell(index: number): readonly [number, number] {
+  const n = TRACK.length;
+  return TRACK[((index % n) + n) % n] ?? [0, 6];
+}
+
+export function trackColor(index: number): FlyColor {
+  return PAINT[index % PAINT.length] ?? "blue";
+}
+
+export function startTrackIndex(colorIdx: number): number {
+  return START_AT[colorIdx] ?? 0;
+}
+
+export function flyTrackIndex(colorIdx: number): number {
+  return (startTrackIndex(colorIdx) + FLY_FROM) % TRACK.length;
+}
+
+export function trackIndex(colorIdx: number, pos: number): number | null {
+  if (pos < 0 || pos > LAST_OUTER) return null;
+  return (startTrackIndex(colorIdx) + pos) % TRACK.length;
+}
+
+export function planeCell(colorIdx: number, pos: number): { r: number; c: number } | null {
+  if (pos < 0) return null;
+  if (pos <= LAST_OUTER) {
+    const cell = trackCell(trackIndex(colorIdx, pos) ?? 0);
+    return { r: cell[0], c: cell[1] };
+  }
+  if (pos > FINISH) return null;
+  const cell = HOME[colorIdx]?.[pos - (LAST_OUTER + 1)];
+  if (!cell) return null;
+  return { r: cell[0], c: cell[1] };
+}
+
+function dirOf(dr: number, dc: number): Dir {
+  if (Math.abs(dc) > Math.abs(dr)) return dc > 0 ? "e" : "w";
+  return dr > 0 ? "s" : "n";
+}
+
+export function trackDir(index: number): Dir {
+  const here = trackCell(index);
+  const next = trackCell(index + 1);
+  return dirOf(next[0] - here[0], next[1] - here[1]);
+}
+
+export function flyDir(colorIdx: number): Dir {
+  const from = trackCell(flyTrackIndex(colorIdx));
+  const to = trackCell(startTrackIndex(colorIdx) + FLY_TO);
+  return dirOf(to[0] - from[0], to[1] - from[1]);
+}
+
+export function homeDir(colorIdx: number): Dir {
+  return (["e", "s", "w", "n"] as const)[colorIdx] ?? "e";
+}
+
+export function planeHeading(colorIdx: number, pos: number): number {
+  if (pos < 0) return [90, 180, -90, 0][colorIdx] ?? 0;
+  if (pos >= FINISH) return [0, 90, 180, -90][colorIdx] ?? 0;
+  const here = planeCell(colorIdx, pos);
+  const next = planeCell(colorIdx, pos + 1);
+  if (!here || !next) return 0;
+  const dir = dirOf(next.r - here.r, next.c - here.c);
+  if (dir === "e") return 0;
+  if (dir === "s") return 90;
+  if (dir === "w") return 180;
+  return -90;
+}
+
+export function homeCount(player: LPlayer): number {
+  return player.planes.filter((p) => p.pos === FINISH).length;
+}
+
+function colorIdxOf(player: LPlayer): number {
+  const i = COLORS.indexOf(player.color);
+  return i < 0 ? 0 : i;
+}
+
+function occupants(state: LState, abs: number, ignoreId: string) {
+  const found: Array<{ playerIdx: number; plane: LPlane }> = [];
+  state.players.forEach((pl, playerIdx) => {
+    const ci = colorIdxOf(pl);
+    for (const plane of pl.planes) {
+      if (plane.id === ignoreId) continue;
+      if (trackIndex(ci, plane.pos) === abs) found.push({ playerIdx, plane });
+    }
+  });
+  return found;
+}
+
+function landingAt(state: LState, moverIdx: number, abs: number, ignoreId: string): { blocked: boolean; captures: string[] } {
+  const foes = occupants(state, abs, ignoreId).filter((o) => o.playerIdx !== moverIdx);
+  if (foes.length >= 2) return { blocked: true, captures: [] };
+  if (foes.length === 1) return { blocked: false, captures: [foes[0]!.plane.id] };
+  return { blocked: false, captures: [] };
+}
+
+function planMove(state: LState, moverIdx: number, plane: LPlane, dice: number): Landing | null {
+  const ci = colorIdxOf(state.players[moverIdx]!);
+  if (plane.pos < 0) {
+    if (dice !== 6) return null;
+    const gate = landingAt(state, moverIdx, trackIndex(ci, 0) ?? 0, plane.id);
+    if (gate.blocked) return null;
+    return { pos: 0, flew: false, captures: gate.captures };
+  }
+  if (plane.pos >= FINISH) return null;
+  const raw = plane.pos + dice;
+  if (raw > FINISH) return null;
+  if (raw > LAST_OUTER) return { pos: raw, flew: false, captures: [] };
+  if (raw === FLY_FROM) {
+    const entrance = landingAt(state, moverIdx, trackIndex(ci, FLY_FROM) ?? 0, plane.id);
+    if (entrance.blocked) return null;
+    const exit = landingAt(state, moverIdx, trackIndex(ci, FLY_TO) ?? 0, plane.id);
+    if (!exit.blocked) {
+      return { pos: FLY_TO, flew: true, captures: [...entrance.captures, ...exit.captures] };
+    }
+    return { pos: FLY_FROM, flew: false, captures: entrance.captures };
+  }
+  const land = landingAt(state, moverIdx, trackIndex(ci, raw) ?? 0, plane.id);
+  if (land.blocked) return null;
+  return { pos: raw, flew: false, captures: land.captures };
+}
+
+export function legalMoves(state: LState, playerIdx: number): string[] {
+  if (state.phase !== "move" || state.dice == null) return [];
+  const me = state.players[playerIdx];
+  if (!me) return [];
+  const out: string[] = [];
+  for (const plane of me.planes) {
+    if (planMove(state, playerIdx, plane, state.dice)) out.push(plane.id);
+  }
+  return out;
+}
+
+function makePlayer(p: { id: string; name: string; human?: boolean }, index: number): LPlayer {
+  const color = COLORS[index] ?? "blue";
+  return {
+    id: p.id,
+    name: p.name,
+    human: p.human !== false,
+    color,
+    planes: [0, 1, 2, 3].map((slot) => ({ id: uid(`p${index}${slot}`), slot, pos: -1 })),
+  };
+}
+
+export function startLudoLobby(people: Array<{ id: string; name: string; human?: boolean }>): LState {
+  const players = people.slice(0, 4).map(makePlayer);
+  return {
+    players,
+    turn: 0,
+    dice: null,
+    sixes: 0,
+    phase: "lobby",
+    winnerId: null,
+    log: [{ id: uid("l"), text: `Table ${players.length}/4. Host starts at 2–4. Roll 6 to take off.` }],
+  };
+}
+
+export function startLudoTable(people: Array<{ id: string; name: string; human?: boolean }>): LState {
+  const seated = people.slice(0, 4);
+  if (seated.length < 2) return startLudoLobby(seated);
+  const players = seated.map(makePlayer);
+  return {
+    players,
+    turn: 0,
+    dice: null,
+    sixes: 0,
+    phase: "roll",
+    winnerId: null,
+    log: [
+      {
+        id: uid("l"),
+        text: `${players.map((p) => `${p.name} (${p.color})`).join(" · ")}. Roll 6 to leave the hangar. First to bring all 4 planes home wins.`,
+      },
+    ],
+  };
+}
+
+export function startLudoPractice(): LState {
+  return startLudoTable([
+    { id: "you", name: "YOU", human: true },
+    { id: "cpu-1", name: "CPU", human: false },
+  ]);
 }
 
 export function startLudoDuel(
   a: { id: string; name: string; human?: boolean },
   b: { id: string; name: string; human?: boolean },
 ): LState {
-  return {
-    players: [
-      { id: a.id, name: a.name, human: a.human !== false, pieces: pieces(), finished: 0 },
-      { id: b.id, name: b.name, human: b.human !== false, pieces: pieces(), finished: 0 },
-    ],
-    turn: 0,
-    dice: null,
-    phase: "roll",
-    winnerId: null,
-    log: [{ id: uid("l"), text: `${a.name} vs ${b.name}. Roll 6 to leave base. First to land all 4 home wins.` }],
-  };
+  return startLudoTable([
+    { id: a.id, name: a.name, human: a.human !== false },
+    { id: b.id, name: b.name, human: b.human !== false },
+  ]);
 }
 
-export function startLudoPractice(): LState {
-  return startLudoDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });
+function endTurn(state: LState, log: LState["log"]): LState {
+  const n = Math.max(1, state.players.length);
+  return { ...state, log, phase: "roll", sixes: 0, turn: (state.turn + 1) % n };
 }
 
-function absPos(playerIdx: number, track: number) {
-  if (track < 0) return -1;
-  return (ENTRY[playerIdx]! + track) % PATH;
+function applyLanding(state: LState, moverIdx: number, planeId: string, landing: Landing): LPlayer[] {
+  const capture = new Set(landing.captures);
+  return state.players.map((pl, pi) => ({
+    ...pl,
+    planes: pl.planes.map((plane) => {
+      if (capture.has(plane.id)) return { ...plane, pos: -1 };
+      if (pi === moverIdx && plane.id === planeId) return { ...plane, pos: landing.pos };
+      return plane;
+    }),
+  }));
 }
 
-export function legalMoves(state: LState, playerIdx: number): string[] {
-  const dice = state.dice;
-  if (dice == null) return [];
-  const me = state.players[playerIdx]!;
-  const out: string[] = [];
-  for (const p of me.pieces) {
-    if (p.home) continue;
-    if (p.track < 0) {
-      if (dice === 6) out.push(p.id);
-      continue;
-    }
-    const next = p.track + dice;
-    if (next === PATH) out.push(p.id);
-    else if (next < PATH) out.push(p.id);
+function capturedNames(state: LState, ids: string[]): string[] {
+  const names: string[] = [];
+  for (const id of ids) {
+    const owner = state.players.find((p) => p.planes.some((pl) => pl.id === id));
+    if (owner && !names.includes(owner.name)) names.push(owner.name);
   }
-  return out;
+  return names;
 }
 
-function bump(state: LState, moverIdx: number, abs: number): LPlayer[] {
-  return state.players.map((pl, i) => {
-    if (i === moverIdx) return pl;
-    return {
-      ...pl,
-      pieces: pl.pieces.map((p) => {
-        if (p.home || p.track < 0) return p;
-        if (absPos(i, p.track) === abs) return { ...p, track: -1 };
-        return p;
-      }),
-    };
-  });
+export function applyLudoRoll(state: LState, actorId: string, dice: number): LState {
+  if (state.phase === "over" || state.phase === "lobby") return state;
+  const me = state.players[state.turn];
+  if (!me || me.id !== actorId) return state;
+  if (state.phase === "move") {
+    if (legalMoves(state, state.turn).length === 0) {
+      return endTurn(state, [...state.log, { id: uid("l"), text: "No legal move." }]);
+    }
+    return state;
+  }
+  const face = Math.trunc(dice);
+  if (face < 1 || face > 6) return state;
+  const rolled: LState = {
+    ...state,
+    dice: face,
+    phase: "move",
+    log: [...state.log, { id: uid("l"), text: `${me.name} rolls ${face}.` }],
+  };
+  if (legalMoves(rolled, state.turn).length === 0) {
+    return endTurn(rolled, [...rolled.log, { id: uid("l"), text: "No legal move." }]);
+  }
+  return rolled;
 }
 
 export function applyLudoAction(state: LState, actorId: string, action: LAction): LState {
   if (state.phase === "over") return state;
+  if (!state.players.some((p) => p.id === actorId)) return state;
+
+  if (state.phase === "lobby") {
+    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 2) {
+      return startLudoTable(state.players);
+    }
+    return state;
+  }
+
   const me = state.players[state.turn];
   if (!me || me.id !== actorId) return state;
 
-  if (action.type === "roll" && state.phase === "roll") {
-    const dice = 1 + Math.floor(Math.random() * 6);
-    const next: LState = {
-      ...state,
-      dice,
-      phase: "move",
-      log: [...state.log, { id: uid("l"), text: `${me.name} rolls ${dice}.` }],
-    };
-    if (legalMoves(next, state.turn).length === 0) {
-      return {
-        ...next,
-        dice: null,
-        phase: "roll",
-        turn: (state.turn + 1) % 2,
-        log: [...next.log, { id: uid("l"), text: "No legal move." }],
-      };
-    }
-    return next;
+  if (action.type === "roll") {
+    const face = 1 + Math.floor(Math.random() * 6);
+    return applyLudoRoll(state, actorId, face);
   }
 
-  if (action.type === "move" && state.phase === "move" && state.dice != null) {
-    const legal = legalMoves(state, state.turn);
-    if (!legal.includes(action.pieceId)) return state;
-    const dice = state.dice;
-    let players = state.players.map((pl, i) => {
-      if (i !== state.turn) return pl;
-      return {
-        ...pl,
-        pieces: pl.pieces.map((p) => {
-          if (p.id !== action.pieceId) return p;
-          if (p.track < 0) return { ...p, track: 0 };
-          const next = p.track + dice;
-          if (next === PATH) return { ...p, track: PATH, home: true };
-          return { ...p, track: next };
-        }),
-      };
-    });
-    const moved = players[state.turn]!.pieces.find((p) => p.id === action.pieceId)!;
-    if (!moved.home && moved.track >= 0) {
-      players = bump({ ...state, players }, state.turn, absPos(state.turn, moved.track));
-    }
-    const finisher = {
-      ...players[state.turn]!,
-      finished: players[state.turn]!.pieces.filter((p) => p.home).length,
-    };
-    players = players.map((p, i) => (i === state.turn ? finisher : p));
-    if (finisher.finished >= 4) {
-      return {
-        ...state,
-        players,
-        dice: null,
-        phase: "over",
-        winnerId: me.id,
-        log: [...state.log, { id: uid("l"), text: `${me.name} gets all pieces home!` }],
-      };
-    }
-    const extra = dice === 6;
+  if (action.type !== "move" || state.phase !== "move" || state.dice == null) return state;
+  const plane = me.planes.find((p) => p.id === action.pieceId);
+  if (!plane) return state;
+  const landing = planMove(state, state.turn, plane, state.dice);
+  if (!landing) return state;
+
+  const players = applyLanding(state, state.turn, plane.id, landing);
+  const mover = players[state.turn];
+  const parked = mover ? homeCount(mover) : 0;
+  const sent = capturedNames(state, landing.captures);
+  const won = Boolean(mover && mover.planes.every((p) => p.pos === FINISH));
+  let text = plane.pos < 0 ? `${me.name} takes off` : landing.pos === FINISH ? `${me.name} parks a plane (${parked}/4)` : `${me.name} moves`;
+  if (landing.flew) text += " · flies the dotted shortcut";
+  if (sent.length) text += ` · sends ${sent.join(" & ")} back to the hangar`;
+  text += ".";
+  if (!won && state.dice === 6 && state.sixes + 1 < MAX_SIXES) text += " Rolls again.";
+  if (!won && state.dice === 6 && state.sixes + 1 >= MAX_SIXES) text += " Three sixes — turn passes.";
+  const log = [...state.log, { id: uid("l"), text }];
+
+  if (won && mover) {
     return {
       ...state,
       players,
-      dice: null,
-      phase: "roll",
-      turn: extra ? state.turn : (state.turn + 1) % 2,
-      log: [
-        ...state.log,
-        {
-          id: uid("l"),
-          text: moved.home
-            ? `${me.name} lands a piece home.`
-            : `${me.name} moves a piece${extra ? " · rolls again" : ""}.`,
-        },
-      ],
+      phase: "over",
+      winnerId: mover.id,
+      sixes: 0,
+      log: [...log, { id: uid("l"), text: `${mover.name} brings all 4 planes home.` }],
     };
   }
-  return state;
+  const moved: LState = { ...state, players, log };
+  if (state.dice === 6 && state.sixes + 1 < MAX_SIXES) {
+    return { ...moved, phase: "roll", turn: state.turn, sixes: state.sixes + 1 };
+  }
+  return endTurn(moved, log);
 }
 
 export function viewLudo(state: LState, _viewerId: string): LState {
@@ -165,44 +366,26 @@ export function viewLudo(state: LState, _viewerId: string): LState {
 }
 
 export function aiLudo(state: LState): LAction {
-  if (state.phase === "roll") return { type: "roll" };
+  if (state.phase !== "move" || state.dice == null) return { type: "roll" };
+  const me = state.players[state.turn];
   const moves = legalMoves(state, state.turn);
-  // Prefer finishing, then leaving base, then farthest.
-  const me = state.players[state.turn]!;
-  const scored = moves.map((id) => {
-    const p = me.pieces.find((x) => x.id === id)!;
-    let score = p.track;
-    if (state.dice != null && p.track >= 0 && p.track + state.dice === PATH) score = 100;
-    if (p.track < 0) score = 50;
-    return { id, score };
-  });
-  scored.sort((a, b) => b.score - a.score);
-  return { type: "move", pieceId: scored[0]!.id };
-}
-
-export function pieceCell(playerIdx: number, piece: LPiece): { r: number; c: number } | null {
-  if (piece.home) return playerIdx === 0 ? { r: 5, c: 5 } : { r: 5, c: 5 };
-  if (piece.track < 0) {
-    const nest = playerIdx === 0 ? [0, 0] : [0, 9];
-    const offsets = [
-      [0, 0],
-      [0, 1],
-      [1, 0],
-      [1, 1],
-    ];
-    const idx = Number(piece.id.slice(-1)) % 4;
-    const o = offsets[idx] || [0, 0];
-    return { r: nest[0]! + o[0]!, c: nest[1]! + o[1]! };
+  if (!me || moves.length === 0) return { type: "roll" };
+  let best = moves[0]!;
+  let bestScore = -Infinity;
+  for (const id of moves) {
+    const plane = me.planes.find((p) => p.id === id);
+    if (!plane) continue;
+    const landing = planMove(state, state.turn, plane, state.dice);
+    if (!landing) continue;
+    let score = landing.pos;
+    if (landing.pos === FINISH) score += 2000;
+    if (landing.captures.length) score += 800;
+    if (landing.flew) score += 500;
+    if (plane.pos < 0) score += 450;
+    if (score > bestScore) {
+      bestScore = score;
+      best = id;
+    }
   }
-  // Map 0..47 onto an 11x11 ring-ish path (simplified visual).
-  const ring: Array<[number, number]> = [];
-  for (let c = 0; c < 11; c++) ring.push([0, c]);
-  for (let r = 1; r < 11; r++) ring.push([r, 10]);
-  for (let c = 9; c >= 0; c--) ring.push([10, c]);
-  for (let r = 9; r >= 1; r--) ring.push([r, 0]);
-  // pad/trim to PATH
-  while (ring.length < PATH) ring.push(ring[ring.length - 1]!);
-  const abs = absPos(playerIdx, piece.track) % ring.length;
-  const [r, c] = ring[abs]!;
-  return { r, c };
+  return { type: "move", pieceId: best };
 }

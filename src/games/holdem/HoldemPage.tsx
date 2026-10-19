@@ -20,8 +20,9 @@ export function HoldemPage() {
   const lobby = useLobby();
   const room = lobby.room?.game === "holdem" ? lobby.room : null;
   const [local, setLocal] = useState<HoldemState | null>(null);
-  const state = (room?.view as HoldemState | undefined) ?? local;
-  const practice = Boolean(local && !room);
+  const held = (!room && lobby.settlement?.game === "holdem" ? lobby.settlement.view : null) as HoldemState | null;
+  const state = (room?.view as HoldemState | undefined) ?? held ?? local;
+  const practice = Boolean(local && !room && !held);
   const youId = practice ? "you" : user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
@@ -173,7 +174,7 @@ export function HoldemPage() {
                   ))}
                 </div>
                 <div className="row-actions">
-                  {state.street === "showdown" ? (
+                  {state.street === "over" ? null : state.street === "showdown" ? (
                     <button className="btn" type="button" onClick={() => act({ type: "next" })}>
                       Next hand
                     </button>

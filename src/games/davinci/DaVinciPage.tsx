@@ -36,6 +36,7 @@ import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 import { measureFit } from "../../components/FitCards";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
+import { forfeitText } from "../../lib/forfeit";
 import { InvitePanel } from "../../components/InvitePanel";
 import { GameRules } from "../../components/GameRules";
 import { LobbyDecor } from "../../components/LobbyDecor";
@@ -54,6 +55,8 @@ function statusText(state: CodaState, myTurn: boolean, remain: number, matching:
     return `Opening mix. Ready ${ready}/${state.players.length} — game starts when everyone is ready (2–4).`;
   }
   if (state.phase === "over") {
+    const forfeited = forfeitText(state);
+    if (forfeited) return forfeited;
     const w = state.players.find((p) => p.id === state.winnerId);
     return w ? `Showdown — all codes revealed. ${w.name} wins.` : "Showdown — all codes revealed.";
   }
@@ -375,6 +378,7 @@ export function DaVinciPage() {
   const { user } = useAuth();
   const lobby = useLobby();
   const codaRoom = lobby.room?.game === "coda" ? lobby.room : null;
+  const heldCoda = (!codaRoom && lobby.settlement?.game === "coda" ? lobby.settlement.view : null) as CodaState | null;
   const [jokers, setJokers] = useState(true);
   const [blackN, setBlackN] = useState(2);
   const [whiteN, setWhiteN] = useState(2);
@@ -501,7 +505,7 @@ export function DaVinciPage() {
   }, [state?.phase, state?.winnerId, you?.id]);
 
   useEffect(() => {
-    if (!state || online) return;
+    if (!state || online || heldCoda) return;
     if (!me || me.human || state.phase === "over" || arranging || state.phase === "rps" || state.phase === "lobby") return;
     let stop = false;
     (async () => {
@@ -543,7 +547,7 @@ export function DaVinciPage() {
     return () => {
       stop = true;
     };
-  }, [state, me, arranging, online, you?.id]);
+  }, [state, me, arranging, online, heldCoda, you?.id]);
 
   const numbers = useMemo(() => Array.from({ length: 12 }, (_, i) => i), []);
   const ownOpeningDash = Boolean(opening && you?.stash);
@@ -602,8 +606,15 @@ export function DaVinciPage() {
     setYouId(null);
     endsAtRef.current = null;
     prevLog.current = 0;
+    lobby.clearSettlement();
     if (codaRoom) void lobby.leave();
   }
+
+  useLayoutEffect(() => {
+    if (codaRoom || !heldCoda) return;
+    setYouId(user?.id ?? null);
+    setState(heldCoda);
+  }, [codaRoom, heldCoda, user?.id]);
 
   useEffect(() => {
     if (!codaRoom) return;

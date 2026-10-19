@@ -22,6 +22,7 @@ import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
+import { forfeitText } from "../../lib/forfeit";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 function aroundYou<T extends { id: string }>(players: T[], youId: string) {
@@ -95,8 +96,9 @@ export function HalliGalliPage() {
   const lobby = useLobby();
   const room = lobby.room?.game === "halli" ? lobby.room : null;
   const [local, setLocal] = useState<HalliState | null>(null);
-  const state = (room?.view as HalliState | undefined) ?? local;
-  const practice = Boolean(local && !room);
+  const held = (!room && lobby.settlement?.game === "halli" ? lobby.settlement.view : null) as HalliState | null;
+  const state = (room?.view as HalliState | undefined) ?? held ?? local;
+  const practice = Boolean(local && !room && !held);
   const youId = practice ? "you" : user?.id;
   const waiting = Boolean(state && state.phase === "lobby");
   const me = state ? state.players.find((p) => p.id === youId) ?? (waiting ? state.players[0] : null) : null;
@@ -247,9 +249,10 @@ export function HalliGalliPage() {
                 </button>
                 <div className="status-line">
                   {state.phase === "over"
-                    ? state.winnerId
-                      ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
-                      : state.log.at(-1)?.text || "Game over"
+                    ? forfeitText(state) ||
+                      (state.winnerId
+                        ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+                        : state.log.at(-1)?.text || "Game over")
                     : hot
                       ? `Five ${HALLI_LABEL[hot].toLowerCase()} — ring now!`
                       : myTurn

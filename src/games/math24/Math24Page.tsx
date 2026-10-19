@@ -15,8 +15,9 @@ export function Math24Page() {
   const lobby = useLobby();
   const room = lobby.room?.game === "m24" ? lobby.room : null;
   const [local, setLocal] = useState<M24DuelState | null>(null);
-  const state = (room?.view as M24DuelState | undefined) ?? local;
-  const practice = Boolean(local && !room);
+  const held = (!room && lobby.settlement?.game === "m24" ? lobby.settlement.view : null) as M24DuelState | null;
+  const state = (room?.view as M24DuelState | undefined) ?? held ?? local;
+  const practice = Boolean(local && !room && !held);
   const [used, setUsed] = useState<boolean[]>([false, false, false, false]);
   const [expr, setExpr] = useState("");
   const youId = practice ? "you" : user?.id;

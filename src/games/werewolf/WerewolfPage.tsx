@@ -18,6 +18,7 @@ import { GameRules } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
+import { forfeitText } from "../../lib/forfeit";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 function phaseLabel(phase: WolfPhase, day: number) {
@@ -64,8 +65,9 @@ export function WerewolfPage() {
   const room = lobby.room?.game === "werewolf" ? lobby.room : null;
   const [local, setLocal] = useState<WState | null>(null);
   const [poisonPick, setPoisonPick] = useState<string | null>(null);
-  const state = (room?.view as WState | undefined) ?? local;
-  const practice = Boolean(local && !room);
+  const held = (!room && lobby.settlement?.game === "werewolf" ? lobby.settlement.view : null) as WState | null;
+  const state = (room?.view as WState | undefined) ?? held ?? local;
+  const practice = Boolean(local && !room && !held);
   const youId = practice ? "you" : user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const waiting = Boolean(state?.phase === "lobby");
@@ -183,9 +185,7 @@ export function WerewolfPage() {
                 <p className="kicker">{phaseLabel(state.phase, state.day)}</p>
                 <h2>
                   {state.phase === "over"
-                    ? state.winner === "wolves"
-                      ? "Werewolves win"
-                      : "Village wins"
+                    ? forfeitText(state) || (state.winner === "wolves" ? "Werewolves win" : "Village wins")
                     : me.alive
                       ? `You are ${roleLabel(me.role)}`
                       : "You are out"}
@@ -333,7 +333,7 @@ export function WerewolfPage() {
 
                 {state.phase === "over" ? (
                   <p className="status-line">
-                    {state.winner === "wolves" ? "Pack takes the village." : "The village holds."}
+                    {forfeitText(state) || (state.winner === "wolves" ? "Pack takes the village." : "The village holds.")}
                   </p>
                 ) : null}
 

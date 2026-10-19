@@ -1,6 +1,7 @@
 import Redis from "ioredis";
 import { loadMods } from "./game-mods.mjs";
 import { rapfiAvailable, rapfiSuggest } from "./rapfi.mjs";
+import { SOLO_GAMES, applyForfeit, isLiveMatchState, isLobbyState, withForfeitView } from "./forfeit.mjs";
 
 const ONLINE_SEC = 20;
 const INVITE_SEC = 60;
@@ -25,10 +26,6 @@ function tableMax(game) {
   if (game === "gomoku" || game === "ecard" || game === "bj" || game === "m24" || game === "holdem")
     return 2;
   return 4;
-}
-
-function isLobbyState(state) {
-  return Boolean(state && (state.phase === "lobby" || state.street === "lobby"));
 }
 
 function isCpuId(id) {
@@ -702,13 +699,25 @@ export async function snapshot(userId, light = false) {
   const rid = await getSeat(userId);
   let room = null;
   if (rid) {
-    const rec = await attachMods(await getRoomRecord(rid));
+    let rec = await attachMods(await getRoomRecord(rid));
     if (rec) {
-      await expireArrange(rec);
-      room = publicRoom(rec, userId);
+      rec = await forfeitIfAbsent(rec, String(userId));
+      if (rec) {
+        await expireArrange(rec);
+        room = publicRoom(rec, userId);
+      }
     }
   }
-  return { online, invites, room, store: lobbyStoreKind(), light: Boolean(light) };
+  const pending = await readJson(`axiom:result:${userId}`);
+  if (pending?.game) await kvDel(`axiom:result:${userId}`);
+  return {
+    online,
+    invites,
+    room,
+    store: lobbyStoreKind(),
+    light: Boolean(light),
+    settlement: pending?.game ? pending : null,
+  };
 }
 
 async function expireArrange(room) {
@@ -894,6 +903,7 @@ function newLobbyState(game, people, mods, meta) {
   if (game === "m24") return mods.m24.startM24Lobby(people);
   if (game === "holdem") return mods.holdem.startHoldemLobby(people);
   if (game === "werewolf") return mods.werewolf.startWerewolfLobby(people);
+  if (game === "ludo") return mods.ludo.startLudoLobby(people);
   throw new Error("Unknown table game");
 }
 
@@ -908,6 +918,7 @@ function rebuildLobby(rec, joiner, mods) {
   if (rec.game === "m24") return mods.m24.startM24Lobby(people);
   if (rec.game === "holdem") return mods.holdem.startHoldemLobby(people);
   if (rec.game === "werewolf") return mods.werewolf.startWerewolfLobby(people);
+  if (rec.game === "ludo") return mods.ludo.startLudoLobby(people);
   if (rec.game === "coda") {
     let state = mods.coda.startCodaLobby(people, Boolean(rec.state?.useJokers));
     for (const p of rec.state.players || []) {
@@ -1026,6 +1037,11 @@ function cpuIsToAct(room) {
       return s.players.some((p) => isCpuPlayer(p) && p.alive && !p.voteFor);
     }
     return false;
+  }
+  if (room.game === "ludo") {
+    if (s.phase !== "roll" && s.phase !== "move") return false;
+    const cur = s.players[s.turn];
+    return Boolean(isCpuPlayer(cur));
   }
   return false;
 }
@@ -1249,6 +1265,15 @@ async function playOneCpuTurn(room) {
     return true;
   }
 
+  if (room.game === "ludo") {
+    const cur = s.players[s.turn];
+    if (!cur || !isCpuPlayer(cur)) return false;
+    const next = mods.ludo.applyLudoAction(s, cur.id, mods.ludo.aiLudo(s));
+    if (next === s) return false;
+    room.state = next;
+    return true;
+  }
+
   return false;
 }
 
@@ -1263,6 +1288,7 @@ const OPEN_TABLES = new Set([
   "m24",
   "holdem",
   "werewolf",
+  "ludo",
 ]);
 
 export async function applyRoomAction(user, roomId, action, mods) {
@@ -1316,32 +1342,100 @@ export async function applyRoomAction(user, roomId, action, mods) {
   return publicRoom(room, user.id);
 }
 
+async function releaseSeat(rec, userId) {
+  const id = String(userId);
+  await kvDel(`axiom:seat:${id}`);
+  if (!rec?.id) return null;
+  const loaded = await attachMods(await getRoomRecord(rec.id));
+  const fresh = loaded || rec;
+  if (rec.state?.forfeit && !fresh.state?.forfeit) {
+    fresh.state = rec.state;
+    fresh.endsAt = null;
+  }
+  const seats = [];
+  for (const sid of fresh.seats || []) {
+    if (String(sid) === id) continue;
+    if (isCpuId(sid)) {
+      seats.push(sid);
+      continue;
+    }
+    if ((await getSeat(sid)) === fresh.id) seats.push(sid);
+  }
+  fresh.seats = seats;
+  fresh.cpuReadyAt = null;
+  if (!humanSeatIds(seats).length) {
+    await kvDel(`axiom:room:${fresh.id}`);
+    await wakeUsers(humanSeatIds(rec.seats || []));
+    rec.seats = seats;
+    return null;
+  }
+  fresh.seq = (fresh.seq || 0) + 1;
+  await saveRoom(fresh);
+  Object.assign(rec, fresh);
+  return fresh;
+}
+
+/** A seated human whose presence expired mid-match loses at once. */
+async function forfeitIfAbsent(rec, exceptId) {
+  if (!rec || !isLiveMatchState(rec.game, rec.state)) return rec;
+  const now = Date.now();
+  const humans = humanSeatIds(rec.seats);
+  for (const id of humans) {
+    if (id === exceptId) continue;
+    const presence = await readJson(`axiom:p:${id}`);
+    if (presence && now - Number(presence.seenAt || 0) <= ONLINE_SEC * 1000) continue;
+    rec.state = applyForfeit(rec.state, rec.game, id);
+    rec.endsAt = null;
+    rec.cpuReadyAt = null;
+    const view = publicRoom(rec, id)?.view ?? rec.state;
+    await kvSet(`axiom:result:${id}`, { game: rec.game, view }, 60);
+    return releaseSeat(rec, id);
+  }
+  return rec;
+}
+
 export async function leaveRoom(userId) {
   const rid = await getSeat(userId);
   if (!rid) return snapshot(userId);
   const rec = await attachMods(await getRoomRecord(rid));
-  if (rec?.game && OPEN_TABLES.has(rec.game) && isLobbyState(rec.state)) {
-    const hostLeft = rec.seats[0] === userId;
+  if (!rec) {
     await kvDel(`axiom:seat:${userId}`);
-    const humansLeft = humanSeatIds(rec.seats).filter((id) => id !== userId);
-    if (hostLeft || humansLeft.length < 1) {
-      for (const id of humanSeatIds(rec.seats)) await kvDel(`axiom:seat:${id}`);
-      await kvDel(`axiom:room:${rid}`);
-      await wakeUsers(humanSeatIds(rec.seats));
-      return snapshot(userId);
-    }
-    rec.seats = rec.seats.filter((id) => id !== userId);
-    rec.state = rebuildLobby(rec, null, rec.mods);
-    await saveRoom(rec);
     return snapshot(userId);
   }
 
-  // Mid-match or settlement: leaving closes the table for everyone so nobody stays stuck on "over".
-  const humans = humanSeatIds(rec?.seats || [userId]);
-  for (const id of humans) await kvDel(`axiom:seat:${id}`);
-  await kvDel(`axiom:room:${rid}`);
-  await wakeUsers(humans);
-  return snapshot(userId);
+  if (isLobbyState(rec.state)) {
+    if (rec.game && OPEN_TABLES.has(rec.game)) {
+      const hostLeft = rec.seats[0] === userId;
+      await kvDel(`axiom:seat:${userId}`);
+      const humansLeft = humanSeatIds(rec.seats).filter((id) => id !== userId);
+      if (hostLeft || humansLeft.length < 1) {
+        for (const id of humanSeatIds(rec.seats)) await kvDel(`axiom:seat:${id}`);
+        await kvDel(`axiom:room:${rid}`);
+        await wakeUsers(humanSeatIds(rec.seats));
+        return snapshot(userId);
+      }
+      rec.seats = rec.seats.filter((id) => id !== userId);
+      rec.state = rebuildLobby(rec, null, rec.mods);
+      await saveRoom(rec);
+      return snapshot(userId);
+    }
+    await releaseSeat(rec, userId);
+    return snapshot(userId);
+  }
+
+  // Solo casino: no opponent to award a win. Just leave.
+  if (SOLO_GAMES.has(rec.game) || !isLiveMatchState(rec.game, rec.state)) {
+    await releaseSeat(rec, userId);
+    return snapshot(userId);
+  }
+
+  rec.state = applyForfeit(rec.state, rec.game, String(userId));
+  rec.endsAt = null;
+  rec.cpuReadyAt = null;
+  const view = publicRoom(rec, userId)?.view ?? rec.state;
+  await releaseSeat(rec, userId);
+  const snap = await snapshot(userId);
+  return { ...snap, settlement: { game: rec.game, view } };
 }
 
 function publicRoom(room, viewerId) {
@@ -1370,6 +1464,7 @@ function publicRoom(room, viewerId) {
       view = room.state;
     }
   }
+  view = withForfeitView(view, room.state, room.game, viewerId);
   return {
     id: room.id,
     game: room.game,
