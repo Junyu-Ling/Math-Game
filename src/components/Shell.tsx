@@ -14,19 +14,6 @@ export function Shell({ children }: { children: ReactNode }) {
           <span>Play</span>
         </NavLink>
         <nav className="nav">
-          <NavLink to="/play/davinci">Coda</NavLink>
-          <NavLink to="/play/flip7">Flip 7</NavLink>
-          <NavLink to="/play/blackjack">21</NavLink>
-          <NavLink to="/play/24">24</NavLink>
-          <NavLink to="/play/holdem">Hold’em</NavLink>
-          <NavLink to="/play/uno">UNO</NavLink>
-          <NavLink to="/play/halli">Halli</NavLink>
-          <NavLink to="/play/ecard">E-Card</NavLink>
-          <NavLink to="/play/gomoku">Gomoku</NavLink>
-          <NavLink to="/play/werewolf">Werewolf</NavLink>
-          <NavLink to="/play/roulette">Roulette</NavLink>
-          <NavLink to="/play/slots">Slots</NavLink>
-          {/* Deferred: Ludo / Animal / Army */}
           {user ? (
             <>
               <span className="chip-pill">{user.chips}</span>
