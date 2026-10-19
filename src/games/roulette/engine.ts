@@ -272,11 +272,36 @@ export function settleBets(bets: Bet[], result: number): { win: number; details:
   return { win, details };
 }
 
-/** Degrees per pocket (clockwise wheel). */
+/** Degrees per pocket (clockwise wheel). Pocket 0 is centered on the top pointer. */
 export const POCKET_DEG = 360 / WHEEL_ORDER.length;
 
 export function indexOnWheel(n: number): number {
   return WHEEL_ORDER.indexOf(n as (typeof WHEEL_ORDER)[number]);
+}
+
+/**
+ * CSS `rotate` degrees (clockwise, in [0, 360)) that park the center of pocket
+ * `index` under the top pointer.
+ *
+ * Wedges and labels are drawn clockwise from 12 o'clock: pocket `i` sits at
+ * `i * POCKET_DEG`. Positive CSS rotation is clockwise, so the wheel must turn
+ * the other way by that amount.
+ */
+export function rotationForPocket(index: number): number {
+  const clockwiseFromTop = index * POCKET_DEG;
+  return (360 - (clockwiseFromTop % 360) + 360) % 360;
+}
+
+/**
+ * Next cumulative wheel angle. Always spins clockwise by `extraTurns` full
+ * revolutions plus the shortest forward delta onto `rotationForPocket(index)`,
+ * so a later spin is measured from the current angle instead of from 0.
+ */
+export function wheelDegForPocket(currentDeg: number, index: number, extraTurns: number): number {
+  const landing = rotationForPocket(index);
+  const current = ((currentDeg % 360) + 360) % 360;
+  const delta = (landing - current + 360) % 360;
+  return currentDeg + extraTurns * 360 + delta;
 }
 
 /**
@@ -291,13 +316,12 @@ export function beginSpin(state: RouletteState, result?: number): RouletteState 
       ? result
       : WHEEL_ORDER[Math.floor(Math.random() * WHEEL_ORDER.length)]!;
   const idx = indexOnWheel(pocket);
-  // Pointer at top; wheel rotates so pocket lands under pointer.
-  const target = 360 * (4 + Math.floor(Math.random() * 3)) + (360 - idx * POCKET_DEG);
+  const extraTurns = 4 + Math.floor(Math.random() * 3);
   return {
     ...state,
     phase: "spinning",
     result: pocket,
-    wheelDeg: state.wheelDeg + target,
+    wheelDeg: wheelDegForPocket(state.wheelDeg, idx, extraTurns),
     message: "Ball in play…",
   };
 }

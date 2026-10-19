@@ -3569,7 +3569,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   font-weight: 700;
   color: #fff;
   text-align: center;
-  transform: rotate(calc(var(--i) * 9.729deg)) translateY(-88px) rotate(calc(var(--i) * -9.729deg));
+  transform: rotate(calc(var(--i) * 360deg / 37)) translateY(-88px) rotate(calc(var(--i) * -360deg / 37));
 }
 
 .roulette-hub {
