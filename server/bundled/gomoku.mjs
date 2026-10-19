@@ -221,8 +221,8 @@ var DIRS2 = [
   [1, -1]
 ];
 var FOUL_LABEL = {
-  "double-three": "double three",
-  "double-four": "double four",
+  "double-three": "double live three",
+  "double-four": "double live four",
   overline: "overline"
 };
 var RPS_LABEL = { rock: "rock", paper: "paper", scissors: "scissors" };
@@ -281,7 +281,7 @@ function beginGomokuMatch(people) {
     log: [
       {
         id: uid("l"),
-        text: `Rock-paper-scissors. Winner plays black. Five in a row wins. Black fouls (RIF): double three, double four, overline.`
+        text: `Rock-paper-scissors. Winner plays black. Five in a row wins. Black fouls: double live three, double live four, overline.`
       }
     ]
   };
@@ -483,10 +483,10 @@ function isStraightFourOnAxis(board, r, c, dr, dc, stone) {
 function isFourOnAxis(board, r, c, dr, dc, stone) {
   return fivePointsOnAxis(board, r, c, dr, dc, stone) >= 1;
 }
-function countFours(board, r, c, stone) {
+function countLiveFours(board, r, c, stone) {
   let n = 0;
   for (const [dr, dc] of DIRS2) {
-    if (isFourOnAxis(board, r, c, dr, dc, stone)) n += 1;
+    if (isStraightFourOnAxis(board, r, c, dr, dc, stone)) n += 1;
   }
   return n;
 }
@@ -498,15 +498,14 @@ function isThreeOnAxis(board, r, c, dr, dc, stone, depth) {
     const cc = c + i * dc;
     if (!inBoard2(rr, cc) || board[rr][cc] !== 0) continue;
     board[rr][cc] = stone;
-    const madeFiveOrMore = axisLen(board, rr, cc, dr, dc, stone) >= 5;
-    const becameStraight = !madeFiveOrMore && (isStraightFourOnAxis(board, r, c, dr, dc, stone) || isStraightFourOnAxis(board, rr, cc, dr, dc, stone));
+    const becameLiveFour = isStraightFourOnAxis(board, r, c, dr, dc, stone);
     let illegalMake = false;
-    if (becameStraight && stone === 1) {
-      if (isOverline(board, rr, cc) || countFours(board, rr, cc, 1) >= 2) illegalMake = true;
+    if (becameLiveFour && stone === 1) {
+      if (isOverline(board, rr, cc) || countLiveFours(board, rr, cc, 1) >= 2) illegalMake = true;
       else if (depth < 4 && countThrees(board, rr, cc, 1, depth + 1) >= 2) illegalMake = true;
     }
     board[rr][cc] = 0;
-    if (becameStraight && !illegalMake) return true;
+    if (becameLiveFour && !illegalMake) return true;
   }
   return false;
 }
@@ -519,9 +518,9 @@ function countThrees(board, r, c, stone, depth = 0) {
 }
 function blackFoulAt(board, r, c) {
   if (board[r][c] !== 1) return null;
-  if (isOverline(board, r, c)) return "overline";
   if (winsAt(board, r, c)) return null;
-  if (countFours(board, r, c, 1) >= 2) return "double-four";
+  if (isOverline(board, r, c)) return "overline";
+  if (countLiveFours(board, r, c, 1) >= 2) return "double-four";
   if (countThrees(board, r, c, 1) >= 2) return "double-three";
   return null;
 }

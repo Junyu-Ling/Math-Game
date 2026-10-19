@@ -1,4 +1,4 @@
-/** Quick RIF foul checks — run: node scripts/test-renju-fouls.mjs */
+/** Black foul checks — run: node scripts/test-renju-fouls.mjs */
 import { blackFoulAt } from "../src/games/gomoku/engine.ts";
 
 function empty() {
@@ -24,29 +24,37 @@ function assert(name, cond) {
     [6, 7],
   ]);
   b[7][7] = 1;
-  assert("classic 三三", blackFoulAt(b, 7, 7) === "double-three");
+  assert("classic 双活三", blackFoulAt(b, 7, 7) === "double-three");
 }
 
-// Sleeping three + live three should NOT be 三三 (horizontal blocked into 冲四 only)
+// Jump live threes: `●●_●` × `●●_●`, each gap fills into `_●●●●_`
 {
   const b = empty();
-  // Vertical open three around (7,7): (5,7)(6,7) + play (7,7) with room below
+  place(b, [
+    [7, 4],
+    [7, 5],
+    [4, 7],
+    [5, 7],
+  ]);
+  b[7][7] = 1;
+  assert("跳活三 双活三", blackFoulAt(b, 7, 7) === "double-three");
+}
+
+// Sleeping three + live three is not 双活三 (horizontal can only become 冲四)
+{
+  const b = empty();
   place(b, [
     [5, 7],
     [6, 7],
     [7, 5],
     [7, 6],
   ]);
-  // White blocks one side of the horizontal so it cannot become straight four both ways
   b[7][4] = 2;
   b[7][7] = 1;
-  // Horizontal _blocked●●●●? wait we have ●● at 5,6 and play 7 → three with white at 4
-  // Open side at 8,9... becoming four at 8: ●●●● with white at 4 — only one five-point (right) = 冲四, not 活四
-  const foul = blackFoulAt(b, 7, 7);
-  assert("眠三+活三 not 三三", foul !== "double-three");
+  assert("眠三+活三 not 三三", blackFoulAt(b, 7, 7) === null);
 }
 
-// Double rush four (冲四×冲四) is 四四
+// Two rush fours (one end blocked by white) are not a foul
 {
   const b = empty();
   place(b, [
@@ -60,7 +68,38 @@ function assert(name, cond) {
   b[7][3] = 2;
   b[3][7] = 2;
   b[7][7] = 1;
-  assert("冲四双四", blackFoulAt(b, 7, 7) === "double-four");
+  assert("冲四×冲四 not 四四", blackFoulAt(b, 7, 7) === null);
+}
+
+// Two true live fours: `_●●●●_` × `_●●●●_`
+{
+  const b = empty();
+  place(b, [
+    [7, 4],
+    [7, 5],
+    [7, 6],
+    [4, 7],
+    [5, 7],
+    [6, 7],
+  ]);
+  b[7][7] = 1;
+  assert("双活四", blackFoulAt(b, 7, 7) === "double-four");
+}
+
+// Live four + rush four is not double live four
+{
+  const b = empty();
+  place(b, [
+    [7, 4],
+    [7, 5],
+    [7, 6],
+    [4, 7],
+    [5, 7],
+    [6, 7],
+  ]);
+  b[3][7] = 2;
+  b[7][7] = 1;
+  assert("活四+冲四 not 四四", blackFoulAt(b, 7, 7) === null);
 }
 
 // Overline
@@ -77,7 +116,7 @@ function assert(name, cond) {
   assert("长连", blackFoulAt(b, 7, 7) === "overline");
 }
 
-// Exact five is win path — blackFoulAt returns null when winsAt
+// Exact five is a win, not a foul
 {
   const b = empty();
   place(b, [
@@ -88,6 +127,38 @@ function assert(name, cond) {
   ]);
   b[7][7] = 1;
   assert("正五非禁", blackFoulAt(b, 7, 7) === null);
+}
+
+// Exact five beats an overline on another axis
+{
+  const b = empty();
+  place(b, [
+    [7, 3],
+    [7, 4],
+    [7, 5],
+    [7, 6],
+    [2, 7],
+    [3, 7],
+    [4, 7],
+    [5, 7],
+    [6, 7],
+  ]);
+  b[7][7] = 1;
+  assert("正五胜长连", blackFoulAt(b, 7, 7) === null);
+}
+
+// A live four elsewhere on the axis must not be credited to this stone
+{
+  const b = empty();
+  place(b, [
+    [5, 7],
+    [6, 7],
+    [7, 10],
+    [7, 11],
+    [7, 12],
+  ]);
+  b[7][7] = 1;
+  assert("远处活四不算本子活三", blackFoulAt(b, 7, 7) === null);
 }
 
 console.log("all renju foul checks passed");

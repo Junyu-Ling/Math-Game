@@ -8,7 +8,7 @@ export type Stone = 0 | 1 | 2; // 0 empty, 1 black, 2 white
 export type RpsThrow = "rock" | "paper" | "scissors";
 export type RpsReveal = { aId: string; a: RpsThrow; bId: string; b: RpsThrow };
 
-/** RIF: double-three (two live threes), double-four (two fours), or overline (6+). */
+/** Black fouls: double live three, double live four, or overline (6+). */
 export type FoulKind = "double-three" | "double-four" | "overline";
 
 export type GPlayer = {
@@ -48,8 +48,8 @@ const DIRS: Array<[number, number]> = [
 ];
 
 const FOUL_LABEL: Record<FoulKind, string> = {
-  "double-three": "double three",
-  "double-four": "double four",
+  "double-three": "double live three",
+  "double-four": "double live four",
   overline: "overline",
 };
 
@@ -121,7 +121,7 @@ function beginGomokuMatch(people: Array<{ id: string; name: string; human?: bool
     log: [
       {
         id: uid("l"),
-        text: `Rock-paper-scissors. Winner plays black. Five in a row wins. Black fouls (RIF): double three, double four, overline.`,
+        text: `Rock-paper-scissors. Winner plays black. Five in a row wins. Black fouls: double live three, double live four, overline.`,
       },
     ],
   };
@@ -354,8 +354,10 @@ function onSameSegment(
 }
 
 /**
- * RIF STRAIGHT FOUR (活四): unbroken four with two distinct ways to make five.
- * Broken shapes (e.g. ●●_●●) are not straight fours even if they threaten five.
+ * Live four (活四): unbroken four with two ways to make exactly five.
+ * A rush four (冲四) has only one way, because the other end is blocked by
+ * the opponent, the edge, an own stone, or would be overline (6+).
+ * Broken shapes (e.g. ●●_●●) are rush fours, not live fours.
  */
 function isStraightFourOnAxis(
   board: Stone[][],
@@ -368,7 +370,7 @@ function isStraightFourOnAxis(
   return axisLen(board, r, c, dr, dc, stone) === 4 && fivePointsOnAxis(board, r, c, dr, dc, stone) >= 2;
 }
 
-/** RIF FOUR (四): any row that can add one stone to make five (冲四 or 活四). */
+/** Any four that can add one stone to make five (rush four or live four). */
 function isFourOnAxis(
   board: Stone[][],
   r: number,
@@ -380,19 +382,20 @@ function isFourOnAxis(
   return fivePointsOnAxis(board, r, c, dr, dc, stone) >= 1;
 }
 
-function countFours(board: Stone[][], r: number, c: number, stone: Stone): number {
+/** Live fours only. Two rush fours are not a double-four foul. */
+function countLiveFours(board: Stone[][], r: number, c: number, stone: Stone): number {
   let n = 0;
   for (const [dr, dc] of DIRS) {
-    if (isFourOnAxis(board, r, c, dr, dc, stone)) n += 1;
+    if (isStraightFourOnAxis(board, r, c, dr, dc, stone)) n += 1;
   }
   return n;
 }
 
 /**
- * RIF THREE (活三): three stones that can become a straight four by adding one stone,
- * without that add making five. For Black, the make-four point must also avoid
- * overline / double-four / forbidden double-three (RIF 9.3).
- * Sleeping threes and gap shapes that only make a rush four (冲四) do not count.
+ * Live three (活三), including a jump three (跳活三, e.g. ●●_●).
+ * Counts only when one empty cell on this axis, filled by this stone's line,
+ * becomes an unbroken live four. If every such cell makes only a rush four,
+ * or cannot be played (overline, double live four, double live three), it is not live.
  */
 function isThreeOnAxis(
   board: Stone[][],
@@ -410,17 +413,14 @@ function isThreeOnAxis(
     const cc = c + i * dc;
     if (!inBoard(rr, cc) || board[rr]![cc] !== 0) continue;
     board[rr]![cc] = stone;
-    const madeFiveOrMore = axisLen(board, rr, cc, dr, dc, stone) >= 5;
-    const becameStraight =
-      !madeFiveOrMore &&
-      (isStraightFourOnAxis(board, r, c, dr, dc, stone) || isStraightFourOnAxis(board, rr, cc, dr, dc, stone));
+    const becameLiveFour = isStraightFourOnAxis(board, r, c, dr, dc, stone);
     let illegalMake = false;
-    if (becameStraight && stone === 1) {
-      if (isOverline(board, rr, cc) || countFours(board, rr, cc, 1) >= 2) illegalMake = true;
+    if (becameLiveFour && stone === 1) {
+      if (isOverline(board, rr, cc) || countLiveFours(board, rr, cc, 1) >= 2) illegalMake = true;
       else if (depth < 4 && countThrees(board, rr, cc, 1, depth + 1) >= 2) illegalMake = true;
     }
     board[rr]![cc] = 0;
-    if (becameStraight && !illegalMake) return true;
+    if (becameLiveFour && !illegalMake) return true;
   }
   return false;
 }
@@ -434,15 +434,15 @@ function countThrees(board: Stone[][], r: number, c: number, stone: Stone, depth
 }
 
 /**
- * Black fouls after the stone is on the board at (r,c) — RIF 9.2:
- * overline, double-four (any two fours), double-three (two live threes).
- * Exact five wins and is not a foul.
+ * Black fouls after the stone is on the board at (r,c):
+ * overline (6+), double live four, double live three.
+ * Exact five wins and beats any foul. White is never fouled here.
  */
 export function blackFoulAt(board: Stone[][], r: number, c: number): FoulKind | null {
   if (board[r]![c] !== 1) return null;
-  if (isOverline(board, r, c)) return "overline";
   if (winsAt(board, r, c)) return null;
-  if (countFours(board, r, c, 1) >= 2) return "double-four";
+  if (isOverline(board, r, c)) return "overline";
+  if (countLiveFours(board, r, c, 1) >= 2) return "double-four";
   if (countThrees(board, r, c, 1) >= 2) return "double-three";
   return null;
 }

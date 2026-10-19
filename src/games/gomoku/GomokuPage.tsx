@@ -244,7 +244,7 @@ export function GomokuPage() {
               <p>
                 {waiting
                   ? "Add a CPU or invite one friend, then start. RPS winner plays black."
-                  : "15×15 Renju (RIF). Practice vs CPU, or open a table. Black fouls: double three, double four, overline."}
+                  : "15×15 Renju. Practice vs CPU, or open a table. Black fouls: double live three, double live four, overline."}
               </p>
               {waiting && state ? (
                 <ul className="lobby-roster">
@@ -339,8 +339,8 @@ export function GomokuPage() {
               {state.foul ? (
                 <p className="gomoku-foul-tip" role="alert">
                   Foul loss: Black played <strong>{foulLabel(state.foul.kind)}</strong> at (
-                  {state.foul.r + 1},{state.foul.c + 1}). Forbidden: double three (two live threes), double
-                  four, overline.
+                  {state.foul.r + 1},{state.foul.c + 1}). Forbidden: double live three, double live four,
+                  overline. A blocked line is not live.
                 </p>
               ) : null}
               <div className="gomoku-board" role="grid" aria-label="15 by 15 goban">

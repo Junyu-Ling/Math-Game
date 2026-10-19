@@ -43,7 +43,7 @@ const RULES: Record<string, string[]> = {
   ],
   gomoku: [
     "15×15. Open a table, add a CPU or invite, then start. Rock-paper-scissors: winner plays black. First exact five in a row wins.",
-    "Black fouls (RIF Renju): double three (two live threes that can each become a straight four), double four (two fours, including rush fours), or overline (six+). Sleeping threes do not count. White has no fouls.",
+    "Black fouls: double live three (two live threes), double live four (two live fours with both ends open), or overline (six+). A blocked line is not live — sleeping threes and rush fours do not count. Exact five wins. White has no fouls.",
   ],
   ludo: [
     "Two-player flying chess. Each has four pieces. Roll a die to move.",
