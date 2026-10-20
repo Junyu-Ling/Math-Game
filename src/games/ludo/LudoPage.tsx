@@ -64,47 +64,62 @@ const BASE_PLACE: Record<FlyColor, { gridRow: string; gridColumn: string }> = {
   yellow: { gridRow: "10 / 16", gridColumn: "1 / 7" },
 };
 
-/** Inner corners of the cross, split like the classic board. */
-const SPLITS: Array<{ r: number; c: number; a: FlyColor; b: FlyColor }> = [
-  { r: 6, c: 6, a: "green", b: "blue" },
-  { r: 6, c: 8, a: "green", b: "yellow" },
-  { r: 8, c: 6, a: "blue", b: "red" },
-  { r: 8, c: 8, a: "red", b: "green" },
+/**
+ * Shortcuts stay in the lanes beside the star, split so they don't cut the triangles.
+ * Green leftward above, yellow upward on the right, red rightward below, blue downward on the left.
+ */
+const JUMPS: Array<{ id: string; stroke: string; x1: number; y1: number; x2: number; y2: number; rot: number }> = [
+  { id: "green-l", stroke: "#1f9d45", x1: 6.72, y1: 6.32, x2: 4.35, y2: 6.32, rot: 180 },
+  { id: "green-r", stroke: "#1f9d45", x1: 10.65, y1: 6.32, x2: 8.28, y2: 6.32, rot: 180 },
+  { id: "yellow-t", stroke: "#e0a800", x1: 8.68, y1: 6.72, x2: 8.68, y2: 4.35, rot: -90 },
+  { id: "yellow-b", stroke: "#e0a800", x1: 8.68, y1: 10.65, x2: 8.68, y2: 8.28, rot: -90 },
+  { id: "red-l", stroke: "#e23b3b", x1: 4.35, y1: 8.68, x2: 6.72, y2: 8.68, rot: 0 },
+  { id: "red-r", stroke: "#e23b3b", x1: 8.28, y1: 8.68, x2: 10.65, y2: 8.68, rot: 0 },
+  { id: "blue-t", stroke: "#2f6bff", x1: 6.32, y1: 4.35, x2: 6.32, y2: 6.72, rot: 90 },
+  { id: "blue-b", stroke: "#2f6bff", x1: 6.32, y1: 8.28, x2: 6.32, y2: 10.65, rot: 90 },
 ];
 
-const JUMPS: Array<{ id: FlyColor; stroke: string; x1: number; y1: number; x2: number; y2: number; rot: number }> = [
-  { id: "green", stroke: "#1f9d45", x1: 9.35, y1: 6.15, x2: 5.65, y2: 6.15, rot: 180 },
-  { id: "yellow", stroke: "#e0a800", x1: 8.85, y1: 9.35, x2: 8.85, y2: 5.65, rot: -90 },
-  { id: "red", stroke: "#e23b3b", x1: 5.65, y1: 8.85, x2: 9.35, y2: 8.85, rot: 0 },
-  { id: "blue", stroke: "#2f6bff", x1: 6.15, y1: 5.65, x2: 6.15, y2: 9.35, rot: 90 },
-];
+const PIPS: Record<number, Array<[number, number]>> = {
+  1: [[1, 1]],
+  2: [[0, 0], [2, 2]],
+  3: [[0, 0], [1, 1], [2, 2]],
+  4: [[0, 0], [0, 2], [2, 0], [2, 2]],
+  5: [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2]],
+  6: [[0, 0], [0, 2], [1, 0], [1, 2], [2, 0], [2, 2]],
+};
 
-function outward(dir: "e" | "s" | "w" | "n"): "e" | "s" | "w" | "n" {
-  if (dir === "n") return "s";
-  if (dir === "s") return "n";
-  if (dir === "e") return "w";
-  return "e";
+function PipGrid({ n }: { n: number }) {
+  const on = PIPS[n] ?? [];
+  return (
+    <span className="fly-die-pips">
+      {[0, 1, 2].map((r) =>
+        [0, 1, 2].map((c) => <i key={`${r}${c}`} className={on.some(([rr, cc]) => rr === r && cc === c) ? "on" : ""} />),
+      )}
+    </span>
+  );
 }
 
-function DieFace({ n }: { n: number | null }) {
-  const spots: Record<number, Array<[number, number]>> = {
-    1: [[1, 1]],
-    2: [[0, 0], [2, 2]],
-    3: [[0, 0], [1, 1], [2, 2]],
-    4: [[0, 0], [0, 2], [2, 0], [2, 2]],
-    5: [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2]],
-    6: [[0, 0], [0, 2], [1, 0], [1, 2], [2, 0], [2, 2]],
-  };
-  const on = n ? spots[n] ?? [] : [];
+function DieFace({ n, tick }: { n: number | null; tick?: string }) {
+  const [spin, setSpin] = useState(0);
+  const face = n && n >= 1 && n <= 6 ? n : null;
+  const top = face ?? 0;
+  const bottom = face ? 7 - face : 6;
+  const sides = [1, 2, 3, 4, 5, 6].filter((v) => v !== (face ?? 1) && v !== (face ? 7 - face : 6));
+  useEffect(() => {
+    if (!tick || n == null) return;
+    setSpin((s) => s + 1);
+  }, [tick, n]);
+  const tumble = `rotateX(${spin * 360}deg) rotateY(${spin * 540}deg)`;
   return (
-    <div className="fly-die" aria-label={n ? `Die ${n}` : "Die"}>
-      {[0, 1, 2].map((r) => (
-        <div key={r} className="fly-die-row">
-          {[0, 1, 2].map((c) => (
-            <i key={c} className={on.some(([rr, cc]) => rr === r && cc === c) ? "on" : ""} />
-          ))}
-        </div>
-      ))}
+    <div className="fly-die-scene" aria-label={n ? `Die ${n}` : "Die"}>
+      <div className="fly-die-cube" style={{ transform: `rotateX(-54deg) rotateY(-36deg) ${tumble}` }}>
+        <span className="fly-die-face front"><PipGrid n={sides[0] ?? 2} /></span>
+        <span className="fly-die-face back"><PipGrid n={sides[1] ?? 5} /></span>
+        <span className="fly-die-face right"><PipGrid n={sides[2] ?? 3} /></span>
+        <span className="fly-die-face left"><PipGrid n={sides[3] ?? 4} /></span>
+        <span className="fly-die-face top"><PipGrid n={top} /></span>
+        <span className="fly-die-face bottom"><PipGrid n={bottom} /></span>
+      </div>
     </div>
   );
 }
@@ -306,7 +321,7 @@ export function LudoPage() {
               <div className="fly-board">
                 <div className="fly-sheet">
                   <div className="fly-grid">
-                    <svg className="fly-jumps" viewBox="0 0 15 15" aria-hidden>
+                    <svg className="fly-jumps" viewBox="0 0 15 15" preserveAspectRatio="none" aria-hidden>
                       {JUMPS.map((j) => (
                         <g key={j.id}>
                           <line
@@ -319,7 +334,7 @@ export function LudoPage() {
                             strokeDasharray="0.22 0.14"
                             strokeLinecap="round"
                           />
-                          <g transform={`translate(${(j.x1 + j.x2) / 2} ${(j.y1 + j.y2) / 2}) rotate(${j.rot}) scale(0.012) translate(-32 -32)`}>
+                          <g transform={`translate(${(j.x1 + j.x2) / 2} ${(j.y1 + j.y2) / 2}) rotate(${j.rot}) scale(0.0085) translate(-32 -32)`}>
                             <path
                               fill={j.stroke}
                               stroke="#1c1915"
@@ -359,12 +374,19 @@ export function LudoPage() {
                       const start = starts.get(index);
                       const fly = flies.get(index);
                       const door = doors.get(index);
-                      const color = start ?? trackColor(index);
+                      const color = start ?? door ?? trackColor(index);
                       const arrow = start ? trackDir(index) : fly ? flyDir(COLORS.indexOf(fly)) : door ? homeDir(COLORS.indexOf(door)) : null;
+                      const flyTurn = arrow === "s" ? 90 : arrow === "w" ? 180 : arrow === "n" ? -90 : 0;
                       return (
                         <div key={`t${index}`} className={`fly-cell track${start ? " is-start" : ""}${fly ? " is-fly" : ""}${door ? " is-door" : ""}`} style={{ gridRow: r + 1, gridColumn: c + 1 }}>
                           <span className={`sq c-${color}`} />
-                          {arrow ? <Arrow dir={arrow} /> : null}
+                          {fly ? (
+                            <span className={`fly-mark tone-${fly}`} style={{ transform: `rotate(${flyTurn}deg)` }}>
+                              <PlaneIcon />
+                            </span>
+                          ) : arrow ? (
+                            <Arrow dir={arrow} />
+                          ) : null}
                           {tokens(`${r},${c}`)}
                         </div>
                       );
@@ -373,28 +395,30 @@ export function LudoPage() {
                       lane.map((cell, step) => {
                         const color = COLORS[ci] ?? "blue";
                         const finish = step === lane.length - 1;
-                        const into = homeDir(ci);
                         return (
                           <div
                             key={`h${ci}-${step}`}
-                            className={`fly-cell home${finish ? ` finish dir-${outward(into)}` : ""}`}
+                            className={`fly-cell home${finish ? " finish" : ""}`}
                             style={{ gridRow: cell[0] + 1, gridColumn: cell[1] + 1 }}
                           >
-                            <span className={`sq c-${color}`} />
-                            {finish ? <Arrow dir={into} /> : null}
+                            {finish ? null : <span className={`sq c-${color}`} />}
                             {tokens(`${cell[0]},${cell[1]}`)}
                           </div>
                         );
                       }),
                     )}
-                    {SPLITS.map((split) => (
-                      <div key={`c${split.r}${split.c}`} className="fly-cell corner" style={{ gridRow: split.r + 1, gridColumn: split.c + 1 }}>
-                        <span className="sq split" style={{ background: `linear-gradient(to bottom right, var(--fly-${split.a}) 50%, var(--fly-${split.b}) 50%)` }} />
-                      </div>
-                    ))}
-                    <div className="fly-cell hub" style={{ gridRow: 8, gridColumn: 8 }}>
-                      <span className="sq pinwheel" />
-                    </div>
+                    <svg className="fly-star" viewBox="0 0 3 3" preserveAspectRatio="none" aria-hidden>
+                      <polygon points="1,0 2,0 1.5,1.5" className="c-red" />
+                      <polygon points="3,1 3,2 1.5,1.5" className="c-blue" />
+                      <polygon points="2,3 1,3 1.5,1.5" className="c-green" />
+                      <polygon points="0,1 0,2 1.5,1.5" className="c-yellow" />
+                      <g fill="none" stroke="#fff" strokeWidth="0.09" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1.5 0.28 v0.42 M1.32 0.52 1.5 0.72 1.68 0.52" />
+                        <path d="M2.72 1.5 h-0.42 M2.48 1.32 2.28 1.5 2.48 1.68" />
+                        <path d="M1.5 2.72 v-0.42 M1.68 2.48 1.5 2.28 1.32 2.48" />
+                        <path d="M0.28 1.5 h0.42 M0.52 1.68 0.72 1.5 0.52 1.32" />
+                      </g>
+                    </svg>
                   </div>
                 </div>
               </div>
@@ -410,7 +434,7 @@ export function LudoPage() {
                 ))}
               </ul>
               <div className="fly-controls">
-                <DieFace n={state.dice} />
+                <DieFace n={state.dice} tick={state.log.at(-1)?.text.includes("rolls") ? state.log.at(-1)?.id : undefined} />
                 <button className="btn btn-go" type="button" disabled={!myTurn || state.phase !== "roll"} onClick={() => act({ type: "roll" })}>
                   ROLL
                 </button>
