@@ -16,7 +16,8 @@ import { UnoPage } from "./games/uno/UnoPage";
 import { HalliGalliPage } from "./games/halligalli/HalliGalliPage";
 import { EcardPage } from "./games/ecard/EcardPage";
 import { GomokuPage } from "./games/gomoku/GomokuPage";
-import { WerewolfPage } from "./games/werewolf/WerewolfPage";
+// Deferred — Werewolf
+// import { WerewolfPage } from "./games/werewolf/WerewolfPage";
 import { RoulettePage } from "./games/roulette/RoulettePage";
 import { SlotsPage } from "./games/slots/SlotsPage";
 import { LudoPage } from "./games/ludo/LudoPage";
@@ -45,7 +46,7 @@ export function App() {
             <Route path="/play/halli" element={<HalliGalliPage />} />
             <Route path="/play/ecard" element={<EcardPage />} />
             <Route path="/play/gomoku" element={<GomokuPage />} />
-            <Route path="/play/werewolf" element={<WerewolfPage />} />
+            {/* Deferred — Werewolf: /play/werewolf */}
             <Route path="/play/roulette" element={<RoulettePage />} />
             <Route path="/play/slots" element={<SlotsPage />} />
             <Route path="/play/ludo" element={<LudoPage />} />

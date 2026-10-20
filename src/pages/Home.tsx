@@ -76,14 +76,15 @@ const games = [
     blurb: "15×15. Place stones. First five in a row wins.",
     preview: "gomoku" as const,
   },
-  {
-    to: "/play/werewolf",
-    idx: "10",
-    code: "WOLF",
-    name: "Werewolf",
-    blurb: "Night kills, day votes. Werewolves, Seer, Witch, and villagers.",
-    preview: "werewolf" as const,
-  },
+  // Deferred — Werewolf
+  // {
+  //   to: "/play/werewolf",
+  //   idx: "10",
+  //   code: "WOLF",
+  //   name: "Werewolf",
+  //   blurb: "Night kills, day votes. Werewolves, Seer, Witch, and villagers.",
+  //   preview: "werewolf" as const,
+  // },
   {
     to: "/play/roulette",
     idx: "11",
@@ -212,15 +213,16 @@ function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
       </div>
     );
   }
-  if (kind === "werewolf") {
-    return (
-      <div className="preview-row">
-        <span className="wolf-preview tone-wolf">W</span>
-        <span className="wolf-preview tone-seer">S</span>
-        <span className="wolf-preview tone-witch">K</span>
-      </div>
-    );
-  }
+  // Deferred — Werewolf
+  // if (kind === "werewolf") {
+  //   return (
+  //     <div className="preview-row">
+  //       <span className="wolf-preview tone-wolf">W</span>
+  //       <span className="wolf-preview tone-seer">S</span>
+  //       <span className="wolf-preview tone-witch">K</span>
+  //     </div>
+  //   );
+  // }
   if (kind === "roulette") {
     return (
       <div className="preview-row">
@@ -265,7 +267,7 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="kicker">Thirteen tables · Invite play</p>
+          <p className="kicker">Twelve tables · Invite play</p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
             Card art follows the physical decks. Practice against the CPU, or sign in and invite someone who is online.
