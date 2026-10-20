@@ -3,133 +3,148 @@ import { MahjongTile } from "../components/MahjongTile";
 import { FlipFace, MiniPoker, UnoFace } from "../components/PlayingCard";
 import { PlaneIcon } from "../games/ludo/LudoPage";
 
-const games = [
+const sections = [
   {
-    to: "/play/davinci",
-    idx: "01",
-    code: "CODA",
-    name: "Da Vinci Code",
-    blurb: "Black and white acrylic tiles. Choose a color to draw, then guess the numbers in your rival’s row.",
-    preview: "coda" as const,
+    title: "Card games",
+    games: [
+      {
+        to: "/play/davinci",
+        idx: "01",
+        code: "CODA",
+        name: "Da Vinci Code",
+        blurb: "Black and white acrylic tiles. Choose a color to draw, then guess the numbers in your rival’s row.",
+        preview: "coda" as const,
+      },
+      {
+        to: "/play/flip7",
+        idx: "02",
+        code: "FLIP7",
+        name: "Flip 7",
+        blurb: "Number wreaths. Seven distinct values score a bonus. First to 200 wins.",
+        preview: "flip" as const,
+      },
+      {
+        to: "/play/uno",
+        idx: "03",
+        code: "UNO",
+        name: "UNO",
+        blurb: "Classic four-color ovals. Empty your hand to win.",
+        preview: "uno" as const,
+      },
+      {
+        to: "/play/halli",
+        idx: "04",
+        code: "HALLI",
+        name: "Halli Galli",
+        blurb: "Flip fruit cards. When five of one fruit show, ring the bell first.",
+        preview: "halli" as const,
+      },
+      {
+        to: "/play/ecard",
+        idx: "05",
+        code: "ECARD",
+        name: "E-Card",
+        blurb: "Kaiji’s Emperor · Citizen · Slave. Psychological duel — Slave alone can kill the Emperor.",
+        preview: "ecard" as const,
+      },
+      {
+        to: "/play/blackjack",
+        idx: "06",
+        code: "BJ21",
+        name: "Blackjack",
+        blurb: "Head-to-head poker. The rival hole card stays down until they stand.",
+        preview: "bj" as const,
+      },
+      // Deferred — Make 24
+      // {
+      //   to: "/play/24",
+      //   idx: "04",
+      //   code: "M24",
+      //   name: "Make 24",
+      //   blurb: "Same four poker cards. First to make 24 scores.",
+      //   preview: "m24" as const,
+      // },
+      {
+        to: "/play/holdem",
+        idx: "07",
+        code: "HOLD",
+        name: "Texas Hold’em",
+        blurb: "Heads-up Hold’em on a standard deck. Blinds, streets, showdown.",
+        preview: "hold" as const,
+      },
+    ],
   },
   {
-    to: "/play/flip7",
-    idx: "02",
-    code: "FLIP7",
-    name: "Flip 7",
-    blurb: "Number wreaths. Seven distinct values score a bonus. First to 200 wins.",
-    preview: "flip" as const,
+    title: "Board",
+    games: [
+      {
+        to: "/play/gomoku",
+        idx: "08",
+        code: "GOMOKU",
+        name: "Gomoku",
+        blurb: "15×15. Place stones. First five in a row wins.",
+        preview: "gomoku" as const,
+      },
+      {
+        to: "/play/ludo",
+        idx: "09",
+        code: "FLY",
+        name: "Flying Chess",
+        blurb: "Four planes each. Roll a 6 to take off, then race the colored track home.",
+        preview: "ludo" as const,
+      },
+      // Deferred — Werewolf
+      // {
+      //   to: "/play/werewolf",
+      //   idx: "10",
+      //   code: "WOLF",
+      //   name: "Werewolf",
+      //   blurb: "Night kills, day votes. Werewolves, Seer, Witch, and villagers.",
+      //   preview: "werewolf" as const,
+      // },
+      // Deferred — Animal Chess / Army Chess
+      // {
+      //   to: "/play/animal",
+      //   idx: "14",
+      //   code: "ANIMAL",
+      //   name: "Animal Chess",
+      //   blurb: "Jungle ranks, rivers, and dens. Enter the rival den to win.",
+      //   preview: "animal" as const,
+      // },
+      // {
+      //   to: "/play/army",
+      //   idx: "15",
+      //   code: "ARMY",
+      //   name: "Army Chess",
+      //   blurb: "Open 军棋. Bombs, mines, and the flag. Capture 军旗 to win.",
+      //   preview: "army" as const,
+      // },
+    ],
   },
   {
-    to: "/play/blackjack",
-    idx: "03",
-    code: "BJ21",
-    name: "Blackjack",
-    blurb: "Head-to-head poker. The rival hole card stays down until they stand.",
-    preview: "bj" as const,
+    title: "Casino",
+    games: [
+      {
+        to: "/play/roulette",
+        idx: "10",
+        code: "ROULETTE",
+        name: "European Roulette",
+        blurb: "Single-zero wheel 0–36. Solo bets vs the house — straight through even money.",
+        preview: "roulette" as const,
+      },
+      {
+        to: "/play/slots",
+        idx: "11",
+        code: "SLOTS",
+        name: "Slot Machine",
+        blurb: "Three-reel practice slots. Pick a bet, spin, and check the paytable.",
+        preview: "slots" as const,
+      },
+    ],
   },
-  // Deferred — Make 24
-  // {
-  //   to: "/play/24",
-  //   idx: "04",
-  //   code: "M24",
-  //   name: "Make 24",
-  //   blurb: "Same four poker cards. First to make 24 scores.",
-  //   preview: "m24" as const,
-  // },
-  {
-    to: "/play/holdem",
-    idx: "05",
-    code: "HOLD",
-    name: "Texas Hold’em",
-    blurb: "Heads-up Hold’em on a standard deck. Blinds, streets, showdown.",
-    preview: "hold" as const,
-  },
-  {
-    to: "/play/uno",
-    idx: "06",
-    code: "UNO",
-    name: "UNO",
-    blurb: "Classic four-color ovals. Empty your hand to win.",
-    preview: "uno" as const,
-  },
-  {
-    to: "/play/halli",
-    idx: "07",
-    code: "HALLI",
-    name: "Halli Galli",
-    blurb: "Flip fruit cards. When five of one fruit show, ring the bell first.",
-    preview: "halli" as const,
-  },
-  {
-    to: "/play/ecard",
-    idx: "08",
-    code: "ECARD",
-    name: "E-Card",
-    blurb: "Kaiji’s Emperor · Citizen · Slave. Psychological duel — Slave alone can kill the Emperor.",
-    preview: "ecard" as const,
-  },
-  {
-    to: "/play/gomoku",
-    idx: "09",
-    code: "GOMOKU",
-    name: "Gomoku",
-    blurb: "15×15. Place stones. First five in a row wins.",
-    preview: "gomoku" as const,
-  },
-  // Deferred — Werewolf
-  // {
-  //   to: "/play/werewolf",
-  //   idx: "10",
-  //   code: "WOLF",
-  //   name: "Werewolf",
-  //   blurb: "Night kills, day votes. Werewolves, Seer, Witch, and villagers.",
-  //   preview: "werewolf" as const,
-  // },
-  {
-    to: "/play/roulette",
-    idx: "11",
-    code: "ROULETTE",
-    name: "European Roulette",
-    blurb: "Single-zero wheel 0–36. Solo bets vs the house — straight through even money.",
-    preview: "roulette" as const,
-  },
-  {
-    to: "/play/slots",
-    idx: "12",
-    code: "SLOTS",
-    name: "Slot Machine",
-    blurb: "Three-reel practice slots. Pick a bet, spin, and check the paytable.",
-    preview: "slots" as const,
-  },
-  {
-    to: "/play/ludo",
-    idx: "13",
-    code: "FLY",
-    name: "Flying Chess",
-    blurb: "Four planes each. Roll a 6 to take off, then race the colored track home.",
-    preview: "ludo" as const,
-  },
-  // Deferred — Animal Chess / Army Chess
-  // {
-  //   to: "/play/animal",
-  //   idx: "14",
-  //   code: "ANIMAL",
-  //   name: "Animal Chess",
-  //   blurb: "Jungle ranks, rivers, and dens. Enter the rival den to win.",
-  //   preview: "animal" as const,
-  // },
-  // {
-  //   to: "/play/army",
-  //   idx: "15",
-  //   code: "ARMY",
-  //   name: "Army Chess",
-  //   blurb: "Open 军棋. Bombs, mines, and the flag. Capture 军旗 to win.",
-  //   preview: "army" as const,
-  // },
 ];
 
-function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
+function Preview({ kind }: { kind: (typeof sections)[number]["games"][number]["preview"] }) {
   if (kind === "coda") {
     return (
       <div className="preview-row">
@@ -280,21 +295,26 @@ export function Home() {
           <UnoFace card={{ id: "h2", color: "black", kind: "wild4" }} />
         </div>
       </section>
-      <div className="game-grid">
-        {games.map((g) => (
-          <Link key={g.code} to={g.to} className="game-card">
-            <div>
-              <div className="idx">
-                {g.idx} / {g.code}
-              </div>
-              <h2>{g.name}</h2>
-              <p>{g.blurb}</p>
-              <Preview kind={g.preview} />
-            </div>
-            <div className="enter">Open →</div>
-          </Link>
-        ))}
-      </div>
+      {sections.map((section) => (
+        <section key={section.title} className="game-section" aria-label={section.title}>
+          <p className="kicker">{section.title}</p>
+          <div className="game-grid">
+            {section.games.map((g) => (
+              <Link key={g.code} to={g.to} className="game-card">
+                <div>
+                  <div className="idx">
+                    {g.idx} / {g.code}
+                  </div>
+                  <h2>{g.name}</h2>
+                  <p>{g.blurb}</p>
+                  <Preview kind={g.preview} />
+                </div>
+                <div className="enter">Open →</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ))}
       <p className="section-note">Sign in to open a table, add CPUs or invite, then start. All games support online play.</p>
     </div>
   );
