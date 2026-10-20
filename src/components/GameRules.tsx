@@ -48,7 +48,7 @@ const RULES: Record<string, string[]> = {
   ludo: [
     "2–4 players. Each color has four planes. Practice is you (blue) against a red CPU. Open a table for a full set of seats.",
     "Roll a die. A 6 takes one plane from the hangar onto your ready square, or moves a plane 6 steps. A 6 gives another roll, up to three sixes; the third six still moves, then the turn passes.",
-    "Move clockwise on the shared track, then along your own colored home stretch. You need an exact roll to land on the center. First to bring all four planes home wins.",
+    "Move counter-clockwise on the shared track, then along your own colored home stretch. You need an exact roll to land on the center. First to bring all four planes home wins.",
     "Landing on one opponent plane sends it back to its hangar. Two or more of your own planes on a square stack into a block — opponents cannot land there, but they can move past it. Each plane still moves on its own.",
     "Colored dotted lines are fly shortcuts. Land exactly on your color’s arrow at the start of the line and you jump to the far end, closer to home. Passing over that square does not jump. Other colors cannot use your line.",
   ],

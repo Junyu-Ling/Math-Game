@@ -59,11 +59,11 @@ var TRACK = [
   [2, 6],
   [1, 6]
 ];
-var START_AT = [42, 3, 16, 29];
+var START_AT = [12, 51, 38, 25];
 var HOME = [
-  [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6]],
-  [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]],
   [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9], [7, 8]],
+  [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]],
+  [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6]],
   [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7], [8, 7]]
 ];
 var FLY_FROM = 17;
@@ -72,9 +72,12 @@ var LAST_OUTER = 50;
 var FINISH = 56;
 var MAX_SIXES = 3;
 var PAINT = ["red", "yellow", "blue", "green"];
+function mod(index, n) {
+  return (index % n + n) % n;
+}
 function trackCell(index) {
   const n = TRACK.length;
-  return TRACK[(index % n + n) % n] ?? [0, 6];
+  return TRACK[mod(index, n)] ?? [0, 6];
 }
 function trackColor(index) {
   return PAINT[index % PAINT.length] ?? "blue";
@@ -82,12 +85,9 @@ function trackColor(index) {
 function startTrackIndex(colorIdx) {
   return START_AT[colorIdx] ?? 0;
 }
-function flyTrackIndex(colorIdx) {
-  return (startTrackIndex(colorIdx) + FLY_FROM) % TRACK.length;
-}
 function trackIndex(colorIdx, pos) {
   if (pos < 0 || pos > LAST_OUTER) return null;
-  return (startTrackIndex(colorIdx) + pos) % TRACK.length;
+  return mod(startTrackIndex(colorIdx) - pos, TRACK.length);
 }
 function planeCell(colorIdx, pos) {
   if (pos < 0) return null;
@@ -106,20 +106,23 @@ function dirOf(dr, dc) {
 }
 function trackDir(index) {
   const here = trackCell(index);
-  const next = trackCell(index + 1);
+  const next = trackCell(index - 1);
   return dirOf(next[0] - here[0], next[1] - here[1]);
+}
+function flyTrackIndex(colorIdx) {
+  return mod(startTrackIndex(colorIdx) - FLY_FROM, TRACK.length);
 }
 function flyDir(colorIdx) {
   const from = trackCell(flyTrackIndex(colorIdx));
-  const to = trackCell(startTrackIndex(colorIdx) + FLY_TO);
+  const to = trackCell(mod(startTrackIndex(colorIdx) - FLY_TO, TRACK.length));
   return dirOf(to[0] - from[0], to[1] - from[1]);
 }
 function homeDir(colorIdx) {
-  return ["e", "s", "w", "n"][colorIdx] ?? "e";
+  return ["w", "s", "e", "n"][colorIdx] ?? "w";
 }
 function planeHeading(colorIdx, pos) {
-  if (pos < 0) return [90, 180, -90, 0][colorIdx] ?? 0;
-  if (pos >= FINISH) return [0, 90, 180, -90][colorIdx] ?? 0;
+  if (pos < 0) return [180, 90, 180, -90][colorIdx] ?? 0;
+  if (pos >= FINISH) return [180, 90, 0, -90][colorIdx] ?? 0;
   const here = planeCell(colorIdx, pos);
   const next = planeCell(colorIdx, pos + 1);
   if (!here || !next) return 0;

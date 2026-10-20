@@ -2,7 +2,10 @@ import { uid } from "../../lib/shuffle";
 
 /**
  * Chinese airplane chess (飞行棋).
- * 15×15 cross: shared clockwise track of 52, then 6 private home squares.
+ * 15×15 cross: shared counter-clockwise track of 52, then 6 private home squares.
+ * Bases: red top-left, blue top-right, green bottom-right, yellow bottom-left.
+ * Home columns run into the center star: red down from the top, blue left from the
+ * right, green up from the bottom, yellow right from the left.
  * Relative pos: -1 hangar, 0 ready square, 1–50 rest of the outer track,
  * 51–55 home approach, 56 center (exact roll).
  * Landing exactly on relative 17 flies to relative 31 along that color's dotted line.
@@ -27,13 +30,16 @@ export const TRACK: ReadonlyArray<readonly [number, number]> = [
 ];
 
 /** Blue, red, yellow, green — index of each ready square on TRACK. */
-export const START_AT = [42, 3, 16, 29] as const;
+export const START_AT = [12, 51, 38, 25] as const;
 
-/** Six home squares per color, last one is the center finish. */
+/**
+ * Six home squares per color, last one is the star point.
+ * Blue from the right, red from the top, yellow from the left, green from the bottom.
+ */
 export const HOME: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
-  [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6]],
-  [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]],
   [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9], [7, 8]],
+  [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]],
+  [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6]],
   [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7], [8, 7]],
 ];
 
@@ -62,9 +68,13 @@ export type LAction = { type: "roll" } | { type: "move"; pieceId: string } | { t
 type Landing = { pos: number; flew: boolean; captures: string[] };
 type Dir = "e" | "s" | "w" | "n";
 
+function mod(index: number, n: number): number {
+  return ((index % n) + n) % n;
+}
+
 function trackCell(index: number): readonly [number, number] {
   const n = TRACK.length;
-  return TRACK[((index % n) + n) % n] ?? [0, 6];
+  return TRACK[mod(index, n)] ?? [0, 6];
 }
 
 export function trackColor(index: number): FlyColor {
@@ -75,13 +85,9 @@ export function startTrackIndex(colorIdx: number): number {
   return START_AT[colorIdx] ?? 0;
 }
 
-export function flyTrackIndex(colorIdx: number): number {
-  return (startTrackIndex(colorIdx) + FLY_FROM) % TRACK.length;
-}
-
 export function trackIndex(colorIdx: number, pos: number): number | null {
   if (pos < 0 || pos > LAST_OUTER) return null;
-  return (startTrackIndex(colorIdx) + pos) % TRACK.length;
+  return mod(startTrackIndex(colorIdx) - pos, TRACK.length);
 }
 
 export function planeCell(colorIdx: number, pos: number): { r: number; c: number } | null {
@@ -103,23 +109,27 @@ function dirOf(dr: number, dc: number): Dir {
 
 export function trackDir(index: number): Dir {
   const here = trackCell(index);
-  const next = trackCell(index + 1);
+  const next = trackCell(index - 1);
   return dirOf(next[0] - here[0], next[1] - here[1]);
+}
+
+export function flyTrackIndex(colorIdx: number): number {
+  return mod(startTrackIndex(colorIdx) - FLY_FROM, TRACK.length);
 }
 
 export function flyDir(colorIdx: number): Dir {
   const from = trackCell(flyTrackIndex(colorIdx));
-  const to = trackCell(startTrackIndex(colorIdx) + FLY_TO);
+  const to = trackCell(mod(startTrackIndex(colorIdx) - FLY_TO, TRACK.length));
   return dirOf(to[0] - from[0], to[1] - from[1]);
 }
 
 export function homeDir(colorIdx: number): Dir {
-  return (["e", "s", "w", "n"] as const)[colorIdx] ?? "e";
+  return (["w", "s", "e", "n"] as const)[colorIdx] ?? "w";
 }
 
 export function planeHeading(colorIdx: number, pos: number): number {
-  if (pos < 0) return [90, 180, -90, 0][colorIdx] ?? 0;
-  if (pos >= FINISH) return [0, 90, 180, -90][colorIdx] ?? 0;
+  if (pos < 0) return [180, 90, 180, -90][colorIdx] ?? 0;
+  if (pos >= FINISH) return [180, 90, 0, -90][colorIdx] ?? 0;
   const here = planeCell(colorIdx, pos);
   const next = planeCell(colorIdx, pos + 1);
   if (!here || !next) return 0;

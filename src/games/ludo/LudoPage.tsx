@@ -3,7 +3,9 @@ import {
   COLORS,
   FINISH,
   HOME,
+  LAST_OUTER,
   TRACK,
+  trackIndex,
   aiLudo,
   applyLudoAction,
   flyDir,
@@ -55,26 +57,34 @@ function Arrow({ dir }: { dir: "e" | "s" | "w" | "n" }) {
   );
 }
 
-const BASE_PLACE: Record<FlyColor, { gridRow: string; gridColumn: string; ready: string }> = {
-  blue: { gridRow: "1 / 7", gridColumn: "1 / 7", ready: "ready ↓" },
-  red: { gridRow: "1 / 7", gridColumn: "10 / 16", ready: "↓ ready" },
-  yellow: { gridRow: "10 / 16", gridColumn: "10 / 16", ready: "← ready" },
-  green: { gridRow: "10 / 16", gridColumn: "1 / 7", ready: "ready ↑" },
+const BASE_PLACE: Record<FlyColor, { gridRow: string; gridColumn: string }> = {
+  red: { gridRow: "1 / 7", gridColumn: "1 / 7" },
+  blue: { gridRow: "1 / 7", gridColumn: "10 / 16" },
+  green: { gridRow: "10 / 16", gridColumn: "10 / 16" },
+  yellow: { gridRow: "10 / 16", gridColumn: "1 / 7" },
 };
 
-const CORNERS: Array<{ r: number; c: number; color: FlyColor; tri: string }> = [
-  { r: 6, c: 6, color: "blue", tri: "se" },
-  { r: 6, c: 8, color: "red", tri: "sw" },
-  { r: 8, c: 8, color: "yellow", tri: "nw" },
-  { r: 8, c: 6, color: "green", tri: "ne" },
+/** Inner corners of the cross, split like the classic board. */
+const SPLITS: Array<{ r: number; c: number; a: FlyColor; b: FlyColor }> = [
+  { r: 6, c: 6, a: "green", b: "blue" },
+  { r: 6, c: 8, a: "green", b: "yellow" },
+  { r: 8, c: 6, a: "blue", b: "red" },
+  { r: 8, c: 8, a: "red", b: "green" },
 ];
 
 const JUMPS: Array<{ id: FlyColor; stroke: string; x1: number; y1: number; x2: number; y2: number; rot: number }> = [
-  { id: "green", stroke: "#35c15a", x1: 5.5, y1: 6, x2: 9.5, y2: 6, rot: 0 },
-  { id: "red", stroke: "#f04444", x1: 9.5, y1: 9, x2: 5.5, y2: 9, rot: 180 },
-  { id: "yellow", stroke: "#e6b000", x1: 6, y1: 9.5, x2: 6, y2: 5.5, rot: -90 },
-  { id: "blue", stroke: "#3d7dff", x1: 9, y1: 5.5, x2: 9, y2: 9.5, rot: 90 },
+  { id: "green", stroke: "#1f9d45", x1: 9.35, y1: 6.15, x2: 5.65, y2: 6.15, rot: 180 },
+  { id: "yellow", stroke: "#e0a800", x1: 8.85, y1: 9.35, x2: 8.85, y2: 5.65, rot: -90 },
+  { id: "red", stroke: "#e23b3b", x1: 5.65, y1: 8.85, x2: 9.35, y2: 8.85, rot: 0 },
+  { id: "blue", stroke: "#2f6bff", x1: 6.15, y1: 5.65, x2: 6.15, y2: 9.35, rot: 90 },
 ];
+
+function outward(dir: "e" | "s" | "w" | "n"): "e" | "s" | "w" | "n" {
+  if (dir === "n") return "s";
+  if (dir === "s") return "n";
+  if (dir === "e") return "w";
+  return "e";
+}
 
 function DieFace({ n }: { n: number | null }) {
   const spots: Record<number, Array<[number, number]>> = {
@@ -207,9 +217,12 @@ export function LudoPage() {
 
   const starts = new Map<number, FlyColor>();
   const flies = new Map<number, FlyColor>();
+  const doors = new Map<number, FlyColor>();
   COLORS.forEach((color, i) => {
     starts.set(startTrackIndex(i), color);
     flies.set(flyTrackIndex(i), color);
+    const door = trackIndex(i, LAST_OUTER);
+    if (door != null) doors.set(door, color);
   });
 
   function tokens(key: string) {
@@ -302,8 +315,8 @@ export function LudoPage() {
                             x2={j.x2}
                             y2={j.y2}
                             stroke={j.stroke}
-                            strokeWidth="0.08"
-                            strokeDasharray="0.16 0.12"
+                            strokeWidth="0.11"
+                            strokeDasharray="0.22 0.14"
                             strokeLinecap="round"
                           />
                           <g transform={`translate(${(j.x1 + j.x2) / 2} ${(j.y1 + j.y2) / 2}) rotate(${j.rot}) scale(0.012) translate(-32 -32)`}>
@@ -324,7 +337,6 @@ export function LudoPage() {
                       const ci = COLORS.indexOf(color);
                       return (
                         <div key={color} className={`fly-base ${color}`} style={{ gridRow: place.gridRow, gridColumn: place.gridColumn }}>
-                          <span className="fly-ready">{place.ready}</span>
                           {parked.map((plane, slot) => (
                             <div key={slot} className="fly-pad">
                               {plane && owner ? (
@@ -346,10 +358,11 @@ export function LudoPage() {
                       const [r, c] = cell;
                       const start = starts.get(index);
                       const fly = flies.get(index);
+                      const door = doors.get(index);
                       const color = start ?? trackColor(index);
-                      const arrow = start ? trackDir(index) : fly ? flyDir(COLORS.indexOf(fly)) : null;
+                      const arrow = start ? trackDir(index) : fly ? flyDir(COLORS.indexOf(fly)) : door ? homeDir(COLORS.indexOf(door)) : null;
                       return (
-                        <div key={`t${index}`} className={`fly-cell track${start ? " is-start" : ""}${fly ? " is-fly" : ""}`} style={{ gridRow: r + 1, gridColumn: c + 1 }}>
+                        <div key={`t${index}`} className={`fly-cell track${start ? " is-start" : ""}${fly ? " is-fly" : ""}${door ? " is-door" : ""}`} style={{ gridRow: r + 1, gridColumn: c + 1 }}>
                           <span className={`sq c-${color}`} />
                           {arrow ? <Arrow dir={arrow} /> : null}
                           {tokens(`${r},${c}`)}
@@ -360,22 +373,23 @@ export function LudoPage() {
                       lane.map((cell, step) => {
                         const color = COLORS[ci] ?? "blue";
                         const finish = step === lane.length - 1;
+                        const into = homeDir(ci);
                         return (
                           <div
                             key={`h${ci}-${step}`}
-                            className={`fly-cell home${finish ? ` finish dir-${homeDir(ci)}` : ""}`}
+                            className={`fly-cell home${finish ? ` finish dir-${outward(into)}` : ""}`}
                             style={{ gridRow: cell[0] + 1, gridColumn: cell[1] + 1 }}
                           >
                             <span className={`sq c-${color}`} />
-                            {step === 0 ? <Arrow dir={homeDir(ci)} /> : null}
+                            {finish ? <Arrow dir={into} /> : null}
                             {tokens(`${cell[0]},${cell[1]}`)}
                           </div>
                         );
                       }),
                     )}
-                    {CORNERS.map((corner) => (
-                      <div key={`c${corner.r}${corner.c}`} className="fly-cell corner" style={{ gridRow: corner.r + 1, gridColumn: corner.c + 1 }}>
-                        <span className={`sq c-${corner.color} tri-${corner.tri}`} />
+                    {SPLITS.map((split) => (
+                      <div key={`c${split.r}${split.c}`} className="fly-cell corner" style={{ gridRow: split.r + 1, gridColumn: split.c + 1 }}>
+                        <span className="sq split" style={{ background: `linear-gradient(to bottom right, var(--fly-${split.a}) 50%, var(--fly-${split.b}) 50%)` }} />
                       </div>
                     ))}
                     <div className="fly-cell hub" style={{ gridRow: 8, gridColumn: 8 }}>

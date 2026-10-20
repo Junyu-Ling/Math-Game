@@ -62,18 +62,25 @@ function withPlanes(state, actorId, positions, dice) {
     assert(`${color} home is 6`, HOME[i].length === 6);
     for (const [r, c] of HOME[i]) assert(`${color} home off the track`, !keys.includes(`${r},${c}`));
   });
-  assert("blue ready", TRACK[START_AT[0]][0] === 6 && TRACK[START_AT[0]][1] === 1);
-  assert("red ready", TRACK[START_AT[1]][0] === 1 && TRACK[START_AT[1]][1] === 8);
-  assert("yellow ready", TRACK[START_AT[2]][0] === 8 && TRACK[START_AT[2]][1] === 13);
-  assert("green ready", TRACK[START_AT[3]][0] === 13 && TRACK[START_AT[3]][1] === 6);
-  assert("blue door", abs(0, LAST_OUTER) === 40 && TRACK[40][0] === 7 && TRACK[40][1] === 0);
+  assert("blue ready", TRACK[START_AT[0]][0] === 6 && TRACK[START_AT[0]][1] === 13);
+  assert("red ready", TRACK[START_AT[1]][0] === 1 && TRACK[START_AT[1]][1] === 6);
+  assert("yellow ready", TRACK[START_AT[2]][0] === 8 && TRACK[START_AT[2]][1] === 1);
+  assert("green ready", TRACK[START_AT[3]][0] === 13 && TRACK[START_AT[3]][1] === 8);
+  assert("blue door", abs(0, LAST_OUTER) === 14 && TRACK[14][0] === 7 && TRACK[14][1] === 14);
+  assert("red door", abs(1, LAST_OUTER) === 1 && TRACK[1][0] === 0 && TRACK[1][1] === 7);
   assert("shared fly offset", [0, 1, 2, 3].every((i) => abs(i, FLY_FROM) != null && abs(i, FLY_TO) != null));
   const blueIn = abs(0, FLY_FROM);
   const blueOut = abs(0, FLY_TO);
   assert("blue shortcut is vertical", TRACK[blueIn][1] === TRACK[blueOut][1] && TRACK[blueOut][0] > TRACK[blueIn][0]);
   const greenIn = abs(3, FLY_FROM);
   const greenOut = abs(3, FLY_TO);
-  assert("green shortcut is horizontal", TRACK[greenIn][0] === TRACK[greenOut][0] && TRACK[greenOut][1] > TRACK[greenIn][1]);
+  assert("green shortcut is horizontal", TRACK[greenIn][0] === TRACK[greenOut][0] && TRACK[greenOut][1] < TRACK[greenIn][1]);
+  const redIn = abs(1, FLY_FROM);
+  const redOut = abs(1, FLY_TO);
+  assert("red shortcut points right", TRACK[redIn][0] === TRACK[redOut][0] && TRACK[redOut][1] > TRACK[redIn][1]);
+  const yellowIn = abs(2, FLY_FROM);
+  const yellowOut = abs(2, FLY_TO);
+  assert("yellow shortcut points up", TRACK[yellowIn][1] === TRACK[yellowOut][1] && TRACK[yellowOut][0] < TRACK[yellowIn][0]);
 }
 
 {
