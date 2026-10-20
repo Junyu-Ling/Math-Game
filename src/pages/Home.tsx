@@ -28,14 +28,15 @@ const games = [
     blurb: "Head-to-head poker. The rival hole card stays down until they stand.",
     preview: "bj" as const,
   },
-  {
-    to: "/play/24",
-    idx: "04",
-    code: "M24",
-    name: "Make 24",
-    blurb: "Same four poker cards. First to make 24 scores.",
-    preview: "m24" as const,
-  },
+  // Deferred — Make 24
+  // {
+  //   to: "/play/24",
+  //   idx: "04",
+  //   code: "M24",
+  //   name: "Make 24",
+  //   blurb: "Same four poker cards. First to make 24 scores.",
+  //   preview: "m24" as const,
+  // },
   {
     to: "/play/holdem",
     idx: "05",
@@ -154,7 +155,7 @@ function Preview({ kind }: { kind: (typeof games)[number]["preview"] }) {
       </div>
     );
   }
-  if (kind === "m24" || kind === "hold") {
+  if (kind === "hold") {
     return (
       <div className="preview-row">
         <MiniPoker rank="A" suit="S" />
@@ -267,7 +268,7 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="kicker">Twelve tables · Invite play</p>
+          <p className="kicker">Eleven tables · Invite play</p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
             Card art follows the physical decks. Practice against the CPU, or sign in and invite someone who is online.

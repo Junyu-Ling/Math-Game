@@ -52,7 +52,8 @@ export const GAME_LABEL: Record<string, string> = {
   coda: "Coda",
   flip7: "Flip 7",
   bj: "Blackjack",
-  m24: "Make 24",
+  // Deferred — Make 24
+  // m24: "Make 24",
   holdem: "Hold’em",
   uno: "UNO",
   halli: "Halli Galli",
@@ -129,7 +130,8 @@ export const GAME_PATH: Record<string, string> = {
   coda: "/play/davinci",
   flip7: "/play/flip7",
   bj: "/play/blackjack",
-  m24: "/play/24",
+  // Deferred — Make 24
+  // m24: "/play/24",
   holdem: "/play/holdem",
   uno: "/play/uno",
   halli: "/play/halli",

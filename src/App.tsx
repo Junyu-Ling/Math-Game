@@ -10,7 +10,8 @@ import { Account } from "./pages/Account";
 import { DaVinciPage } from "./games/davinci/DaVinciPage";
 import { Flip7Page } from "./games/flip7/Flip7Page";
 import { BlackjackPage } from "./games/blackjack/BlackjackPage";
-import { Math24Page } from "./games/math24/Math24Page";
+// Deferred — Make 24
+// import { Math24Page } from "./games/math24/Math24Page";
 import { HoldemPage } from "./games/holdem/HoldemPage";
 import { UnoPage } from "./games/uno/UnoPage";
 import { HalliGalliPage } from "./games/halligalli/HalliGalliPage";
@@ -40,7 +41,7 @@ export function App() {
             <Route path="/play/davinci" element={<DaVinciPage />} />
             <Route path="/play/flip7" element={<Flip7Page />} />
             <Route path="/play/blackjack" element={<BlackjackPage />} />
-            <Route path="/play/24" element={<Math24Page />} />
+            {/* Deferred — Make 24: /play/24 */}
             <Route path="/play/holdem" element={<HoldemPage />} />
             <Route path="/play/uno" element={<UnoPage />} />
             <Route path="/play/halli" element={<HalliGalliPage />} />
