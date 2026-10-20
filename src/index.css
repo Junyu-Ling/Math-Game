@@ -30,6 +30,7 @@
 
 html, body, #root {
   margin: 0;
+  width: 100%;
   min-height: 100%;
   min-height: 100dvh;
   background: var(--bg);
@@ -38,14 +39,6 @@ html, body, #root {
 }
 
 html { overflow-x: hidden; }
-
-body {
-  background-color: var(--bg);
-  background-image:
-    radial-gradient(900px 520px at 8% -10%, rgba(196, 168, 148, 0.18), transparent 58%),
-    radial-gradient(720px 480px at 100% 0%, rgba(164, 184, 176, 0.16), transparent 55%),
-    radial-gradient(640px 420px at 50% 100%, rgba(210, 198, 178, 0.22), transparent 60%);
-}
 
 button, input, select, textarea {
   font-family: inherit;
@@ -68,8 +61,10 @@ button:disabled {
 }
 
 .shell {
+  width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
+  background: var(--bg);
   display: grid;
   grid-template-rows: auto 1fr auto;
 }
