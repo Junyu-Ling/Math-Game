@@ -2,6 +2,10 @@ import { Link } from "react-router-dom";
 import { MahjongTile } from "../components/MahjongTile";
 import { FlipFace, MiniPoker, UnoFace } from "../components/PlayingCard";
 import { PlaneIcon } from "../games/ludo/LudoPage";
+import { SlotGlyph } from "../games/slots/SlotsPage";
+import type { SymbolId } from "../games/slots/engine";
+
+const SLOT_PREVIEW: SymbolId[] = ["cherry", "seven", "bar", "wild", "lemon", "bell", "orange", "plum"];
 
 const sections = [
   {
@@ -248,10 +252,12 @@ function Preview({ kind }: { kind: (typeof sections)[number]["games"][number]["p
   }
   if (kind === "slots") {
     return (
-      <div className="preview-row">
-        <span className="slots-preview" aria-hidden>
-          🍒 · 7 · ★
-        </span>
+      <div className="preview-row slots-home-preview">
+        {SLOT_PREVIEW.map((sym) => (
+          <span key={sym} className="slots-home-glyph" aria-hidden>
+            <SlotGlyph sym={sym} />
+          </span>
+        ))}
       </div>
     );
   }

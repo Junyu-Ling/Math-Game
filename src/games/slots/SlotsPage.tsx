@@ -21,7 +21,7 @@ const REEL_STOP_FIRST_MS = 780;
 const REEL_STOP_GAP_MS = 560;
 const REEL_LAND_MS = 340;
 
-const GLYPH: Record<SymbolId, string> = {
+export const SLOT_GLYPH: Record<SymbolId, string> = {
   cherry: "🍒",
   lemon: "🍋",
   orange: "🍊",
@@ -31,6 +31,15 @@ const GLYPH: Record<SymbolId, string> = {
   seven: "7",
   wild: "★",
 };
+
+/** Compact paytable face for the home-card preview. */
+export function SlotGlyph({ sym }: { sym: SymbolId }) {
+  return (
+    <span className={`slots-symbol sym-${sym}`}>
+      <span className="slots-glyph">{SLOT_GLYPH[sym]}</span>
+    </span>
+  );
+}
 
 function reelLoop(offset: number): SymbolId[] {
   const once = SYMBOLS.map((_, i) => SYMBOLS[(i + offset) % SYMBOLS.length]!);
@@ -196,7 +205,7 @@ export function SlotsPage() {
 function ReelFace({ sym }: { sym: SymbolId }) {
   return (
     <div className={`slots-symbol sym-${sym}`}>
-      <span className="slots-glyph">{GLYPH[sym]}</span>
+      <span className="slots-glyph">{SLOT_GLYPH[sym]}</span>
       <span className="slots-name">{SYMBOL_LABEL[sym]}</span>
     </div>
   );
