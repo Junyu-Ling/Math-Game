@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   PAYTABLE,
+  SYMBOLS,
   SYMBOL_LABEL,
   ackResult,
   beginSpin,
@@ -15,6 +16,10 @@ import { GameRules } from "../../components/GameRules";
 import { useAuth } from "../../context/AuthContext";
 
 const BETS = [1, 5, 10, 25, 50, 100];
+const REEL_COUNT = 3;
+const REEL_STOP_FIRST_MS = 780;
+const REEL_STOP_GAP_MS = 560;
+const REEL_LAND_MS = 340;
 
 const GLYPH: Record<SymbolId, string> = {
   cherry: "🍒",
@@ -27,23 +32,43 @@ const GLYPH: Record<SymbolId, string> = {
   wild: "★",
 };
 
+function reelLoop(offset: number): SymbolId[] {
+  const once = SYMBOLS.map((_, i) => SYMBOLS[(i + offset) % SYMBOLS.length]!);
+  return [...once, ...once];
+}
+
+const REEL_LOOPS = [0, 3, 5].map(reelLoop);
+
 export function SlotsPage() {
   const { user, setChips } = useAuth();
   const [state, setState] = useState<SlotsState>(() => startSlots(user?.chips ?? 1000));
+  const [stopped, setStopped] = useState(REEL_COUNT);
 
   useEffect(() => {
-    if (state.phase !== "spinning") return;
-    const t = window.setTimeout(() => {
+    if (state.phase !== "spinning") {
+      setStopped(REEL_COUNT);
+      return;
+    }
+    setStopped(0);
+    const timers = Array.from({ length: REEL_COUNT }, (_, i) =>
+      window.setTimeout(() => setStopped(i + 1), REEL_STOP_FIRST_MS + i * REEL_STOP_GAP_MS),
+    );
+    const fin = window.setTimeout(() => {
       setState((s) => {
+        if (s.phase !== "spinning") return s;
         const next = finishSpin(s);
         if (user) void setChips(next.chips).catch(() => undefined);
         return next;
       });
-    }, 1600);
-    return () => window.clearTimeout(t);
+    }, REEL_STOP_FIRST_MS + (REEL_COUNT - 1) * REEL_STOP_GAP_MS + REEL_LAND_MS);
+    return () => {
+      timers.forEach((t) => window.clearTimeout(t));
+      window.clearTimeout(fin);
+    };
   }, [state.phase, state.spinCount, user, setChips]);
 
   function spin() {
+    setStopped(0);
     setState((s) => {
       const idle = s.phase === "result" ? ackResult(s) : s;
       return beginSpin(idle);
@@ -84,15 +109,34 @@ export function SlotsPage() {
               ) : null}
             </div>
 
-            <div className={`slots-window${state.phase === "spinning" ? " spinning" : ""}`}>
-              {state.reels.map((sym, i) => (
-                <div key={i} className="slots-reel" style={{ ["--delay" as string]: `${i * 0.12}s` }}>
-                  <div className={`slots-symbol sym-${sym}`}>
-                    <span className="slots-glyph">{GLYPH[sym]}</span>
-                    <span className="slots-name">{SYMBOL_LABEL[sym]}</span>
+            <div
+              className="slots-window"
+              aria-busy={state.phase === "spinning"}
+            >
+              {state.reels.map((sym, i) => {
+                const spinning = state.phase === "spinning" && i >= stopped;
+                const landed = state.phase === "spinning" && i < stopped;
+                return (
+                  <div
+                    key={i}
+                    className={`slots-reel${spinning ? " is-spinning" : ""}${landed ? " is-landed" : ""}`}
+                    style={{ ["--i" as string]: i }}
+                    aria-label={spinning ? `Reel ${i + 1} spinning` : `${SYMBOL_LABEL[sym]}`}
+                  >
+                    {spinning ? (
+                      <div className="slots-strip" aria-hidden>
+                        {REEL_LOOPS[i]!.map((face, n) => (
+                          <div key={n} className="slots-cell">
+                            <ReelFace sym={face} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <ReelFace sym={sym} />
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <p className="slots-status">{state.message}</p>
@@ -145,6 +189,15 @@ export function SlotsPage() {
           <GameRules game="slots" />
         </aside>
       </div>
+    </div>
+  );
+}
+
+function ReelFace({ sym }: { sym: SymbolId }) {
+  return (
+    <div className={`slots-symbol sym-${sym}`}>
+      <span className="slots-glyph">{GLYPH[sym]}</span>
+      <span className="slots-name">{SYMBOL_LABEL[sym]}</span>
     </div>
   );
 }

@@ -3497,11 +3497,9 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   gap: 0.75rem;
   padding: clamp(14px, 2vw, 24px);
   min-height: clamp(480px, 70dvh, 720px);
-  background:
-    radial-gradient(ellipse at 30% 20%, rgba(34, 120, 70, 0.18), transparent 50%),
-    linear-gradient(165deg, #1a2e22 0%, #0f1a14 55%, #152218 100%);
-  border: 1px solid #2d4a38;
-  color: #e8efe9;
+  background: rgba(255, 255, 255, 0.52);
+  border: 1px solid var(--line);
+  color: var(--ink);
 }
 
 .roulette-casino {
@@ -3590,16 +3588,17 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   min-width: 3rem;
   padding: 0.35rem 0.75rem;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid #3d5c48;
+  background: #fff;
+  border: 1px solid var(--line);
   font-weight: 700;
   font-size: 1.25rem;
+  color: var(--ink);
 }
 
 .roulette-status,
 .roulette-history {
   font-size: 0.85rem;
-  color: #c5d4c9;
+  color: var(--muted);
   max-width: 260px;
 }
 
@@ -3609,9 +3608,17 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   font-weight: 700;
 }
 
-.tone-red { color: #f87171; }
-.tone-black { color: #e5e7eb; }
-.tone-green { color: #4ade80; }
+.tone-red { color: #b91c1c; }
+.tone-black { color: #111111; }
+.tone-green { color: #15803d; }
+
+.rw-lab,
+.rb-num,
+.rb-zero,
+.rb-out.tone-red,
+.rb-out.tone-black {
+  color: #fff;
+}
 
 .roulette-board-wrap {
   display: flex;
@@ -3637,8 +3644,9 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 }
 
 .roulette-mode-row .btn.on {
-  border-color: #c9a227;
-  color: #f5e6b8;
+  border-color: var(--ink);
+  color: var(--ink);
+  background: #fff;
 }
 
 .roulette-felt {
@@ -3647,8 +3655,8 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   grid-template-rows: auto auto auto;
   gap: 4px;
   padding: 8px;
-  background: #0d3d28;
-  border: 2px solid #1a6b45;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 8px;
 }
 
@@ -3721,9 +3729,9 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 
 .rb-out {
   padding: 0.4rem 0.25rem;
-  background: #14532d;
-  color: #e8efe9;
-  border: 1px solid #1a6b45;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
   font-size: 0.7rem;
   font-weight: 600;
   cursor: pointer;
@@ -3743,7 +3751,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   max-height: 7rem;
   overflow: auto;
   font-size: 0.8rem;
-  color: #c5d4c9;
+  color: var(--ink);
 }
 
 .roulette-bet-list li + li {
@@ -3756,11 +3764,9 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   flex-direction: column;
   padding: clamp(18px, 2.4vw, 28px);
   min-height: clamp(420px, 60dvh, 640px);
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(180, 140, 40, 0.2), transparent 45%),
-    linear-gradient(180deg, #1c1914 0%, #0f0e0c 100%);
-  border: 1px solid #3f3a32;
-  color: #f3efe6;
+  background: rgba(255, 255, 255, 0.52);
+  border: 1px solid var(--line);
+  color: var(--ink);
 }
 
 .slots-machine {
@@ -3779,30 +3785,79 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   gap: 0.5rem;
   width: 100%;
   padding: 1rem;
-  background: #0a0a09;
+  background: var(--bg-2);
   border: 4px solid #c9a227;
   border-radius: 12px;
-  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 8px 24px rgba(17, 17, 17, 0.06);
 }
 
 .slots-reel {
-  background: linear-gradient(180deg, #2a2620, #1a1814);
-  border: 1px solid #4a4338;
+  --reel-h: 128px;
+  background: #fff;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  min-height: 110px;
+  height: var(--reel-h);
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
-.slots-window.spinning .slots-reel {
-  animation: slots-blur 0.35s ease-in-out infinite alternate;
-  animation-delay: var(--delay, 0s);
+.slots-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  will-change: transform;
 }
 
-@keyframes slots-blur {
-  from { filter: blur(0); transform: translateY(0); }
-  to { filter: blur(1px); transform: translateY(4px); }
+.slots-cell {
+  height: var(--reel-h);
+  flex: 0 0 var(--reel-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.slots-reel.is-spinning {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.slots-reel.is-spinning .slots-strip {
+  animation: reel-spin 0.42s linear infinite;
+  animation-delay: calc(var(--i, 0) * -0.14s);
+}
+
+.slots-reel.is-spinning .slots-glyph {
+  filter: blur(1.4px);
+}
+
+.slots-reel.is-landed .slots-symbol {
+  animation: reel-land 0.34s cubic-bezier(0.16, 0.84, 0.24, 1);
+}
+
+@keyframes reel-spin {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+
+@keyframes reel-land {
+  0% { transform: translateY(-62%); filter: blur(3px); }
+  68% { transform: translateY(7%); filter: blur(0); }
+  100% { transform: translateY(0); filter: blur(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slots-reel.is-spinning .slots-strip,
+  .slots-reel.is-landed .slots-symbol {
+    animation: none;
+  }
+  .slots-reel.is-spinning .slots-glyph {
+    filter: none;
+  }
 }
 
 .slots-symbol {
@@ -3823,23 +3878,24 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
 .slots-name {
   font-size: 0.7rem;
   letter-spacing: 0.04em;
-  color: #c4b8a0;
+  color: var(--muted);
 }
 
 .sym-seven .slots-glyph { color: #ef4444; }
-.sym-bar .slots-glyph { color: #f5e6b8; font-size: 1.4rem; }
-.sym-wild .slots-glyph { color: #fbbf24; }
-.sym-bell .slots-glyph { color: #fcd34d; }
+.sym-bar .slots-glyph { color: #9a3412; font-size: 1.4rem; }
+.sym-wild .slots-glyph { color: #d97706; }
+.sym-bell .slots-glyph { color: #ca8a04; }
 
 .slots-status {
   text-align: center;
-  color: #d6cbb8;
+  color: var(--ink);
   font-size: 0.9rem;
+  min-height: 1.4em;
 }
 
 .slots-paytable {
   width: 100%;
-  border-top: 1px solid #3f3a32;
+  border-top: 1px solid var(--line);
   padding-top: 0.75rem;
 }
 
@@ -3860,7 +3916,7 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   justify-content: space-between;
   gap: 1rem;
   padding: 0.2rem 0;
-  color: #c4b8a0;
+  color: var(--muted);
 }
 
 .slots-preview {
