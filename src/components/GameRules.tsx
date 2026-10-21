@@ -15,7 +15,7 @@ const RULES: Record<string, string[]> = {
     "Duplicate number busts you unless you hold Second Chance (passive — discards with the duplicate; one per player).",
     "Seven different numbers in your area is Flip 7: bank immediately with an extra +15.",
     "Freeze and Flip Three can target any active player, including yourself. Last active player must use them on themselves.",
-    "Freeze banks that player’s round score. Flip Three forces three flips on the target.",
+    "Freeze banks that player’s round score. Flip Three makes that player flip three cards immediately — they do not wait for their turn. Bust or Flip 7 stops the rest.",
   ],
   uno: [
     "2–4 players. Match color or number/symbol. Empty your hand to win.",

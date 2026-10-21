@@ -967,11 +967,15 @@ function cpuIsToAct(room) {
     const cur = s.players[s.turn];
     return Boolean(isCpuPlayer(cur) && (s.phase === "draw" || s.phase === "guess" || s.phase === "continue" || s.phase === "penalty"));
   }
-  if (room.game === "uno" || room.game === "flip7") {
+  if (room.game === "flip7") {
     const cur = s.players[s.turn];
-    if (!isCpuPlayer(cur)) return false;
-    if (room.game === "flip7") return s.phase === "target" || s.phase === "action";
-    return true;
+    if (!cur || (s.phase !== "action" && s.phase !== "target")) return false;
+    if (s.phase === "action" && cur.pendingFlip3 > 0) return true;
+    return Boolean(isCpuPlayer(cur));
+  }
+  if (room.game === "uno") {
+    const cur = s.players[s.turn];
+    return Boolean(isCpuPlayer(cur));
   }
   if (room.game === "halli") {
     if (s.phase !== "play") return false;
@@ -1133,10 +1137,16 @@ async function playOneCpuTurn(room) {
   if (room.game === "flip7") {
     const cur = s.players[s.turn];
     if (s.phase === "target") {
+      if (!isCpuPlayer(cur)) return false;
       room.state = mods.flip.applyFlipAction(s, cur.id, { type: "target", targetId: mods.flip.aiTarget(s) });
       return true;
     }
     if (s.phase === "action") {
+      if (cur.pendingFlip3 > 0) {
+        room.state = mods.flip.applyFlipAction(s, cur.id, { type: "hit" });
+        return true;
+      }
+      if (!isCpuPlayer(cur)) return false;
       room.state = mods.flip.applyFlipAction(s, cur.id, { type: mods.flip.aiDecide(s) });
       return true;
     }

@@ -68,7 +68,8 @@ function emptySeat(p) {
     area: [],
     status: "active",
     pendingFreeze: false,
-    pendingFlip3: 0
+    pendingFlip3: 0,
+    skipTurn: false
   };
 }
 function startFlip7Lobby(people) {
@@ -84,6 +85,7 @@ function startFlip7Lobby(people) {
     lastCard: null,
     winnerId: null,
     goal: 200,
+    resume: [],
     burst: null,
     log: [{ id: uid("l"), text: `Table ${players.length}. Add CPUs or invite, then start with 2+ players.` }]
   };
@@ -103,6 +105,7 @@ function startFlip7Table(people) {
     lastCard: null,
     winnerId: null,
     goal: 200,
+    resume: [],
     burst: null,
     log: [{ id: uid("l"), text: `${players.map((p) => p.name).join(" \xB7 ")}. Hit / Stay. First to 200.` }]
   };
@@ -153,7 +156,7 @@ function withPlayer(state, id, fn) {
 function hit(state) {
   if (state.phase !== "action") return state;
   const me = currentFlip(state);
-  if (me.status !== "active") return advance(state);
+  if (me.status !== "active") return handoff(state);
   const pulled = takeCard({ ...state, burst: null });
   const card = pulled.card;
   let next = pulled.state;
@@ -175,7 +178,7 @@ function hit(state) {
     next.discard = [...next.discard, ...me.area, card];
     next.burst = { playerId: me.id, id: uid("boom"), kind: "bust" };
     next.log = [...next.log, { id: uid("l"), text: `${me.name} busts (duplicate ${card.value}). Round scores 0.`, tone: "bad" }];
-    return advance(next);
+    return handoff(next);
   }
   if (card.kind === "chance" && hasSecondChance(me.area)) {
     next = withPlayer(next, me.id, (p) => ({ ...p, pendingFlip3: Math.max(0, p.pendingFlip3 - 1) }));
@@ -214,11 +217,11 @@ function afterHit(state, playerId) {
     next.log = [...next.log, { id: uid("l"), text: `${me.name} Flip 7! +${scored.score} (includes +15 bonus).`, tone: "you" }];
     next = checkWin(next, me.id);
     if (next.phase === "over") return next;
-    return advance({ ...next, turn: idx });
+    return handoff({ ...next, turn: idx });
   }
   const parked = { ...state, turn: Math.max(0, idx), phase: "action" };
-  if (me.pendingFlip3 > 0) return parked;
-  return advance(parked);
+  if (me.pendingFlip3 > 0 && me.status === "active") return parked;
+  return handoff(parked);
 }
 function stay(state) {
   if (state.phase !== "action") return state;
@@ -230,7 +233,22 @@ function stay(state) {
   next.log = [...next.log, { id: uid("l"), text: `${me.name} stays. Round +${scored}.`, tone: me.human ? "you" : "ai" }];
   next = checkWin(next, me.id);
   if (next.phase === "over") return next;
-  return advance(next);
+  return handoff(next);
+}
+function handoff(state) {
+  const stack = state.resume ?? [];
+  if (!stack.length) return advance(state);
+  const back = stack[stack.length - 1];
+  const restored = {
+    ...state,
+    turn: back,
+    resume: stack.slice(0, -1),
+    phase: "action",
+    pendingAction: null
+  };
+  const caster = restored.players[back];
+  if (caster && caster.status === "active" && caster.pendingFlip3 > 0) return restored;
+  return advance(restored);
 }
 function applyTarget(state, targetId) {
   if (state.phase !== "target" || !state.pendingAction) return state;
@@ -268,16 +286,27 @@ function applyTarget(state, targetId) {
     if (next.phase === "over") return next;
     return afterHit(next, me.id);
   }
-  next = withPlayer(next, target.id, (p) => ({ ...p, pendingFlip3: p.pendingFlip3 + 3 }));
+  next = withPlayer(next, target.id, (p) => ({
+    ...p,
+    pendingFlip3: p.pendingFlip3 + 3,
+    skipTurn: onSelf ? p.skipTurn : true
+  }));
   next.log = [
     ...next.log,
     {
       id: uid("l"),
-      text: onSelf ? `${me.name} uses Flip Three on themselves.` : `${me.name} uses Flip Three on ${target.name}.`
+      text: onSelf ? `${me.name} uses Flip Three on themselves and flips three now.` : `${me.name} uses Flip Three on ${target.name}. ${target.name} flips three now.`
     }
   ];
   next.pendingAction = null;
   next.phase = "action";
+  if (!onSelf) {
+    const targetIdx = next.players.findIndex((p) => p.id === target.id);
+    const myIdx = Math.max(0, next.players.findIndex((p) => p.id === me.id));
+    if (targetIdx >= 0) {
+      return { ...next, turn: targetIdx, resume: [...next.resume ?? [], myIdx] };
+    }
+  }
   return afterHit(next, me.id);
 }
 function checkWin(state, playerId) {
@@ -303,12 +332,14 @@ function newRound(state) {
     area: [],
     status: "active",
     pendingFreeze: false,
-    pendingFlip3: 0
+    pendingFlip3: 0,
+    skipTurn: false
   }));
   return {
     ...state,
     players,
     discard,
+    resume: [],
     // Keep bust/freeze/flip7 FX so the UI can finish animating into the next round.
     burst: state.burst,
     round: state.round + 1,
@@ -322,30 +353,43 @@ function newRound(state) {
     ]
   };
 }
+function clearSkip(state, ids) {
+  if (!ids.length) return state;
+  const skip = new Set(ids);
+  return { ...state, players: state.players.map((p) => skip.has(p.id) ? { ...p, skipTurn: false } : p) };
+}
 function advance(state) {
   if (state.phase === "over") return state;
   if (allSettled(state)) return newRound(state);
   let i = state.turn;
+  const skipped = [];
   for (let n = 0; n < state.players.length; n++) {
     i = (i + 1) % state.players.length;
     const p = state.players[i];
     if (!p || p.status !== "active") continue;
+    if (p.skipTurn) {
+      skipped.push(p.id);
+      continue;
+    }
+    const next = clearSkip(state, skipped);
     if (p.pendingFreeze) {
       const scored = areaScore(p.area).score;
-      let next = withPlayer(state, p.id, (x) => ({
+      let frozen = withPlayer(next, p.id, (x) => ({
         ...x,
         pendingFreeze: false,
         status: "stayed",
         total: x.total + scored
       }));
-      next.log = [...next.log, { id: uid("l"), text: `${p.name} is frozen and must stay +${scored}.` }];
-      next = checkWin(next, p.id);
-      if (next.phase === "over") return next;
-      next.turn = i;
-      return advance(next);
+      frozen.log = [...frozen.log, { id: uid("l"), text: `${p.name} is frozen and must stay +${scored}.` }];
+      frozen = checkWin(frozen, p.id);
+      if (frozen.phase === "over") return frozen;
+      frozen.turn = i;
+      return advance(frozen);
     }
-    return { ...state, turn: i, phase: "action" };
+    return { ...next, turn: i, phase: "action" };
   }
+  const pendingSkips = state.players.filter((p) => p.status === "active" && p.skipTurn).map((p) => p.id);
+  if (pendingSkips.length) return advance(clearSkip(state, pendingSkips));
   return newRound(state);
 }
 function aiDecide(state) {

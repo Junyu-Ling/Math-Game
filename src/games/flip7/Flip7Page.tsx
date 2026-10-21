@@ -98,6 +98,7 @@ function FlipSeat({
       <div className={`seat-label${lead ? " is-lead" : ""}`}>
         {player.name} · {mine ? `round ${scored.score} · total ${player.total}` : `${player.total} PTS · ${player.status.toUpperCase()}`}
         {player.area.some((c) => c.kind === "chance") ? " · 2ND CHANCE" : ""}
+        {player.pendingFlip3 > 0 ? ` · FLIP ${player.pendingFlip3}` : ""}
         {turn ? " · TURN" : ""}
         {lead ? " · LEAD" : ""}
       </div>
@@ -187,7 +188,8 @@ export function Flip7Page() {
   useEffect(() => {
     if (!practice || !local || local.phase === "over" || local.phase === "lobby") return;
     const actor = currentFlip(local);
-    if (actor.human) return;
+    const forced = local.phase === "action" && actor.pendingFlip3 > 0;
+    if (actor.human && !forced) return;
     let stop = false;
     void (async () => {
       await wait(
@@ -201,9 +203,15 @@ export function Flip7Page() {
       );
       if (stop) return;
       setLocal((s) => {
-        if (!s || s.phase === "lobby" || s.phase === "over" || currentFlip(s).human) return s;
-        if (s.phase === "target") return applyFlipAction(s, currentFlip(s).id, { type: "target", targetId: aiTarget(s) });
-        return applyFlipAction(s, currentFlip(s).id, { type: aiDecide(s) });
+        if (!s || s.phase === "lobby" || s.phase === "over") return s;
+        const cur = currentFlip(s);
+        if (s.phase === "target") {
+          if (cur.human) return s;
+          return applyFlipAction(s, cur.id, { type: "target", targetId: aiTarget(s) });
+        }
+        if (cur.pendingFlip3 > 0) return applyFlipAction(s, cur.id, { type: "hit" });
+        if (cur.human) return s;
+        return applyFlipAction(s, cur.id, { type: aiDecide(s) });
       });
     })();
     return () => {
@@ -242,13 +250,18 @@ export function Flip7Page() {
     if (freezeFx) return "Frozen!";
     if (flip7Fx) return "Flip 7! +15";
     if (savePlaying) return "Second Chance!";
-    if (myTurn) {
-      if (state.phase === "target") {
-        return `Choose who gets ${state.pendingAction === "freeze" ? "Freeze" : "Flip Three"} — yourself included.`;
-      }
-      if (me.pendingFlip3 > 0) return `Flip Three: ${me.pendingFlip3} flip${me.pendingFlip3 === 1 ? "" : "s"} left.`;
-      return "Flip one card, then the next player. Stay to bank this round.";
+    if (state.phase === "target") {
+      return myTurn
+        ? `Choose who gets ${state.pendingAction === "freeze" ? "Freeze" : "Flip Three"} — yourself included.`
+        : cur?.name
+          ? `${cur.name} is choosing a target.`
+          : "Choosing a target.";
     }
+    if (cur && cur.pendingFlip3 > 0 && state.phase === "action") {
+      const n = cur.pendingFlip3;
+      return myTurn ? `Flip Three: flipping ${n} more.` : `${cur.name} flips ${n} more from Flip Three.`;
+    }
+    if (myTurn) return "Flip one card, then the next player. Stay to bank this round.";
     return `${cur?.name} is acting`;
   })();
 
@@ -283,7 +296,12 @@ export function Flip7Page() {
         mine
       />
       <div className="row-actions">
-        <button className="btn btn-go" type="button" disabled={!myTurn || state?.phase !== "action" || savePlaying} onClick={() => act({ type: "hit" })}>
+        <button
+          className="btn btn-go"
+          type="button"
+          disabled={!myTurn || state?.phase !== "action" || savePlaying || me.pendingFlip3 > 0}
+          onClick={() => act({ type: "hit" })}
+        >
           HIT
         </button>
         <button
