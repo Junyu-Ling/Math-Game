@@ -168,6 +168,15 @@ export function startFlip7Practice(): FlipState {
   return startFlip7(2);
 }
 
+/** Local guest practice — you alone. Freeze and Flip Three land on you. */
+export function startFlip7Solo(): FlipState {
+  const state = startFlip7(1);
+  return {
+    ...state,
+    log: [{ id: uid("l"), text: "Solo practice. Hit or stay. First to 200. Freeze and Flip Three land on you." }],
+  };
+}
+
 export function viewFlip7(state: FlipState, _viewerId: string): FlipState {
   return state;
 }

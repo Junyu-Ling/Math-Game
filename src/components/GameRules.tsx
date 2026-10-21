@@ -11,7 +11,8 @@ const RULES: Record<string, string[]> = {
     "When the deck is empty, play continues. Skip the draw and guess. A hit lets you guess again or end the turn. A miss knocks down one of your own hidden tiles.",
   ],
   flip7: [
-    "2+ players. On your turn flip one card or stay to bank the round. First to 200 wins.",
+    "2+ players, or Practice Solo alone. On your turn flip one card or stay to bank the round. First to 200 wins.",
+    "In Practice Solo, Freeze and Flip Three are played on yourself.",
     "Duplicate number busts you unless you hold Second Chance (passive — discards with the duplicate; one per player).",
     "Seven different numbers in your area is Flip 7: bank immediately with an extra +15.",
     "Freeze and Flip Three can target any active player, including yourself. Last active player must use them on themselves.",

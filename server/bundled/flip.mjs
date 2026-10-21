@@ -127,6 +127,13 @@ function startFlip7(seats = 2) {
 function startFlip7Practice() {
   return startFlip7(2);
 }
+function startFlip7Solo() {
+  const state = startFlip7(1);
+  return {
+    ...state,
+    log: [{ id: uid("l"), text: "Solo practice. Hit or stay. First to 200. Freeze and Flip Three land on you." }]
+  };
+}
 function viewFlip7(state, _viewerId) {
   return state;
 }
@@ -456,6 +463,7 @@ export {
   startFlip7Duel,
   startFlip7Lobby,
   startFlip7Practice,
+  startFlip7Solo,
   startFlip7Table,
   stay,
   viewFlip7

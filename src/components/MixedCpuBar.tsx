@@ -7,11 +7,14 @@ export function MixedCpuBar({
   game,
   meta,
   onPractice,
+  onSolo,
 }: {
   game: string;
   meta?: Record<string, unknown>;
   /** Local Practice vs CPU — no login / Open table required. */
   onPractice?: () => void;
+  /** Local solo practice — no opponents. */
+  onSolo?: () => void;
 }) {
   const { user } = useAuth();
   const { room, error, adjustCpu } = useLobby();
@@ -47,14 +50,23 @@ export function MixedCpuBar({
       <div className="cpu-bar">
         <p>
           {onPractice
-            ? "Practice vs CPU anytime. Sign in to open a table or invite someone."
+            ? onSolo
+              ? "Practice solo or vs CPU anytime. Sign in to open a table or invite someone."
+              : "Practice vs CPU anytime. Sign in to open a table or invite someone."
             : "Sign in to open a table, then add a CPU or invite someone."}
         </p>
-        {onPractice ? (
+        {onPractice || onSolo ? (
           <div className="row-actions" style={{ justifyContent: "center" }}>
-            <button className="btn" type="button" onClick={onPractice}>
-              Practice vs CPU
-            </button>
+            {onSolo ? (
+              <button className="btn btn-ghost" type="button" onClick={onSolo}>
+                Practice Solo
+              </button>
+            ) : null}
+            {onPractice ? (
+              <button className="btn" type="button" onClick={onPractice}>
+                Practice vs CPU
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -66,7 +78,9 @@ export function MixedCpuBar({
       <p>
         {!atTable
           ? showPractice
-            ? "Practice locally vs CPU, or open a table to add a CPU / invite."
+            ? onSolo
+              ? "Practice solo or vs CPU, or open a table to add a CPU / invite."
+              : "Practice locally vs CPU, or open a table to add a CPU / invite."
             : "Open a table first. Then you can add a CPU or invite from the player list."
           : duel
             ? "Add a CPU or invite one friend from the player list, then start."
@@ -75,6 +89,11 @@ export function MixedCpuBar({
               : `Add CPUs or invite humans, then start with ${minStart(game)}–${max}.`}
       </p>
       <div className="row-actions" style={{ justifyContent: "center" }}>
+        {showPractice && onSolo ? (
+          <button className="btn btn-ghost" type="button" onClick={onSolo}>
+            Practice Solo
+          </button>
+        ) : null}
         {showPractice ? (
           <button className="btn btn-ghost" type="button" onClick={onPractice}>
             Practice vs CPU

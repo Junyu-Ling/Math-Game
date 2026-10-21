@@ -8,6 +8,7 @@ import {
   currentFlip,
   liveTotal,
   startFlip7Practice,
+  startFlip7Solo,
   type FlipAction,
   type FlipPlayer,
   type FlipState,
@@ -261,7 +262,11 @@ export function Flip7Page() {
       const n = cur.pendingFlip3;
       return myTurn ? `Flip Three: flipping ${n} more.` : `${cur.name} flips ${n} more from Flip Three.`;
     }
-    if (myTurn) return "Flip one card, then the next player. Stay to bank this round.";
+    if (myTurn) {
+      return playerN === 1
+        ? "Flip one card, or stay to bank this round."
+        : "Flip one card, then the next player. Stay to bank this round.";
+    }
     return `${cur?.name} is acting`;
   })();
 
@@ -348,7 +353,7 @@ export function Flip7Page() {
                 <p>
                   {waiting
                     ? "Open a table, add CPUs or invite people, then start with 2 or more. No fixed seat count."
-                    : "Practice vs CPU, or open a table. Hit or stay — Freeze and Flip Three can target anyone."}
+                    : "Practice solo or vs CPU, or open a table. Hit or stay — Freeze and Flip Three can target anyone."}
                 </p>
                 {waiting && state ? (
                   <ul className="lobby-roster">
@@ -360,7 +365,11 @@ export function Flip7Page() {
                     ))}
                   </ul>
                 ) : null}
-                <MixedCpuBar game="flip7" onPractice={() => setLocal(startFlip7Practice())} />
+                <MixedCpuBar
+                  game="flip7"
+                  onSolo={() => setLocal(startFlip7Solo())}
+                  onPractice={() => setLocal(startFlip7Practice())}
+                />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
                   {waiting ? (
                     host && (state?.players.length ?? 0) >= 2 ? (
