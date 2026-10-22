@@ -465,7 +465,6 @@ export function Flip7Page() {
                   lead={leadId === seated.rival.id}
                   burst={burst}
                   fx={fx}
-                  lockSize={Boolean(seated.left)}
                 />
               ) : null}
               {seated.left ? (
@@ -477,7 +476,6 @@ export function Flip7Page() {
                   lead={leadId === seated.left.id}
                   burst={burst}
                   fx={fx}
-                  lockSize={Boolean(seated.left)}
                 />
               ) : null}
               {centerWell}
@@ -490,7 +488,6 @@ export function Flip7Page() {
                   lead={leadId === seated.right.id}
                   burst={burst}
                   fx={fx}
-                  lockSize={Boolean(seated.left)}
                 />
               ) : null}
               {youSeat}
