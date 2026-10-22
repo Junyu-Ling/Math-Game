@@ -52,7 +52,7 @@ export const MAX_SIXES = 3;
 const PAINT: FlyColor[] = ["red", "yellow", "blue", "green"];
 
 export type LPlane = { id: string; slot: number; pos: number };
-export type LPlayer = { id: string; name: string; human: boolean; color: FlyColor; planes: LPlane[] };
+export type LPlayer = { id: string; name: string; human: boolean; color: FlyColor; planes: LPlane[]; out?: boolean };
 export type LState = {
   players: LPlayer[];
   turn: number;
@@ -266,9 +266,40 @@ export function startLudoDuel(
   ]);
 }
 
-function endTurn(state: LState, log: LState["log"]): LState {
+function nextSeat(state: LState, from: number): number {
   const n = Math.max(1, state.players.length);
-  return { ...state, log, phase: "roll", sixes: 0, turn: (state.turn + 1) % n };
+  for (let step = 1; step <= n; step++) {
+    const i = (from + step) % n;
+    if (!state.players[i]?.out) return i;
+  }
+  return from;
+}
+
+function endTurn(state: LState, log: LState["log"]): LState {
+  return { ...state, log, phase: "roll", sixes: 0, turn: nextSeat(state, state.turn) };
+}
+
+export function leaveLudo(state: LState, leaverId: string): LState {
+  if (state.phase === "lobby" || state.phase === "over") return state;
+  const leaver = state.players.find((p) => p.id === leaverId);
+  if (!leaver || leaver.out) return state;
+  const players = state.players.map((p) => (p.id === leaverId ? { ...p, out: true } : p));
+  let next: LState = {
+    ...state,
+    players,
+    log: [...state.log, { id: `left-${leaverId}`, text: `${leaver.name} left and loses.` }],
+  };
+  const remain = players.filter((p) => !p.out);
+  if (remain.length <= 1) {
+    return {
+      ...next,
+      phase: "over",
+      winnerId: remain[0]?.id ?? null,
+      log: [...next.log, { id: `win-${leaverId}`, text: remain[0] ? `${remain[0].name} wins.` : `${leaver.name} left.` }],
+    };
+  }
+  if (next.players[next.turn]?.out) next = { ...next, phase: "roll", sixes: 0, dice: null, turn: nextSeat(next, next.turn) };
+  return next;
 }
 
 function applyLanding(state: LState, moverIdx: number, planeId: string, landing: Landing): LPlayer[] {

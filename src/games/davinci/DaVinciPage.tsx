@@ -234,7 +234,7 @@ function OppSeat({
     <div className={`seat ${className} ${opening ? "veiled" : ""}`}>
       <div className="seat-plaque">
         <b>{player.name}</b>
-        <span>{player.out ? "OUT" : opening ? "Arrange" : turn ? "Turn" : "Wait"}</span>
+        <span>{player.out ? (player.tiles.length > 0 && player.tiles.every((t) => t.revealed) ? "OUT" : "LEFT") : opening ? "Arrange" : turn ? "Turn" : "Wait"}</span>
       </div>
       <div className="tiles-wrap">
         {opening ? (
@@ -895,7 +895,7 @@ export function DaVinciPage() {
             <div className="seat-plaque you">
               <b>{you.name}</b>
               <span>
-                {you.out ? "OUT" : opening ? "Arrange" : arranging ? "Insert" : me?.id === you.id ? "Turn" : "Wait"}
+                {you.out ? (you.tiles.length > 0 && you.tiles.every((t) => t.revealed) ? "OUT" : "LEFT") : opening ? "Arrange" : arranging ? "Insert" : me?.id === you.id ? "Turn" : "Wait"}
               </span>
             </div>
             <div className="tiles-wrap">

@@ -62,16 +62,20 @@ button:disabled {
 
 .shell {
   width: 100%;
-  min-height: 100vh;
+  height: 100dvh;
   min-height: 100dvh;
   background: var(--bg);
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
 }
 
 .shell > main {
   min-width: 0;
-  overflow-x: hidden;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .topbar {
@@ -551,10 +555,40 @@ button:disabled {
 }
 
 .page-wide {
-  width: min(1200px, calc(100% - 2 * var(--gutter)));
+  width: min(1400px, calc(100% - 2 * var(--gutter)));
   margin: 0 auto;
-  padding: clamp(20px, 3vw, 36px) 0 clamp(32px, 5vw, 56px);
-  overflow-x: hidden;
+  padding: 12px 0 8px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-wide .game-head {
+  margin-bottom: 10px;
+  flex: none;
+}
+
+.page-wide .game-layout {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  align-items: stretch;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.page-wide .table {
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.page-wide .side-stack {
+  min-height: 0;
+  max-height: 100%;
+  overflow: auto;
 }
 
 .coda-page .game-layout {
@@ -1295,11 +1329,14 @@ h1 {
   .coda-page .game-layout {
     grid-template-columns: 1fr;
   }
+  .page-wide .game-layout {
+    grid-template-rows: minmax(0, 22dvh) minmax(0, 1fr);
+  }
   .side {
     max-height: none;
     order: -1;
   }
-  .side-stack { order: -1; }
+  .side-stack { order: -1; max-height: none; }
 }
 
 @media (max-width: 860px) {

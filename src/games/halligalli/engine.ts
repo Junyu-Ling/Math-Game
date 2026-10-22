@@ -146,6 +146,20 @@ function nextLivingTurn(state: HalliState, from = state.turn): number {
   return from;
 }
 
+export function leaveHalli(state: HalliState, leaverId: string): HalliState {
+  if (state.phase !== "play") return state;
+  const leaver = state.players.find((p) => p.id === leaverId);
+  if (!leaver || leaver.out) return state;
+  let next: HalliState = {
+    ...state,
+    players: state.players.map((p) => (p.id === leaverId ? { ...p, out: true, deck: [], open: [] } : p)),
+    log: [...state.log, { id: uid("l"), text: `${leaver.name} left and loses.` }],
+  };
+  next = finishIfNeeded(next);
+  if (next.phase !== "over" && next.players[state.turn]?.out) next = { ...next, turn: nextLivingTurn(next, state.turn) };
+  return next;
+}
+
 function finishIfNeeded(state: HalliState): HalliState {
   const active = state.players.filter((p) => !p.out);
   if (active.length <= 1 && active[0]) {

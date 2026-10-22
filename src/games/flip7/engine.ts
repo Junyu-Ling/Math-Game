@@ -14,7 +14,7 @@ export type FlipPlayer = {
   human: boolean;
   total: number;
   area: FlipCard[];
-  status: "active" | "stayed" | "bust" | "flip7";
+  status: "active" | "stayed" | "bust" | "flip7" | "left";
   pendingFreeze: boolean;
   pendingFlip3: number;
   /** This player's next natural turn was already taken by an immediate Flip Three. */
@@ -474,18 +474,66 @@ export function applyTarget(state: FlipState, targetId: string): FlipState {
   return afterHit(next, me.id);
 }
 
-function checkWin(state: FlipState, playerId: string): FlipState {
-  if (solo(state)) return state;
-  const p = state.players.find((x) => x.id === playerId);
-  if (p && p.total >= state.goal) {
+function checkWin(state: FlipState, _playerId: string): FlipState {
+  return state;
+}
+
+/** After the round, the highest score of 200 or more wins. A tie plays on. */
+function awardIfGoal(state: FlipState): FlipState | null {
+  if (solo(state)) return null;
+  const field = state.players.filter((p) => p.status !== "left");
+  const qualified = field.filter((p) => p.total >= state.goal);
+  if (!qualified.length) return null;
+  const best = Math.max(...qualified.map((p) => p.total));
+  const leaders = qualified.filter((p) => p.total === best);
+  if (leaders.length !== 1) return null;
+  const winner = leaders[0]!;
+  return {
+    ...state,
+    phase: "over",
+    winnerId: winner.id,
+    log: [
+      ...state.log,
+      {
+        id: uid("l"),
+        text: `${winner.name} ends the round at ${winner.total}. No one overtakes. ${winner.name} wins.`,
+        tone: "you",
+      },
+    ],
+  };
+}
+
+export function leaveFlip7(state: FlipState, leaverId: string): FlipState {
+  if (state.phase === "lobby" || state.phase === "over") return state;
+  const leaver = state.players.find((p) => p.id === leaverId);
+  if (!leaver || leaver.status === "left") return state;
+  let next = withPlayer(state, leaverId, (p) => ({
+    ...p,
+    status: "left" as const,
+    area: [],
+    pendingFlip3: 0,
+    pendingFreeze: false,
+    skipTurn: false,
+  }));
+  next.discard = [...next.discard, ...leaver.area];
+  next.resume = (next.resume ?? []).filter((i) => next.players[i]?.status !== "left");
+  if (next.phase === "target") {
+    next.phase = "action";
+    next.pendingAction = null;
+  }
+  next.log = [...next.log, { id: uid("l"), text: `${leaver.name} left and loses.`, tone: "bad" }];
+  const remain = next.players.filter((p) => p.status !== "left");
+  if (remain.length <= 1) {
+    const winner = remain[0];
     return {
-      ...state,
+      ...next,
       phase: "over",
-      winnerId: p.id,
-      log: [...state.log, { id: uid("l"), text: `${p.name} reaches ${p.total} and wins.`, tone: "you" }],
+      winnerId: winner?.id ?? null,
+      log: [...next.log, { id: uid("l"), text: winner ? `${winner.name} wins.` : `${leaver.name} left.` }],
     };
   }
-  return state;
+  if (currentFlip(next).status === "left" || allSettled(next)) return advance(next);
+  return next;
 }
 
 function allSettled(state: FlipState) {
@@ -493,18 +541,20 @@ function allSettled(state: FlipState) {
 }
 
 function newRound(state: FlipState): FlipState {
+  const won = awardIfGoal(state);
+  if (won) return won;
+  const racing = state.players.filter((p) => p.status !== "left" && p.total >= state.goal);
+  const best = racing.length ? Math.max(...racing.map((p) => p.total)) : 0;
+  const tied = racing.filter((p) => p.total === best).length > 1;
   const renew = solo(state) && state.deck.length === 0;
   const discard = renew ? [] : [...state.discard, ...state.players.flatMap((p) => p.area)];
   const totals = state.players.map((p) => `${p.name} ${p.total}`).join(" · ");
-  const players = state.players.map((p) => ({
-    ...p,
-    area: [],
-    status: "active" as const,
-    pendingFreeze: false,
-    pendingFlip3: 0,
-    skipTurn: false,
-  }));
-  return openRecordRound({
+  const players = state.players.map((p) =>
+    p.status === "left"
+      ? { ...p, area: [], pendingFreeze: false, pendingFlip3: 0, skipTurn: false }
+      : { ...p, area: [], status: "active" as const, pendingFreeze: false, pendingFlip3: 0, skipTurn: false },
+  );
+  const opened = openRecordRound({
     ...state,
     players,
     deck: renew ? deckBuild() : state.deck,
@@ -519,9 +569,12 @@ function newRound(state: FlipState): FlipState {
     log: [
       ...state.log,
       { id: uid("l"), text: `Round complete. Scores kept: ${totals}.` },
+      ...(tied ? [{ id: uid("l"), text: `Tied at ${best}. Another round — someone has to pull ahead.` }] : []),
       { id: uid("l"), text: renew ? `Round ${state.round + 1} starts with a new deck.` : `Round ${state.round + 1} starts.` },
     ],
   });
+  if (opened.players[opened.turn]?.status === "left") return advance(opened);
+  return opened;
 }
 
 function clearSkip(state: FlipState, ids: string[]): FlipState {

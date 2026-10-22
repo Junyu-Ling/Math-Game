@@ -363,7 +363,7 @@ function alive(state) {
 function checkEliminations(state) {
   const players = state.players.map((p) => ({
     ...p,
-    out: p.tiles.length > 0 && p.tiles.every((t) => t.revealed)
+    out: p.out || p.tiles.length > 0 && p.tiles.every((t) => t.revealed)
   }));
   const remaining = players.filter((p) => !p.out);
   if (remaining.length === 1 && remaining[0]) {
@@ -402,6 +402,30 @@ function nextTurn(state) {
 }
 function currentPlayer(state) {
   return state.players[state.turn] ?? state.players[0];
+}
+function leaveCoda(state, leaverId) {
+  if (state.phase === "lobby" || state.phase === "over") return state;
+  const leaver = state.players.find((p) => p.id === leaverId);
+  if (!leaver || leaver.out) return state;
+  let next = {
+    ...state,
+    players: state.players.map((p) => p.id === leaverId ? { ...p, out: true } : p),
+    drawn: null,
+    pending: null,
+    selected: null,
+    log: [...state.log, { id: uid("l"), text: `${leaver.name} left and loses.` }]
+  };
+  const remain = next.players.filter((p) => !p.out);
+  if (remain.length <= 1) {
+    return {
+      ...next,
+      phase: "over",
+      winnerId: remain[0]?.id ?? null,
+      log: [...next.log, { id: uid("l"), text: remain[0] ? `${remain[0].name} wins.` : `${leaver.name} left.` }]
+    };
+  }
+  if (next.players[next.turn]?.out) next = nextTurn({ ...next, phase: "draw" });
+  return next;
 }
 function deckCounts(state) {
   if (state.leftByColor) return state.leftByColor;
@@ -973,6 +997,7 @@ export {
   guessTile,
   insertIndices,
   isSorted,
+  leaveCoda,
   openingCount,
   payPenalty,
   pickCodaMix,

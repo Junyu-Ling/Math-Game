@@ -121,6 +121,19 @@ function nextLivingTurn(state, from = state.turn) {
   }
   return from;
 }
+function leaveHalli(state, leaverId) {
+  if (state.phase !== "play") return state;
+  const leaver = state.players.find((p) => p.id === leaverId);
+  if (!leaver || leaver.out) return state;
+  let next = {
+    ...state,
+    players: state.players.map((p) => p.id === leaverId ? { ...p, out: true, deck: [], open: [] } : p),
+    log: [...state.log, { id: uid("l"), text: `${leaver.name} left and loses.` }]
+  };
+  next = finishIfNeeded(next);
+  if (next.phase !== "over" && next.players[state.turn]?.out) next = { ...next, turn: nextLivingTurn(next, state.turn) };
+  return next;
+}
 function finishIfNeeded(state) {
   const active = state.players.filter((p) => !p.out);
   if (active.length <= 1 && active[0]) {
@@ -267,6 +280,7 @@ export {
   currentHalli,
   flipHalli,
   fruitTotals,
+  leaveHalli,
   ringHalli,
   ringingFruit,
   startHalliLobby,

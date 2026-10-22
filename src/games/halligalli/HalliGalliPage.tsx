@@ -64,7 +64,7 @@ function HalliSeat({
     <div className={`seat ${className}`}>
       <div className="seat-label">
         {player.name} · deck {player.deck.length} · score {player.score}
-        {player.out ? " · OUT" : turn ? " · TURN" : ""}
+        {player.out ? " · LEFT" : turn ? " · TURN" : ""}
         {mine ? " · YOU" : ""}
       </div>
       <div className="hg-seat-row">

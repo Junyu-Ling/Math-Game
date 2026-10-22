@@ -375,35 +375,80 @@ function applyTarget(state, targetId) {
   }
   return afterHit(next, me.id);
 }
-function checkWin(state, playerId) {
-  if (solo(state)) return state;
-  const p = state.players.find((x) => x.id === playerId);
-  if (p && p.total >= state.goal) {
+function checkWin(state, _playerId) {
+  return state;
+}
+function awardIfGoal(state) {
+  if (solo(state)) return null;
+  const field = state.players.filter((p) => p.status !== "left");
+  const qualified = field.filter((p) => p.total >= state.goal);
+  if (!qualified.length) return null;
+  const best = Math.max(...qualified.map((p) => p.total));
+  const leaders = qualified.filter((p) => p.total === best);
+  if (leaders.length !== 1) return null;
+  const winner = leaders[0];
+  return {
+    ...state,
+    phase: "over",
+    winnerId: winner.id,
+    log: [
+      ...state.log,
+      {
+        id: uid("l"),
+        text: `${winner.name} ends the round at ${winner.total}. No one overtakes. ${winner.name} wins.`,
+        tone: "you"
+      }
+    ]
+  };
+}
+function leaveFlip7(state, leaverId) {
+  if (state.phase === "lobby" || state.phase === "over") return state;
+  const leaver = state.players.find((p) => p.id === leaverId);
+  if (!leaver || leaver.status === "left") return state;
+  let next = withPlayer(state, leaverId, (p) => ({
+    ...p,
+    status: "left",
+    area: [],
+    pendingFlip3: 0,
+    pendingFreeze: false,
+    skipTurn: false
+  }));
+  next.discard = [...next.discard, ...leaver.area];
+  next.resume = (next.resume ?? []).filter((i) => next.players[i]?.status !== "left");
+  if (next.phase === "target") {
+    next.phase = "action";
+    next.pendingAction = null;
+  }
+  next.log = [...next.log, { id: uid("l"), text: `${leaver.name} left and loses.`, tone: "bad" }];
+  const remain = next.players.filter((p) => p.status !== "left");
+  if (remain.length <= 1) {
+    const winner = remain[0];
     return {
-      ...state,
+      ...next,
       phase: "over",
-      winnerId: p.id,
-      log: [...state.log, { id: uid("l"), text: `${p.name} reaches ${p.total} and wins.`, tone: "you" }]
+      winnerId: winner?.id ?? null,
+      log: [...next.log, { id: uid("l"), text: winner ? `${winner.name} wins.` : `${leaver.name} left.` }]
     };
   }
-  return state;
+  if (currentFlip(next).status === "left" || allSettled(next)) return advance(next);
+  return next;
 }
 function allSettled(state) {
   return state.players.every((p) => p.status !== "active");
 }
 function newRound(state) {
+  const won = awardIfGoal(state);
+  if (won) return won;
+  const racing = state.players.filter((p) => p.status !== "left" && p.total >= state.goal);
+  const best = racing.length ? Math.max(...racing.map((p) => p.total)) : 0;
+  const tied = racing.filter((p) => p.total === best).length > 1;
   const renew = solo(state) && state.deck.length === 0;
   const discard = renew ? [] : [...state.discard, ...state.players.flatMap((p) => p.area)];
   const totals = state.players.map((p) => `${p.name} ${p.total}`).join(" \xB7 ");
-  const players = state.players.map((p) => ({
-    ...p,
-    area: [],
-    status: "active",
-    pendingFreeze: false,
-    pendingFlip3: 0,
-    skipTurn: false
-  }));
-  return openRecordRound({
+  const players = state.players.map(
+    (p) => p.status === "left" ? { ...p, area: [], pendingFreeze: false, pendingFlip3: 0, skipTurn: false } : { ...p, area: [], status: "active", pendingFreeze: false, pendingFlip3: 0, skipTurn: false }
+  );
+  const opened = openRecordRound({
     ...state,
     players,
     deck: renew ? deckBuild() : state.deck,
@@ -418,9 +463,12 @@ function newRound(state) {
     log: [
       ...state.log,
       { id: uid("l"), text: `Round complete. Scores kept: ${totals}.` },
+      ...tied ? [{ id: uid("l"), text: `Tied at ${best}. Another round \u2014 someone has to pull ahead.` }] : [],
       { id: uid("l"), text: renew ? `Round ${state.round + 1} starts with a new deck.` : `Round ${state.round + 1} starts.` }
     ]
   });
+  if (opened.players[opened.turn]?.status === "left") return advance(opened);
+  return opened;
 }
 function clearSkip(state, ids) {
   if (!ids.length) return state;
@@ -519,6 +567,7 @@ export {
   cardLabel,
   currentFlip,
   hit,
+  leaveFlip7,
   liveTotal,
   numberPower,
   startFlip7,

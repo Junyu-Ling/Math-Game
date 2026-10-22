@@ -85,7 +85,7 @@ function UnoSeat({
   return (
     <div className={`seat ${className}${vertical ? " seat-side" : ""}`}>
       <div className="seat-label">
-        {player.name} · {player.hand.length} cards{turn ? " · TURN" : ""}
+        {player.name} · {player.out ? "LEFT" : `${player.hand.length} cards`}{!player.out && turn ? " · TURN" : ""}
         {player.calledUno ? " · UNO" : ""}
       </div>
       <div className={`uno-seat-row ${vertical ? "is-vertical" : ""}`}>

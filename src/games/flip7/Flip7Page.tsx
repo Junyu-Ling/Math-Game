@@ -278,7 +278,14 @@ export function Flip7Page() {
     <div className="center-well">
       <div className="flip-center-row">
         <DeckStack count={state.deck.length} />
-        <div className="status-line">{statusText}</div>
+        <div className="status-line">
+          {state.players
+            .filter((p) => p.status === "left")
+            .map((p) => `${p.name} left and loses.`)
+            .join(" ")}
+          {state.players.some((p) => p.status === "left") ? " " : ""}
+          {statusText}
+        </div>
       </div>
       <div className="target-slot">
         {myTurn && state.phase === "target" && !savePlaying
@@ -301,7 +308,6 @@ export function Flip7Page() {
         lead={leadId === me.id}
         burst={burst}
         fx={fx}
-        lockSize={!useRing && Boolean(seated?.left)}
         mine
       />
       <div className="row-actions">
@@ -454,7 +460,6 @@ export function Flip7Page() {
                   lead={leadId === seated.partner.id}
                   burst={burst}
                   fx={fx}
-                  lockSize={Boolean(seated.left)}
                 />
               ) : null}
               {seated.rival ? (

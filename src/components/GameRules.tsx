@@ -11,7 +11,7 @@ const RULES: Record<string, string[]> = {
     "When the deck is empty, play continues. Skip the draw and guess. A hit lets you guess again or end the turn. A miss knocks down one of your own hidden tiles.",
   ],
   flip7: [
-    "2+ players, or Practice Solo alone. On your turn flip one card or stay to bank the round. First to 200 wins.",
+    "2+ players, or Practice Solo alone. On your turn flip one card or stay to bank the round. Hitting 200 does not win mid-round. After the round, the highest score of 200 or more wins. A tie at the top plays another round. If someone leaves, they lose and the others keep playing.",
     "Practice Solo does not end at 200. Drawing the last card stays that round, and the next round deals a new deck. Freeze and Flip Three are played on yourself. The record lists number cards each round, the average number sum when a duplicate is drawn, and how often a finished round is Flip 7. A Second Chance save is marked as a bust too, so that round can count twice.",
     "Duplicate number busts you unless you hold Second Chance (passive — discards with the duplicate; one per player).",
     "Seven different numbers in your area is Flip 7: bank immediately with an extra +15.",

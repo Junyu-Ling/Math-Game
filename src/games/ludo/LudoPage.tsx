@@ -428,7 +428,7 @@ export function LudoPage() {
                     <i className={`c-${p.color}`} />
                     <b>{p.name}</b>
                     <span>
-                      {homeCount(p)}/4 home
+                      {p.out ? "LEFT" : `${homeCount(p)}/4 home`}
                     </span>
                   </li>
                 ))}

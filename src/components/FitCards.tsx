@@ -2,11 +2,15 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 export function measureFit(wrap: HTMLElement, row: HTMLElement, vertical: boolean) {
   const style = getComputedStyle(wrap);
-  const pad = vertical
+  const padAlong = vertical
     ? parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
     : parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-  const avail = (vertical ? wrap.clientHeight : wrap.clientWidth) - pad - 6;
-  if (avail < 8) return null;
+  const padCross = vertical
+    ? parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
+    : parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+  const alongAvail = (vertical ? wrap.clientHeight : wrap.clientWidth) - padAlong - 6;
+  const crossAvail = (vertical ? wrap.clientWidth : wrap.clientHeight) - padCross - 6;
+  if (alongAvail < 8) return null;
   const prev = row.style.zoom;
   row.style.zoom = "1";
   const kids = row.children.length ? [...row.children] : [row];
@@ -24,10 +28,13 @@ export function measureFit(wrap: HTMLElement, row: HTMLElement, vertical: boolea
   }
   const rowBox = row.getBoundingClientRect();
   const along = vertical ? Math.max(row.scrollHeight, rowBox.height) : Math.max(row.scrollWidth, rowBox.width);
+  const cross = vertical ? Math.max(row.scrollWidth, rowBox.width) : Math.max(row.scrollHeight, rowBox.height);
   const need = Math.max(along, max - min) + 12;
   row.style.zoom = prev;
   if (!Number.isFinite(need) || need <= 0) return 1;
-  return need > avail ? Math.max(0.28, avail / need) : 1;
+  const alongScale = need > alongAvail ? alongAvail / need : 1;
+  const crossScale = crossAvail > 8 && cross > crossAvail ? crossAvail / cross : 1;
+  return Math.max(0.28, Math.min(alongScale, crossScale));
 }
 
 export function FitCards({

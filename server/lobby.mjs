@@ -1385,6 +1385,18 @@ async function releaseSeat(rec, userId) {
   return fresh;
 }
 
+function dropLeaver(rec, userId) {
+  const mods = rec?.mods;
+  const id = String(userId);
+  if (!mods || !rec?.state) return null;
+  if (rec.game === "flip7" && mods.flip?.leaveFlip7) return mods.flip.leaveFlip7(rec.state, id);
+  if (rec.game === "uno" && mods.uno?.leaveUno) return mods.uno.leaveUno(rec.state, id);
+  if (rec.game === "halli" && mods.halli?.leaveHalli) return mods.halli.leaveHalli(rec.state, id);
+  if (rec.game === "ludo" && mods.ludo?.leaveLudo) return mods.ludo.leaveLudo(rec.state, id);
+  if (rec.game === "coda" && mods.coda?.leaveCoda) return mods.coda.leaveCoda(rec.state, id);
+  return null;
+}
+
 /** A seated human whose presence expired mid-match loses at once. */
 async function forfeitIfAbsent(rec, exceptId) {
   if (!rec || !isLiveMatchState(rec.game, rec.state)) return rec;
@@ -1394,6 +1406,16 @@ async function forfeitIfAbsent(rec, exceptId) {
     if (id === exceptId) continue;
     const presence = await readJson(`axiom:p:${id}`);
     if (presence && now - Number(presence.seenAt || 0) <= ONLINE_SEC * 1000) continue;
+    const dropped = dropLeaver(rec, id);
+    if (dropped) {
+      rec.state = dropped;
+      rec.endsAt = null;
+      rec.cpuReadyAt = null;
+      await saveRoom(rec);
+      const view = publicRoom(rec, id)?.view ?? rec.state;
+      await kvSet(`axiom:result:${id}`, { game: rec.game, view: { ...view, message: "You left. You lose." } }, 60);
+      return releaseSeat(rec, id);
+    }
     rec.state = applyForfeit(rec.state, rec.game, id);
     rec.endsAt = null;
     rec.cpuReadyAt = null;
@@ -1437,6 +1459,20 @@ export async function leaveRoom(userId) {
   if (SOLO_GAMES.has(rec.game) || !isLiveMatchState(rec.game, rec.state)) {
     await releaseSeat(rec, userId);
     return snapshot(userId);
+  }
+
+  const dropped = dropLeaver(rec, String(userId));
+  if (dropped) {
+    rec.state = dropped;
+    rec.endsAt = null;
+    rec.cpuReadyAt = null;
+    await saveRoom(rec);
+    const view = publicRoom(rec, userId)?.view ?? rec.state;
+    const settled = { ...view, message: "You left. You lose." };
+    await kvSet(`axiom:result:${userId}`, { game: rec.game, view: settled }, 60);
+    await releaseSeat(rec, userId);
+    const snap = await snapshot(userId);
+    return { ...snap, settlement: { game: rec.game, view: settled } };
   }
 
   rec.state = applyForfeit(rec.state, rec.game, String(userId));

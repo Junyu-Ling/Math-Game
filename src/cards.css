@@ -1989,16 +1989,16 @@
 }
 
 .table-flip.flip-multi {
-  grid-template-columns: minmax(148px, 22%) minmax(0, 1fr) minmax(148px, 22%);
-  grid-template-rows: auto 248px auto;
-  height: auto;
-  min-height: 640px;
-  max-height: none;
-  overflow: visible;
-  align-items: center;
+  grid-template-columns: minmax(120px, 22%) minmax(0, 1fr) minmax(120px, 22%);
+  grid-template-rows: minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  align-items: stretch;
 }
 
-.table-flip.flip-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: visible; min-height: 168px; }
+.table-flip.flip-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: hidden; min-height: 0; height: 100%; }
 .table-flip.flip-multi > .seat-left,
 .table-flip.flip-multi > .seat-right {
   height: 100%;
@@ -2006,14 +2006,49 @@
   overflow: hidden;
 }
 .table-flip.flip-multi > .seat-left { grid-column: 1; grid-row: 2; }
-.table-flip.flip-multi > .center-well { grid-column: 2; grid-row: 2; }
+.table-flip.flip-multi > .center-well { grid-column: 2; grid-row: 2; min-height: 0; }
 .table-flip.flip-multi > .seat-right { grid-column: 3; grid-row: 2; }
-.table-flip.flip-multi > .seat-you { grid-column: 1 / -1; grid-row: 3; }
+.table-flip.flip-multi > .seat-you {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  justify-content: flex-end;
+}
+.table-flip.flip-multi > .seat-you > .seat-you-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  justify-content: flex-end;
+}
 
+.table-flip.flip-multi .cards-fit,
 .table-flip.flip-multi .cards-fit.is-vertical {
   height: auto;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.page-wide .table-uno.uno-multi,
+.page-wide .table-hg.hg-multi,
+.page-wide .table-coda.coda-multi {
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  grid-template-rows: minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.page-wide .table-uno.uno-multi > .seat-partner,
+.page-wide .table-hg.hg-multi > .seat-partner,
+.page-wide .table-coda.coda-multi > .seat-partner,
+.page-wide .table-uno.uno-multi > .seat-you,
+.page-wide .table-hg.hg-multi > .seat-you,
+.page-wide .table-coda.coda-multi > .seat-you {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .flip-record {

@@ -17,6 +17,7 @@ export type UnoPlayer = {
   human: boolean;
   hand: UnoCard[];
   calledUno: boolean;
+  out?: boolean;
 };
 
 export type UnoState = {
@@ -206,9 +207,39 @@ export function startUnoTable(people: Array<{ id: string; name: string; human?: 
 }
 
 function nextIndex(state: UnoState, skip = false): number {
-  const step = skip ? 2 : 1;
   const n = state.players.length;
-  return (state.turn + state.dir * step + n * 8) % n;
+  let steps = skip ? 2 : 1;
+  let i = state.turn;
+  for (let guard = 0; steps > 0 && guard < n * 4; guard++) {
+    i = (i + state.dir + n) % n;
+    if (state.players[i]?.out) continue;
+    steps -= 1;
+  }
+  return i;
+}
+
+export function leaveUno(state: UnoState, leaverId: string): UnoState {
+  if (state.phase === "lobby" || state.phase === "over") return state;
+  const leaver = state.players.find((p) => p.id === leaverId);
+  if (!leaver || leaver.out) return state;
+  let next: UnoState = {
+    ...state,
+    players: state.players.map((p) => (p.id === leaverId ? { ...p, out: true, hand: [] } : p)),
+    log: [...state.log, { id: uid("l"), text: `${leaver.name} left and loses.` }],
+  };
+  const alive = next.players.filter((p) => !p.out);
+  if (alive.length <= 1) {
+    return {
+      ...next,
+      phase: "over",
+      winnerId: alive[0]?.id ?? null,
+      log: [...next.log, { id: uid("l"), text: alive[0] ? `${alive[0].name} wins.` : `${leaver.name} left.` }],
+    };
+  }
+  if (next.players[next.turn]?.out || next.phase === "color") {
+    next = { ...next, phase: "play", wildCardId: null, justDrawnId: null, turn: nextIndex(next) };
+  }
+  return next;
 }
 
 function withPlayer(state: UnoState, id: string, fn: (p: UnoPlayer) => UnoPlayer): UnoState {
@@ -217,7 +248,7 @@ function withPlayer(state: UnoState, id: string, fn: (p: UnoPlayer) => UnoPlayer
 
 function winCheck(state: UnoState, id: string): UnoState {
   const p = state.players.find((x) => x.id === id);
-  if (p && p.hand.length === 0) {
+  if (p && !p.out && p.hand.length === 0) {
     return { ...state, phase: "over", winnerId: id, log: [...state.log, { id: uid("l"), text: `${p.name} emptied their hand and wins.` }] };
   }
   return state;

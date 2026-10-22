@@ -244,9 +244,38 @@ function startLudoDuel(a, b) {
     { id: b.id, name: b.name, human: b.human !== false }
   ]);
 }
-function endTurn(state, log) {
+function nextSeat(state, from) {
   const n = Math.max(1, state.players.length);
-  return { ...state, log, phase: "roll", sixes: 0, turn: (state.turn + 1) % n };
+  for (let step = 1; step <= n; step++) {
+    const i = (from + step) % n;
+    if (!state.players[i]?.out) return i;
+  }
+  return from;
+}
+function endTurn(state, log) {
+  return { ...state, log, phase: "roll", sixes: 0, turn: nextSeat(state, state.turn) };
+}
+function leaveLudo(state, leaverId) {
+  if (state.phase === "lobby" || state.phase === "over") return state;
+  const leaver = state.players.find((p) => p.id === leaverId);
+  if (!leaver || leaver.out) return state;
+  const players = state.players.map((p) => p.id === leaverId ? { ...p, out: true } : p);
+  let next = {
+    ...state,
+    players,
+    log: [...state.log, { id: `left-${leaverId}`, text: `${leaver.name} left and loses.` }]
+  };
+  const remain = players.filter((p) => !p.out);
+  if (remain.length <= 1) {
+    return {
+      ...next,
+      phase: "over",
+      winnerId: remain[0]?.id ?? null,
+      log: [...next.log, { id: `win-${leaverId}`, text: remain[0] ? `${remain[0].name} wins.` : `${leaver.name} left.` }]
+    };
+  }
+  if (next.players[next.turn]?.out) next = { ...next, phase: "roll", sixes: 0, dice: null, turn: nextSeat(next, next.turn) };
+  return next;
 }
 function applyLanding(state, moverIdx, planeId, landing) {
   const capture = new Set(landing.captures);
@@ -382,6 +411,7 @@ export {
   flyTrackIndex,
   homeCount,
   homeDir,
+  leaveLudo,
   legalMoves,
   planeCell,
   planeHeading,
