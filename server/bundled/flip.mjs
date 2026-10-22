@@ -16,34 +16,6 @@ function uid(prefix = "id") {
 }
 
 // src/games/flip7/engine.ts
-var FLIP_COPIES = [
-  ...Array.from({ length: 13 }, (_, n) => ({
-    key: `n${n}`,
-    label: String(n),
-    kind: "number",
-    value: n,
-    copies: n === 0 ? 1 : n
-  })),
-  ...[2, 4, 6, 8, 10].map((n) => ({
-    key: `p${n}`,
-    label: `+${n}`,
-    kind: "plus",
-    value: n,
-    copies: 1
-  })),
-  { key: "x2", label: "\xD72", kind: "double", copies: 1 },
-  { key: "freeze", label: "FRZ", kind: "freeze", copies: 3 },
-  { key: "flip3", label: "F3", kind: "flip3", copies: 3 },
-  { key: "chance", label: "2ND", kind: "chance", copies: 3 }
-];
-function flipCopyKey(card) {
-  if (card.kind === "number") return `n${card.value ?? 0}`;
-  if (card.kind === "plus") return `p${card.value ?? 0}`;
-  if (card.kind === "double") return "x2";
-  if (card.kind === "freeze") return "freeze";
-  if (card.kind === "flip3") return "flip3";
-  return "chance";
-}
 var FLIP_MAX = 16;
 function deckBuild() {
   const cards = [];
@@ -164,7 +136,7 @@ function startFlip7Solo() {
   };
 }
 function pushDraw(state, card, note) {
-  if (!state.record) return state;
+  if (!state.record || card.kind !== "number") return state;
   const draw = { id: card.id, kind: card.kind, value: card.value, ...note ? { note } : {} };
   const rounds = state.record.rounds;
   const last = rounds[rounds.length - 1];
@@ -510,7 +482,6 @@ function aiTarget(state) {
   return fat.id;
 }
 export {
-  FLIP_COPIES,
   FLIP_MAX,
   activePlayers,
   advance,
@@ -521,7 +492,6 @@ export {
   areaScore,
   cardLabel,
   currentFlip,
-  flipCopyKey,
   hit,
   liveTotal,
   numberPower,

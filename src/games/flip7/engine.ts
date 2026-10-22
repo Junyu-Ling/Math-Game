@@ -43,49 +43,10 @@ export type FlipRoundRecord = {
   score?: number;
 };
 
-/** Solo practice log of every card drawn, grouped by round. */
+/** Solo practice log of number cards drawn, grouped by round. */
 export type FlipSoloRecord = {
   rounds: FlipRoundRecord[];
 };
-
-export type FlipCopy = {
-  key: string;
-  label: string;
-  kind: FlipKind;
-  value?: number;
-  copies: number;
-};
-
-/** Copies of each card in one full 94-card deck. */
-export const FLIP_COPIES: FlipCopy[] = [
-  ...Array.from({ length: 13 }, (_, n) => ({
-    key: `n${n}`,
-    label: String(n),
-    kind: "number" as const,
-    value: n,
-    copies: n === 0 ? 1 : n,
-  })),
-  ...[2, 4, 6, 8, 10].map((n) => ({
-    key: `p${n}`,
-    label: `+${n}`,
-    kind: "plus" as const,
-    value: n,
-    copies: 1,
-  })),
-  { key: "x2", label: "×2", kind: "double", copies: 1 },
-  { key: "freeze", label: "FRZ", kind: "freeze", copies: 3 },
-  { key: "flip3", label: "F3", kind: "flip3", copies: 3 },
-  { key: "chance", label: "2ND", kind: "chance", copies: 3 },
-];
-
-export function flipCopyKey(card: { kind: FlipKind; value?: number }): string {
-  if (card.kind === "number") return `n${card.value ?? 0}`;
-  if (card.kind === "plus") return `p${card.value ?? 0}`;
-  if (card.kind === "double") return "x2";
-  if (card.kind === "freeze") return "freeze";
-  if (card.kind === "flip3") return "flip3";
-  return "chance";
-}
 
 export type FlipState = {
   players: FlipPlayer[];
@@ -243,7 +204,7 @@ export function startFlip7Solo(): FlipState {
 }
 
 function pushDraw(state: FlipState, card: FlipCard, note?: FlipDrawNote): FlipState {
-  if (!state.record) return state;
+  if (!state.record || card.kind !== "number") return state;
   const draw: FlipDraw = { id: card.id, kind: card.kind, value: card.value, ...(note ? { note } : {}) };
   const rounds = state.record.rounds;
   const last = rounds[rounds.length - 1];

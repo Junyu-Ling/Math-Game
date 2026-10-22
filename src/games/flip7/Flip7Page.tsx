@@ -7,8 +7,6 @@ import {
   activePlayers,
   currentFlip,
   cardLabel,
-  FLIP_COPIES,
-  flipCopyKey,
   liveTotal,
   startFlip7Practice,
   startFlip7Solo,
@@ -527,67 +525,24 @@ function resultText(round: FlipRoundRecord): string {
 }
 
 function SoloRecord({ record }: { record: FlipSoloRecord }) {
-  const draws = record.rounds.flatMap((round) => round.draws);
-  const seen = new Map<string, number>();
-  for (const draw of draws) seen.set(flipCopyKey(draw), (seen.get(flipCopyKey(draw)) ?? 0) + 1);
-  const finished = record.rounds.filter((round) => round.result);
-  const busts = finished.filter((round) => round.result === "bust").length;
-  const banked = finished.reduce((sum, round) => sum + (round.score ?? 0), 0);
-  const avg = finished.length ? Math.round(banked / finished.length) : null;
-  const bustPct = finished.length ? Math.round((busts / finished.length) * 100) : null;
   const rounds = [...record.rounds].reverse();
   return (
     <aside className="side flip-record" aria-label="Solo record">
       <div>
         <h3>Record</h3>
-        <p>Every card this solo game, as it is drawn.</p>
+        <p>Number cards you draw, listed by round.</p>
       </div>
-      <div className="flip-record-stats">
-        <div>
-          <b>{draws.length}</b>
-          <span>Seen</span>
-        </div>
-        <div>
-          <b>{finished.length ? `${busts}/${finished.length}` : "—"}</b>
-          <span>{bustPct === null ? "Busts" : `Busts ${bustPct}%`}</span>
-        </div>
-        <div>
-          <b>{avg === null ? "—" : avg}</b>
-          <span>Avg bank</span>
-        </div>
-        <div>
-          <b>{banked}</b>
-          <span>Banked</span>
-        </div>
-      </div>
-      <div>
-        <h3>Seen / deck</h3>
-        <div className="flip-record-mix">
-          {FLIP_COPIES.map((copy) => {
-            const n = seen.get(copy.key) ?? 0;
-            return (
-              <div key={copy.key} className={`flip-record-cell${n ? " is-on" : ""}`}>
-                <b>{copy.label}</b>
-                <em>
-                  {n}/{copy.copies}
-                </em>
-              </div>
-            );
-          })}
-        </div>
-        <p className="flip-record-note">Copies in one 94-card deck. Seen can pass that after a reshuffle.</p>
-      </div>
-      <div>
-        <h3>Rounds</h3>
-        <div className="flip-record-rounds">
-          {rounds.map((round) => (
+      <div className="flip-record-rounds">
+        {rounds.map((round) => {
+          const numbers = round.draws.filter((draw) => draw.kind === "number");
+          return (
             <div key={round.round} className={`flip-record-round${round.result ? "" : " is-live"}`}>
               <b>R{round.round}</b>
-              <span>{round.draws.length ? round.draws.map(drawText).join(" · ") : "—"}</span>
+              <span>{numbers.length ? numbers.map(drawText).join(" · ") : "—"}</span>
               <em>{resultText(round)}</em>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
     </aside>
   );
