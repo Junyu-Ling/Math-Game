@@ -70,7 +70,7 @@ function beginEcardMatch(people) {
     log: [
       {
         id: uid("l"),
-        text: `Rock-paper-scissors. Winner picks the opening side. ${TOTAL_ROUNDS} rounds \xB7 roles swap every ${ROUNDS_PER_SET}. Slave win = ${SLAVE_WIN_POINTS}\xD7 Emperor win.`
+        text: `Rock-paper-scissors. Winner picks the opening side. ${TOTAL_ROUNDS} rounds \xB7 roles swap every ${ROUNDS_PER_SET}. Emperor beats Citizen +${EMPEROR_WIN_POINTS} and returns. Slave beats Emperor +${SLAVE_WIN_POINTS}.`
       }
     ]
   };
@@ -89,14 +89,14 @@ function cardBack() {
   return "/ecard-back.png";
 }
 function clash(a, b) {
-  if (a === "citizen" && b === "citizen") return { result: "draw", roundEnd: false };
-  if (a === "emperor" && b === "citizen") return { result: "a", roundEnd: true };
-  if (a === "citizen" && b === "emperor") return { result: "b", roundEnd: true };
-  if (a === "citizen" && b === "slave") return { result: "a", roundEnd: true };
-  if (a === "slave" && b === "citizen") return { result: "b", roundEnd: true };
-  if (a === "slave" && b === "emperor") return { result: "a", roundEnd: true };
-  if (a === "emperor" && b === "slave") return { result: "b", roundEnd: true };
-  return { result: "draw", roundEnd: false };
+  if (a === "citizen" && b === "citizen") return { result: "draw", roundEnd: false, payout: 0, recycle: null };
+  if (a === "emperor" && b === "citizen") return { result: "a", roundEnd: false, payout: EMPEROR_WIN_POINTS, recycle: "a" };
+  if (a === "citizen" && b === "emperor") return { result: "b", roundEnd: false, payout: EMPEROR_WIN_POINTS, recycle: "b" };
+  if (a === "citizen" && b === "slave") return { result: "a", roundEnd: true, payout: EMPEROR_WIN_POINTS, recycle: null };
+  if (a === "slave" && b === "citizen") return { result: "b", roundEnd: true, payout: EMPEROR_WIN_POINTS, recycle: null };
+  if (a === "slave" && b === "emperor") return { result: "a", roundEnd: true, payout: SLAVE_WIN_POINTS, recycle: null };
+  if (a === "emperor" && b === "slave") return { result: "b", roundEnd: true, payout: SLAVE_WIN_POINTS, recycle: null };
+  return { result: "draw", roundEnd: false, payout: 0, recycle: null };
 }
 function dealWithRoles(state, r0, r1, note) {
   const p0 = state.players[0];
@@ -247,12 +247,24 @@ function applyEcardAction(state, actorId, action) {
   }
   return state;
 }
+function clashLine(a, b, winnerName) {
+  const who = winnerName ? `${winnerName} \xB7 ` : "";
+  if (a === "citizen" && b === "citizen") return "Citizen vs Citizen +0.";
+  if (a === "emperor" && b === "citizen" || a === "citizen" && b === "emperor") {
+    return `${who}Emperor beats Citizen +${EMPEROR_WIN_POINTS}. Emperor returns.`;
+  }
+  if (a === "slave" && b === "emperor" || a === "emperor" && b === "slave") {
+    return `${who}Slave beats Emperor +${SLAVE_WIN_POINTS}.`;
+  }
+  return `${who}Citizen beats Slave +${EMPEROR_WIN_POINTS}.`;
+}
 function reveal(state) {
   const a = state.players[0];
   const b = state.players[1];
   const ca = a.hand.find((c) => c.id === a.selectedId);
   const cb = b.hand.find((c) => c.id === b.selectedId);
-  const { result, roundEnd } = clash(ca.kind, cb.kind);
+  const outcome = clash(ca.kind, cb.kind);
+  const { result, roundEnd, payout, recycle } = outcome;
   let log = [
     ...state.log,
     {
@@ -262,29 +274,27 @@ function reveal(state) {
   ];
   const players = state.players.map((p) => {
     const mine = p.id === a.id ? ca : cb;
-    const hand = p.hand.filter((c) => c.id !== mine.id);
+    const side = p.id === a.id ? "a" : "b";
+    const hand = recycle === side ? p.hand : p.hand.filter((c) => c.id !== mine.id);
     return { ...p, hand, selectedId: null, locked: false };
   });
   let score = { ...state.score };
   let roundWinnerId = null;
   let winningRole = null;
-  if (result === "draw") {
-    log = [...log, { id: uid("l"), text: "Citizens cancel. Both leave the hand \u2014 keep playing." }];
-  } else {
-    const winner = result === "a" ? a : b;
+  const winner = result === "a" ? a : result === "b" ? b : null;
+  if (winner && payout > 0) {
     const winCard = result === "a" ? ca.kind : cb.kind;
     winningRole = winCard === "slave" ? "slave" : "emperor";
     roundWinnerId = winner.id;
-    const payout = winningRole === "slave" ? SLAVE_WIN_POINTS : EMPEROR_WIN_POINTS;
     score[roundWinnerId] = (score[roundWinnerId] || 0) + payout;
-    log = [
-      ...log,
-      {
-        id: uid("l"),
-        text: `${winner.name} (${winningRole}) wins round ${state.round}. +${payout} (${score[a.id]}\u2013${score[b.id]}).`
-      }
-    ];
   }
+  log = [
+    ...log,
+    {
+      id: uid("l"),
+      text: `${clashLine(ca.kind, cb.kind, winner?.name ?? "")} (${score[a.id] || 0}\u2013${score[b.id] || 0}).`
+    }
+  ];
   return {
     ...state,
     players,
@@ -398,8 +408,8 @@ function aiPickEmperor(me, rivalHandSize, pressure) {
   if (rivalHandSize <= 1 && citizens[0]) return citizens[0];
   if (!citizens.length) return special;
   const pSlave = 1 / Math.max(1, rivalHandSize);
-  let wCitizen = 1.1 + pSlave * 3.2 + citizens.length * 0.1;
-  let wEmperor = 0.9 + (1 - pSlave) * 2.2 - pSlave * 6;
+  let wCitizen = 1.1 + pSlave * 4 + citizens.length * 0.1;
+  let wEmperor = 1.6 + (1 - pSlave) * 2.8 - pSlave * 7;
   if (me.hand.length >= 4) {
     wCitizen += 0.5;
     wEmperor -= 0.2;

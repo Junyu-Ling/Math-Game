@@ -39,8 +39,8 @@ const RULES: Record<string, string[]> = {
   ],
   ecard: [
     "Heads-up. Open a table, add a CPU or invite one friend, then start. RPS winner picks the opening side. 12 rounds in 4 sets of 3; roles swap every 3.",
-    "Emperor: E + 4C. Slave: S + 4C. E beats C (Emperor side wins the round). C beats S (Emperor side wins the round). S beats E (Slave side wins). C vs C cancel and stay out.",
-    "After a round, reclaim all cards. Slave-side round win scores 5× an Emperor-side round win. Highest score after 12 rounds wins.",
+    "Emperor: E + 4C. Slave: S + 4C. Emperor beats Citizen +1 and the Emperor card returns, so the round continues. Citizen vs Citizen +0, both leave. Citizen beats Slave +1 and the round ends. Slave beats Emperor +5 and the round ends — the Emperor was played on the Slave, so it is not returned.",
+    "After a round, reclaim all cards. Highest score after 12 rounds wins.",
   ],
   gomoku: [
     "15×15. Open a table, add a CPU or invite, then start. Rock-paper-scissors: winner plays black. First exact five in a row wins.",

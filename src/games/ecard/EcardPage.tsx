@@ -276,7 +276,7 @@ export function EcardPage() {
                 <p>
                   {waiting
                     ? "Add a CPU or invite one friend, then start. RPS picks the opening side."
-                    : "Practice vs CPU, or open a table to invite. 12 rounds · roles swap every 3 · Slave win pays 5×."}
+                    : "Practice vs CPU, or open a table to invite. Emperor beats Citizen +1 and returns. Slave beats Emperor +5."}
                 </p>
                 {waiting && state ? (
                   <ul className="lobby-roster">

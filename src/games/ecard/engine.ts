@@ -124,7 +124,7 @@ function beginEcardMatch(people: Array<{ id: string; name: string; human?: boole
     log: [
       {
         id: uid("l"),
-        text: `Rock-paper-scissors. Winner picks the opening side. ${TOTAL_ROUNDS} rounds · roles swap every ${ROUNDS_PER_SET}. Slave win = ${SLAVE_WIN_POINTS}× Emperor win.`,
+        text: `Rock-paper-scissors. Winner picks the opening side. ${TOTAL_ROUNDS} rounds · roles swap every ${ROUNDS_PER_SET}. Emperor beats Citizen +${EMPEROR_WIN_POINTS} and returns. Slave beats Emperor +${SLAVE_WIN_POINTS}.`,
       },
     ],
   };
@@ -146,22 +146,29 @@ export function cardBack() {
   return "/ecard-back.png";
 }
 
+export type ClashOutcome = {
+  result: "a" | "b" | "draw";
+  roundEnd: boolean;
+  payout: number;
+  /** Emperor returns unless it was played onto Slave. */
+  recycle: "a" | "b" | null;
+};
+
 /**
- * Clash resolution:
- *   E vs C → Emperor side wins the round (Emperor did not hit Slave)
- *   C vs S → Emperor side wins the round
- *   S vs E → Slave side wins the round
- *   C vs C → both out, continue
+ * Emperor beats Citizen: +1, Emperor returns, round continues.
+ * Citizen vs Citizen: +0, both leave.
+ * Citizen beats Slave: +1, round ends.
+ * Slave beats Emperor: +5, round ends. Emperor was played on Slave, so it stays out.
  */
-export function clash(a: EKind, b: EKind): { result: "a" | "b" | "draw"; roundEnd: boolean } {
-  if (a === "citizen" && b === "citizen") return { result: "draw", roundEnd: false };
-  if (a === "emperor" && b === "citizen") return { result: "a", roundEnd: true };
-  if (a === "citizen" && b === "emperor") return { result: "b", roundEnd: true };
-  if (a === "citizen" && b === "slave") return { result: "a", roundEnd: true };
-  if (a === "slave" && b === "citizen") return { result: "b", roundEnd: true };
-  if (a === "slave" && b === "emperor") return { result: "a", roundEnd: true };
-  if (a === "emperor" && b === "slave") return { result: "b", roundEnd: true };
-  return { result: "draw", roundEnd: false };
+export function clash(a: EKind, b: EKind): ClashOutcome {
+  if (a === "citizen" && b === "citizen") return { result: "draw", roundEnd: false, payout: 0, recycle: null };
+  if (a === "emperor" && b === "citizen") return { result: "a", roundEnd: false, payout: EMPEROR_WIN_POINTS, recycle: "a" };
+  if (a === "citizen" && b === "emperor") return { result: "b", roundEnd: false, payout: EMPEROR_WIN_POINTS, recycle: "b" };
+  if (a === "citizen" && b === "slave") return { result: "a", roundEnd: true, payout: EMPEROR_WIN_POINTS, recycle: null };
+  if (a === "slave" && b === "citizen") return { result: "b", roundEnd: true, payout: EMPEROR_WIN_POINTS, recycle: null };
+  if (a === "slave" && b === "emperor") return { result: "a", roundEnd: true, payout: SLAVE_WIN_POINTS, recycle: null };
+  if (a === "emperor" && b === "slave") return { result: "b", roundEnd: true, payout: SLAVE_WIN_POINTS, recycle: null };
+  return { result: "draw", roundEnd: false, payout: 0, recycle: null };
 }
 
 function dealWithRoles(state: EState, r0: ERole, r1: ERole, note: string): EState {
@@ -341,12 +348,25 @@ export function applyEcardAction(state: EState, actorId: string, action: EAction
   return state;
 }
 
+function clashLine(a: EKind, b: EKind, winnerName: string): string {
+  const who = winnerName ? `${winnerName} · ` : "";
+  if (a === "citizen" && b === "citizen") return "Citizen vs Citizen +0.";
+  if ((a === "emperor" && b === "citizen") || (a === "citizen" && b === "emperor")) {
+    return `${who}Emperor beats Citizen +${EMPEROR_WIN_POINTS}. Emperor returns.`;
+  }
+  if ((a === "slave" && b === "emperor") || (a === "emperor" && b === "slave")) {
+    return `${who}Slave beats Emperor +${SLAVE_WIN_POINTS}.`;
+  }
+  return `${who}Citizen beats Slave +${EMPEROR_WIN_POINTS}.`;
+}
+
 function reveal(state: EState): EState {
   const a = state.players[0]!;
   const b = state.players[1]!;
   const ca = a.hand.find((c) => c.id === a.selectedId)!;
   const cb = b.hand.find((c) => c.id === b.selectedId)!;
-  const { result, roundEnd } = clash(ca.kind, cb.kind);
+  const outcome = clash(ca.kind, cb.kind);
+  const { result, roundEnd, payout, recycle } = outcome;
   let log = [
     ...state.log,
     {
@@ -357,32 +377,28 @@ function reveal(state: EState): EState {
 
   const players = state.players.map((p) => {
     const mine = p.id === a.id ? ca : cb;
-    const hand = p.hand.filter((c) => c.id !== mine.id);
+    const side = p.id === a.id ? "a" : "b";
+    const hand = recycle === side ? p.hand : p.hand.filter((c) => c.id !== mine.id);
     return { ...p, hand, selectedId: null, locked: false };
   });
 
   let score = { ...state.score };
   let roundWinnerId: string | null = null;
   let winningRole: ERole | null = null;
-
-  if (result === "draw") {
-    log = [...log, { id: uid("l"), text: "Citizens cancel. Both leave the hand — keep playing." }];
-  } else {
-    const winner = result === "a" ? a : b;
+  const winner = result === "a" ? a : result === "b" ? b : null;
+  if (winner && payout > 0) {
     const winCard = result === "a" ? ca.kind : cb.kind;
-    // Slave card win → Slave side; Emperor or Citizen win → Emperor side.
     winningRole = winCard === "slave" ? "slave" : "emperor";
     roundWinnerId = winner.id;
-    const payout = winningRole === "slave" ? SLAVE_WIN_POINTS : EMPEROR_WIN_POINTS;
     score[roundWinnerId] = (score[roundWinnerId] || 0) + payout;
-    log = [
-      ...log,
-      {
-        id: uid("l"),
-        text: `${winner.name} (${winningRole}) wins round ${state.round}. +${payout} (${score[a.id]}–${score[b.id]}).`,
-      },
-    ];
   }
+  log = [
+    ...log,
+    {
+      id: uid("l"),
+      text: `${clashLine(ca.kind, cb.kind, winner?.name ?? "")} (${score[a.id] || 0}–${score[b.id] || 0}).`,
+    },
+  ];
 
   return {
     ...state,
@@ -515,9 +531,9 @@ function aiPickEmperor(me: EPlayer, rivalHandSize: number, pressure: ReturnType<
   if (!citizens.length) return special;
 
   const pSlave = 1 / Math.max(1, rivalHandSize);
-  // E vs C wins round (+1); C vs S wins round (+1); E vs S loses round (rival +5).
-  let wCitizen = 1.1 + pSlave * 3.2 + citizens.length * 0.1;
-  let wEmperor = 0.9 + (1 - pSlave) * 2.2 - pSlave * 6.0;
+  // E vs C is +1 and Emperor returns. E vs S pays the rival +5 and spends Emperor.
+  let wCitizen = 1.1 + pSlave * 4.0 + citizens.length * 0.1;
+  let wEmperor = 1.6 + (1 - pSlave) * 2.8 - pSlave * 7.0;
 
   if (me.hand.length >= 4) {
     wCitizen += 0.5;

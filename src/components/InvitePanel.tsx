@@ -44,7 +44,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       {game === "flip7" ? <p>Flip 7 has no fixed seat count. Add CPUs or invite, then start with 2+.</p> : null}
       {game === "halli" ? <p>Halli Galli is 2–4. Open a table, add CPUs or invite, then start. Ring on five.</p> : null}
       {game === "ecard" ? (
-        <p>E-Card is heads-up. Open a table, add a CPU or invite one friend, then start. RPS · 12 rounds · Slave win ×5.</p>
+        <p>E-Card is heads-up. Open a table, add a CPU or invite one friend, then start. Emperor beats Citizen +1 and returns. Slave beats Emperor +5.</p>
       ) : null}
       {game === "gomoku" ? (
         <p>Gomoku is heads-up. Open a table, add a CPU or invite one friend, then start. RPS winner plays black.</p>
