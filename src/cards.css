@@ -2000,6 +2000,26 @@
   max-height: min(640px, 78dvh);
 }
 
+.flip-record-avg {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 6px;
+  color: var(--ink);
+}
+
+.flip-record-avg b {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.flip-record-avg span {
+  color: var(--faint);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .flip-record-rounds {
   display: flex;
   flex-direction: column;

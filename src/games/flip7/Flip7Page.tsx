@@ -511,9 +511,16 @@ export function Flip7Page() {
 
 function drawText(draw: FlipDraw): string {
   const label = cardLabel(draw);
-  if (draw.note === "saved") return `${label} saved`;
+  if (draw.note === "saved") return `${label} saved at ${draw.at ?? 0}`;
+  if (draw.note === "bust") return `${label} bust at ${draw.at ?? 0}`;
   if (draw.note === "discard") return `${label} out`;
   return label;
+}
+
+function bustAvg(sums: number[]): string {
+  if (!sums.length) return "—";
+  const avg = sums.reduce((sum, n) => sum + n, 0) / sums.length;
+  return Number.isInteger(avg) ? String(avg) : avg.toFixed(1);
 }
 
 function resultText(round: FlipRoundRecord): string {
@@ -526,11 +533,17 @@ function resultText(round: FlipRoundRecord): string {
 
 function SoloRecord({ record }: { record: FlipSoloRecord }) {
   const rounds = [...record.rounds].reverse();
+  const pops = record.rounds.flatMap((round) => round.draws).filter((draw) => draw.note === "bust" || draw.note === "saved");
+  const sums = pops.map((draw) => draw.at ?? 0);
   return (
     <aside className="side flip-record" aria-label="Solo record">
       <div>
         <h3>Record</h3>
-        <p>Number cards you draw, listed by round.</p>
+        <p className="flip-record-avg">
+          <b>{bustAvg(sums)}</b>
+          <span>avg number sum at bust</span>
+        </p>
+        <p>{sums.length ? sums.join(" · ") : "No bust yet. A Second Chance save counts as one."}</p>
       </div>
       <div className="flip-record-rounds">
         {rounds.map((round) => {

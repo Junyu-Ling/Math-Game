@@ -25,13 +25,15 @@ export type FlipPhase = "lobby" | "action" | "target" | "roundEnd" | "over";
 
 export type FlipLog = { id: string; text: string; tone?: "you" | "ai" | "bad" };
 
-export type FlipDrawNote = "saved" | "discard";
+export type FlipDrawNote = "saved" | "bust" | "discard";
 
 export type FlipDraw = {
   id: string;
   kind: FlipKind;
   value?: number;
   note?: FlipDrawNote;
+  /** Number-card sum already held when this draw busted. Second Chance saves count too. */
+  at?: number;
 };
 
 export type FlipRoundResult = "stay" | "bust" | "flip7" | "freeze";
@@ -203,9 +205,19 @@ export function startFlip7Solo(): FlipState {
   };
 }
 
-function pushDraw(state: FlipState, card: FlipCard, note?: FlipDrawNote): FlipState {
+function numberSum(area: FlipCard[]): number {
+  return area.filter((c) => c.kind === "number").reduce((sum, c) => sum + (c.value ?? 0), 0);
+}
+
+function pushDraw(state: FlipState, card: FlipCard, note?: FlipDrawNote, at?: number): FlipState {
   if (!state.record || card.kind !== "number") return state;
-  const draw: FlipDraw = { id: card.id, kind: card.kind, value: card.value, ...(note ? { note } : {}) };
+  const draw: FlipDraw = {
+    id: card.id,
+    kind: card.kind,
+    value: card.value,
+    ...(note ? { note } : {}),
+    ...(at != null ? { at } : {}),
+  };
   const rounds = state.record.rounds;
   const last = rounds[rounds.length - 1];
   const nextRounds =
@@ -283,18 +295,19 @@ export function hit(state: FlipState): FlipState {
   const whoTone = me.human ? "you" : "ai";
 
   if (bust) {
+    const at = numberSum(me.area);
     const chance = me.area.find((c) => c.kind === "chance");
     if (chance) {
       const area = me.area.filter((c) => c.id !== chance.id);
       next = withPlayer(next, me.id, (p) => ({ ...p, area, pendingFlip3: Math.max(0, p.pendingFlip3 - 1) }));
-      next = pushDraw(next, card, "saved");
+      next = pushDraw(next, card, "saved", at);
       next.discard = [...next.discard, chance, card];
       next.burst = { playerId: me.id, id: uid("boom"), kind: "save", saveCard: chance };
       next.log = [...next.log, { id: uid("l"), text: `${me.name} hits a duplicate ${card.value}. Second Chance saves the round.`, tone: whoTone }];
       return afterHit(next, me.id);
     }
     next = withPlayer(next, me.id, (p) => ({ ...p, area: [], status: "bust", pendingFlip3: 0 }));
-    next = sealRecord(pushDraw(next, card), "bust", 0);
+    next = sealRecord(pushDraw(next, card, "bust", at), "bust", 0);
     next.discard = [...next.discard, ...me.area, card];
     next.burst = { playerId: me.id, id: uid("boom"), kind: "bust" };
     next.log = [...next.log, { id: uid("l"), text: `${me.name} busts (duplicate ${card.value}). Round scores 0.`, tone: "bad" }];
