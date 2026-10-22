@@ -25,6 +25,68 @@ export type FlipPhase = "lobby" | "action" | "target" | "roundEnd" | "over";
 
 export type FlipLog = { id: string; text: string; tone?: "you" | "ai" | "bad" };
 
+export type FlipDrawNote = "saved" | "discard";
+
+export type FlipDraw = {
+  id: string;
+  kind: FlipKind;
+  value?: number;
+  note?: FlipDrawNote;
+};
+
+export type FlipRoundResult = "stay" | "bust" | "flip7" | "freeze";
+
+export type FlipRoundRecord = {
+  round: number;
+  draws: FlipDraw[];
+  result?: FlipRoundResult;
+  score?: number;
+};
+
+/** Solo practice log of every card drawn, grouped by round. */
+export type FlipSoloRecord = {
+  rounds: FlipRoundRecord[];
+};
+
+export type FlipCopy = {
+  key: string;
+  label: string;
+  kind: FlipKind;
+  value?: number;
+  copies: number;
+};
+
+/** Copies of each card in one full 94-card deck. */
+export const FLIP_COPIES: FlipCopy[] = [
+  ...Array.from({ length: 13 }, (_, n) => ({
+    key: `n${n}`,
+    label: String(n),
+    kind: "number" as const,
+    value: n,
+    copies: n === 0 ? 1 : n,
+  })),
+  ...[2, 4, 6, 8, 10].map((n) => ({
+    key: `p${n}`,
+    label: `+${n}`,
+    kind: "plus" as const,
+    value: n,
+    copies: 1,
+  })),
+  { key: "x2", label: "×2", kind: "double", copies: 1 },
+  { key: "freeze", label: "FRZ", kind: "freeze", copies: 3 },
+  { key: "flip3", label: "F3", kind: "flip3", copies: 3 },
+  { key: "chance", label: "2ND", kind: "chance", copies: 3 },
+];
+
+export function flipCopyKey(card: { kind: FlipKind; value?: number }): string {
+  if (card.kind === "number") return `n${card.value ?? 0}`;
+  if (card.kind === "plus") return `p${card.value ?? 0}`;
+  if (card.kind === "double") return "x2";
+  if (card.kind === "freeze") return "freeze";
+  if (card.kind === "flip3") return "flip3";
+  return "chance";
+}
+
 export type FlipState = {
   players: FlipPlayer[];
   deck: FlipCard[];
@@ -39,6 +101,8 @@ export type FlipState = {
   goal: number;
   /** Turn indexes to restore after an immediate Flip Three sequence. */
   resume: number[];
+  /** Present only in solo practice. */
+  record?: FlipSoloRecord;
   burst: { playerId: string; id: string; kind: "bust" | "save" | "freeze" | "flip7"; saveCard?: FlipCard } | null;
 };
 
@@ -173,8 +237,43 @@ export function startFlip7Solo(): FlipState {
   const state = startFlip7(1);
   return {
     ...state,
+    record: { rounds: [{ round: 1, draws: [] }] },
     log: [{ id: uid("l"), text: "Solo practice. Hit or stay. First to 200. Freeze and Flip Three land on you." }],
   };
+}
+
+function pushDraw(state: FlipState, card: FlipCard, note?: FlipDrawNote): FlipState {
+  if (!state.record) return state;
+  const draw: FlipDraw = { id: card.id, kind: card.kind, value: card.value, ...(note ? { note } : {}) };
+  const rounds = state.record.rounds;
+  const last = rounds[rounds.length - 1];
+  const nextRounds =
+    last && !last.result
+      ? rounds.map((r, i) => (i === rounds.length - 1 ? { ...r, draws: [...r.draws, draw] } : r))
+      : [...rounds, { round: state.round, draws: [draw] }];
+  return { ...state, record: { rounds: nextRounds } };
+}
+
+function sealRecord(state: FlipState, result: FlipRoundResult, score: number): FlipState {
+  if (!state.record) return state;
+  const rounds = state.record.rounds;
+  if (!rounds.length) {
+    return { ...state, record: { rounds: [{ round: state.round, draws: [], result, score }] } };
+  }
+  return {
+    ...state,
+    record: {
+      rounds: rounds.map((r, i) => (i === rounds.length - 1 && !r.result ? { ...r, result, score } : r)),
+    },
+  };
+}
+
+function openRecordRound(state: FlipState): FlipState {
+  if (!state.record) return state;
+  const rounds = state.record.rounds;
+  const last = rounds[rounds.length - 1];
+  if (last && last.round === state.round && !last.result) return state;
+  return { ...state, record: { rounds: [...rounds, { round: state.round, draws: [] }] } };
 }
 
 export function viewFlip7(state: FlipState, _viewerId: string): FlipState {
@@ -227,12 +326,14 @@ export function hit(state: FlipState): FlipState {
     if (chance) {
       const area = me.area.filter((c) => c.id !== chance.id);
       next = withPlayer(next, me.id, (p) => ({ ...p, area, pendingFlip3: Math.max(0, p.pendingFlip3 - 1) }));
+      next = pushDraw(next, card, "saved");
       next.discard = [...next.discard, chance, card];
       next.burst = { playerId: me.id, id: uid("boom"), kind: "save", saveCard: chance };
       next.log = [...next.log, { id: uid("l"), text: `${me.name} hits a duplicate ${card.value}. Second Chance saves the round.`, tone: whoTone }];
       return afterHit(next, me.id);
     }
     next = withPlayer(next, me.id, (p) => ({ ...p, area: [], status: "bust", pendingFlip3: 0 }));
+    next = sealRecord(pushDraw(next, card), "bust", 0);
     next.discard = [...next.discard, ...me.area, card];
     next.burst = { playerId: me.id, id: uid("boom"), kind: "bust" };
     next.log = [...next.log, { id: uid("l"), text: `${me.name} busts (duplicate ${card.value}). Round scores 0.`, tone: "bad" }];
@@ -241,11 +342,13 @@ export function hit(state: FlipState): FlipState {
 
   if (card.kind === "chance" && hasSecondChance(me.area)) {
     next = withPlayer(next, me.id, (p) => ({ ...p, pendingFlip3: Math.max(0, p.pendingFlip3 - 1) }));
+    next = pushDraw(next, card, "discard");
     next.discard = [...next.discard, card];
     next.log = [...next.log, { id: uid("l"), text: `${me.name} already has Second Chance. The extra is discarded.`, tone: whoTone }];
     return afterHit(next, me.id);
   }
 
+  next = pushDraw(next, card);
   next = withPlayer(next, me.id, (p) => ({
     ...p,
     area: [...p.area, card],
@@ -276,6 +379,7 @@ function afterHit(state: FlipState, playerId: string): FlipState {
     }));
     next.discard = [...next.discard, ...me.area];
     next.burst = { playerId: me.id, id: uid("boom"), kind: "flip7" };
+    next = sealRecord(next, "flip7", scored.score);
     next.log = [...next.log, { id: uid("l"), text: `${me.name} Flip 7! +${scored.score} (includes +15 bonus).`, tone: "you" }];
     next = checkWin(next, me.id);
     if (next.phase === "over") return next;
@@ -292,6 +396,7 @@ export function stay(state: FlipState): FlipState {
   if (me.pendingFlip3 > 0) return hit(state);
   const scored = areaScore(me.area).score;
   let next = withPlayer({ ...state, burst: null }, me.id, (p) => ({ ...p, area: [], status: "stayed", total: p.total + scored }));
+  next = sealRecord(next, "stay", scored);
   next.discard = [...next.discard, ...me.area];
   next.log = [...next.log, { id: uid("l"), text: `${me.name} stays. Round +${scored}.`, tone: me.human ? "you" : "ai" }];
   next = checkWin(next, me.id);
@@ -338,6 +443,7 @@ export function applyTarget(state: FlipState, targetId: string): FlipState {
       area: [],
     }));
     next.discard = [...next.discard, ...target.area];
+    next = sealRecord(next, "freeze", scored);
     next.burst = { playerId: target.id, id: uid("boom"), kind: "freeze" };
     next.log = [
       ...next.log,
@@ -408,7 +514,7 @@ function newRound(state: FlipState): FlipState {
     pendingFlip3: 0,
     skipTurn: false,
   }));
-  return {
+  return openRecordRound({
     ...state,
     players,
     discard,
@@ -424,7 +530,7 @@ function newRound(state: FlipState): FlipState {
       { id: uid("l"), text: `Round complete. Scores kept: ${totals}.` },
       { id: uid("l"), text: `Round ${state.round + 1} starts.` },
     ],
-  };
+  });
 }
 
 function clearSkip(state: FlipState, ids: string[]): FlipState {

@@ -12,7 +12,7 @@ const RULES: Record<string, string[]> = {
   ],
   flip7: [
     "2+ players, or Practice Solo alone. On your turn flip one card or stay to bank the round. First to 200 wins.",
-    "In Practice Solo, Freeze and Flip Three are played on yourself.",
+    "In Practice Solo, Freeze and Flip Three are played on yourself. A record lists every card drawn each round and how often each card has appeared versus the 94-card deck.",
     "Duplicate number busts you unless you hold Second Chance (passive — discards with the duplicate; one per player).",
     "Seven different numbers in your area is Flip 7: bank immediately with an extra +15.",
     "Freeze and Flip Three can target any active player, including yourself. Last active player must use them on themselves.",

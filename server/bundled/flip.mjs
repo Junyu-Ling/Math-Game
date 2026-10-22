@@ -16,6 +16,34 @@ function uid(prefix = "id") {
 }
 
 // src/games/flip7/engine.ts
+var FLIP_COPIES = [
+  ...Array.from({ length: 13 }, (_, n) => ({
+    key: `n${n}`,
+    label: String(n),
+    kind: "number",
+    value: n,
+    copies: n === 0 ? 1 : n
+  })),
+  ...[2, 4, 6, 8, 10].map((n) => ({
+    key: `p${n}`,
+    label: `+${n}`,
+    kind: "plus",
+    value: n,
+    copies: 1
+  })),
+  { key: "x2", label: "\xD72", kind: "double", copies: 1 },
+  { key: "freeze", label: "FRZ", kind: "freeze", copies: 3 },
+  { key: "flip3", label: "F3", kind: "flip3", copies: 3 },
+  { key: "chance", label: "2ND", kind: "chance", copies: 3 }
+];
+function flipCopyKey(card) {
+  if (card.kind === "number") return `n${card.value ?? 0}`;
+  if (card.kind === "plus") return `p${card.value ?? 0}`;
+  if (card.kind === "double") return "x2";
+  if (card.kind === "freeze") return "freeze";
+  if (card.kind === "flip3") return "flip3";
+  return "chance";
+}
 var FLIP_MAX = 16;
 function deckBuild() {
   const cards = [];
@@ -131,8 +159,37 @@ function startFlip7Solo() {
   const state = startFlip7(1);
   return {
     ...state,
+    record: { rounds: [{ round: 1, draws: [] }] },
     log: [{ id: uid("l"), text: "Solo practice. Hit or stay. First to 200. Freeze and Flip Three land on you." }]
   };
+}
+function pushDraw(state, card, note) {
+  if (!state.record) return state;
+  const draw = { id: card.id, kind: card.kind, value: card.value, ...note ? { note } : {} };
+  const rounds = state.record.rounds;
+  const last = rounds[rounds.length - 1];
+  const nextRounds = last && !last.result ? rounds.map((r, i) => i === rounds.length - 1 ? { ...r, draws: [...r.draws, draw] } : r) : [...rounds, { round: state.round, draws: [draw] }];
+  return { ...state, record: { rounds: nextRounds } };
+}
+function sealRecord(state, result, score) {
+  if (!state.record) return state;
+  const rounds = state.record.rounds;
+  if (!rounds.length) {
+    return { ...state, record: { rounds: [{ round: state.round, draws: [], result, score }] } };
+  }
+  return {
+    ...state,
+    record: {
+      rounds: rounds.map((r, i) => i === rounds.length - 1 && !r.result ? { ...r, result, score } : r)
+    }
+  };
+}
+function openRecordRound(state) {
+  if (!state.record) return state;
+  const rounds = state.record.rounds;
+  const last = rounds[rounds.length - 1];
+  if (last && last.round === state.round && !last.result) return state;
+  return { ...state, record: { rounds: [...rounds, { round: state.round, draws: [] }] } };
 }
 function viewFlip7(state, _viewerId) {
   return state;
@@ -176,12 +233,14 @@ function hit(state) {
     if (chance) {
       const area = me.area.filter((c) => c.id !== chance.id);
       next = withPlayer(next, me.id, (p) => ({ ...p, area, pendingFlip3: Math.max(0, p.pendingFlip3 - 1) }));
+      next = pushDraw(next, card, "saved");
       next.discard = [...next.discard, chance, card];
       next.burst = { playerId: me.id, id: uid("boom"), kind: "save", saveCard: chance };
       next.log = [...next.log, { id: uid("l"), text: `${me.name} hits a duplicate ${card.value}. Second Chance saves the round.`, tone: whoTone }];
       return afterHit(next, me.id);
     }
     next = withPlayer(next, me.id, (p) => ({ ...p, area: [], status: "bust", pendingFlip3: 0 }));
+    next = sealRecord(pushDraw(next, card), "bust", 0);
     next.discard = [...next.discard, ...me.area, card];
     next.burst = { playerId: me.id, id: uid("boom"), kind: "bust" };
     next.log = [...next.log, { id: uid("l"), text: `${me.name} busts (duplicate ${card.value}). Round scores 0.`, tone: "bad" }];
@@ -189,10 +248,12 @@ function hit(state) {
   }
   if (card.kind === "chance" && hasSecondChance(me.area)) {
     next = withPlayer(next, me.id, (p) => ({ ...p, pendingFlip3: Math.max(0, p.pendingFlip3 - 1) }));
+    next = pushDraw(next, card, "discard");
     next.discard = [...next.discard, card];
     next.log = [...next.log, { id: uid("l"), text: `${me.name} already has Second Chance. The extra is discarded.`, tone: whoTone }];
     return afterHit(next, me.id);
   }
+  next = pushDraw(next, card);
   next = withPlayer(next, me.id, (p) => ({
     ...p,
     area: [...p.area, card],
@@ -221,6 +282,7 @@ function afterHit(state, playerId) {
     }));
     next.discard = [...next.discard, ...me.area];
     next.burst = { playerId: me.id, id: uid("boom"), kind: "flip7" };
+    next = sealRecord(next, "flip7", scored.score);
     next.log = [...next.log, { id: uid("l"), text: `${me.name} Flip 7! +${scored.score} (includes +15 bonus).`, tone: "you" }];
     next = checkWin(next, me.id);
     if (next.phase === "over") return next;
@@ -236,6 +298,7 @@ function stay(state) {
   if (me.pendingFlip3 > 0) return hit(state);
   const scored = areaScore(me.area).score;
   let next = withPlayer({ ...state, burst: null }, me.id, (p) => ({ ...p, area: [], status: "stayed", total: p.total + scored }));
+  next = sealRecord(next, "stay", scored);
   next.discard = [...next.discard, ...me.area];
   next.log = [...next.log, { id: uid("l"), text: `${me.name} stays. Round +${scored}.`, tone: me.human ? "you" : "ai" }];
   next = checkWin(next, me.id);
@@ -279,6 +342,7 @@ function applyTarget(state, targetId) {
       area: []
     }));
     next.discard = [...next.discard, ...target.area];
+    next = sealRecord(next, "freeze", scored);
     next.burst = { playerId: target.id, id: uid("boom"), kind: "freeze" };
     next.log = [
       ...next.log,
@@ -342,7 +406,7 @@ function newRound(state) {
     pendingFlip3: 0,
     skipTurn: false
   }));
-  return {
+  return openRecordRound({
     ...state,
     players,
     discard,
@@ -358,7 +422,7 @@ function newRound(state) {
       { id: uid("l"), text: `Round complete. Scores kept: ${totals}.` },
       { id: uid("l"), text: `Round ${state.round + 1} starts.` }
     ]
-  };
+  });
 }
 function clearSkip(state, ids) {
   if (!ids.length) return state;
@@ -446,6 +510,7 @@ function aiTarget(state) {
   return fat.id;
 }
 export {
+  FLIP_COPIES,
   FLIP_MAX,
   activePlayers,
   advance,
@@ -456,6 +521,7 @@ export {
   areaScore,
   cardLabel,
   currentFlip,
+  flipCopyKey,
   hit,
   liveTotal,
   numberPower,
