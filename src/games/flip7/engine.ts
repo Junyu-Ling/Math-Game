@@ -201,7 +201,7 @@ export function startFlip7Solo(): FlipState {
   return {
     ...state,
     record: { rounds: [{ round: 1, draws: [] }] },
-    log: [{ id: uid("l"), text: "Solo practice. Hit or stay. First to 200. Freeze and Flip Three land on you." }],
+    log: [{ id: uid("l"), text: "Solo practice. Hit or stay. Score keeps going past 200. An empty deck stays the round, then a new deck is dealt." }],
   };
 }
 
@@ -265,10 +265,14 @@ function hasSecondChance(area: FlipCard[]): boolean {
   return area.some((c) => c.kind === "chance");
 }
 
+function solo(state: FlipState): boolean {
+  return state.players.length === 1;
+}
+
 function takeCard(state: FlipState): { state: FlipState; card: FlipCard } {
   let deck = state.deck;
   let discard = state.discard;
-  if (deck.length === 0) {
+  if (deck.length === 0 && !solo(state)) {
     deck = shuffle(discard);
     discard = [];
   }
@@ -285,6 +289,7 @@ export function hit(state: FlipState): FlipState {
   if (state.phase !== "action") return state;
   const me = currentFlip(state);
   if (me.status !== "active") return handoff(state);
+  if (solo(state) && state.deck.length === 0) return stay(state);
   // Clear prior FX so a new bust boom can mount cleanly.
   const pulled = takeCard({ ...state, burst: null });
   const card = pulled.card;
@@ -360,6 +365,7 @@ function afterHit(state: FlipState, playerId: string): FlipState {
     return handoff({ ...next, turn: idx });
   }
   const parked = { ...state, turn: Math.max(0, idx), phase: "action" as const };
+  if (solo(state) && state.deck.length === 0 && me.status === "active") return stay(parked);
   if (me.pendingFlip3 > 0 && me.status === "active") return parked;
   return handoff(parked);
 }
@@ -367,12 +373,20 @@ function afterHit(state: FlipState, playerId: string): FlipState {
 export function stay(state: FlipState): FlipState {
   if (state.phase !== "action") return state;
   const me = currentFlip(state);
-  if (me.pendingFlip3 > 0) return hit(state);
+  const deckEmpty = solo(state) && state.deck.length === 0;
+  if (me.pendingFlip3 > 0 && !deckEmpty) return hit(state);
   const scored = areaScore(me.area).score;
-  let next = withPlayer({ ...state, burst: null }, me.id, (p) => ({ ...p, area: [], status: "stayed", total: p.total + scored }));
+  let next = withPlayer({ ...state, burst: null }, me.id, (p) => ({ ...p, area: [], status: "stayed", total: p.total + scored, pendingFlip3: 0 }));
   next = sealRecord(next, "stay", scored);
   next.discard = [...next.discard, ...me.area];
-  next.log = [...next.log, { id: uid("l"), text: `${me.name} stays. Round +${scored}.`, tone: me.human ? "you" : "ai" }];
+  next.log = [
+    ...next.log,
+    {
+      id: uid("l"),
+      text: deckEmpty ? `${me.name} stays. The deck is empty. Round +${scored}.` : `${me.name} stays. Round +${scored}.`,
+      tone: me.human ? "you" : "ai",
+    },
+  ];
   next = checkWin(next, me.id);
   if (next.phase === "over") return next;
   return handoff(next);
@@ -461,6 +475,7 @@ export function applyTarget(state: FlipState, targetId: string): FlipState {
 }
 
 function checkWin(state: FlipState, playerId: string): FlipState {
+  if (solo(state)) return state;
   const p = state.players.find((x) => x.id === playerId);
   if (p && p.total >= state.goal) {
     return {
@@ -478,7 +493,8 @@ function allSettled(state: FlipState) {
 }
 
 function newRound(state: FlipState): FlipState {
-  const discard = [...state.discard, ...state.players.flatMap((p) => p.area)];
+  const renew = solo(state) && state.deck.length === 0;
+  const discard = renew ? [] : [...state.discard, ...state.players.flatMap((p) => p.area)];
   const totals = state.players.map((p) => `${p.name} ${p.total}`).join(" · ");
   const players = state.players.map((p) => ({
     ...p,
@@ -491,6 +507,7 @@ function newRound(state: FlipState): FlipState {
   return openRecordRound({
     ...state,
     players,
+    deck: renew ? deckBuild() : state.deck,
     discard,
     resume: [],
     // Keep bust/freeze/flip7 FX so the UI can finish animating into the next round.
@@ -502,7 +519,7 @@ function newRound(state: FlipState): FlipState {
     log: [
       ...state.log,
       { id: uid("l"), text: `Round complete. Scores kept: ${totals}.` },
-      { id: uid("l"), text: `Round ${state.round + 1} starts.` },
+      { id: uid("l"), text: renew ? `Round ${state.round + 1} starts with a new deck.` : `Round ${state.round + 1} starts.` },
     ],
   });
 }

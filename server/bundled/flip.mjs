@@ -132,7 +132,7 @@ function startFlip7Solo() {
   return {
     ...state,
     record: { rounds: [{ round: 1, draws: [] }] },
-    log: [{ id: uid("l"), text: "Solo practice. Hit or stay. First to 200. Freeze and Flip Three land on you." }]
+    log: [{ id: uid("l"), text: "Solo practice. Hit or stay. Score keeps going past 200. An empty deck stays the round, then a new deck is dealt." }]
   };
 }
 function numberSum(area) {
@@ -184,10 +184,13 @@ function activePlayers(state) {
 function hasSecondChance(area) {
   return area.some((c) => c.kind === "chance");
 }
+function solo(state) {
+  return state.players.length === 1;
+}
 function takeCard(state) {
   let deck = state.deck;
   let discard = state.discard;
-  if (deck.length === 0) {
+  if (deck.length === 0 && !solo(state)) {
     deck = shuffle(discard);
     discard = [];
   }
@@ -202,6 +205,7 @@ function hit(state) {
   if (state.phase !== "action") return state;
   const me = currentFlip(state);
   if (me.status !== "active") return handoff(state);
+  if (solo(state) && state.deck.length === 0) return stay(state);
   const pulled = takeCard({ ...state, burst: null });
   const card = pulled.card;
   let next = pulled.state;
@@ -271,18 +275,27 @@ function afterHit(state, playerId) {
     return handoff({ ...next, turn: idx });
   }
   const parked = { ...state, turn: Math.max(0, idx), phase: "action" };
+  if (solo(state) && state.deck.length === 0 && me.status === "active") return stay(parked);
   if (me.pendingFlip3 > 0 && me.status === "active") return parked;
   return handoff(parked);
 }
 function stay(state) {
   if (state.phase !== "action") return state;
   const me = currentFlip(state);
-  if (me.pendingFlip3 > 0) return hit(state);
+  const deckEmpty = solo(state) && state.deck.length === 0;
+  if (me.pendingFlip3 > 0 && !deckEmpty) return hit(state);
   const scored = areaScore(me.area).score;
-  let next = withPlayer({ ...state, burst: null }, me.id, (p) => ({ ...p, area: [], status: "stayed", total: p.total + scored }));
+  let next = withPlayer({ ...state, burst: null }, me.id, (p) => ({ ...p, area: [], status: "stayed", total: p.total + scored, pendingFlip3: 0 }));
   next = sealRecord(next, "stay", scored);
   next.discard = [...next.discard, ...me.area];
-  next.log = [...next.log, { id: uid("l"), text: `${me.name} stays. Round +${scored}.`, tone: me.human ? "you" : "ai" }];
+  next.log = [
+    ...next.log,
+    {
+      id: uid("l"),
+      text: deckEmpty ? `${me.name} stays. The deck is empty. Round +${scored}.` : `${me.name} stays. Round +${scored}.`,
+      tone: me.human ? "you" : "ai"
+    }
+  ];
   next = checkWin(next, me.id);
   if (next.phase === "over") return next;
   return handoff(next);
@@ -363,6 +376,7 @@ function applyTarget(state, targetId) {
   return afterHit(next, me.id);
 }
 function checkWin(state, playerId) {
+  if (solo(state)) return state;
   const p = state.players.find((x) => x.id === playerId);
   if (p && p.total >= state.goal) {
     return {
@@ -378,7 +392,8 @@ function allSettled(state) {
   return state.players.every((p) => p.status !== "active");
 }
 function newRound(state) {
-  const discard = [...state.discard, ...state.players.flatMap((p) => p.area)];
+  const renew = solo(state) && state.deck.length === 0;
+  const discard = renew ? [] : [...state.discard, ...state.players.flatMap((p) => p.area)];
   const totals = state.players.map((p) => `${p.name} ${p.total}`).join(" \xB7 ");
   const players = state.players.map((p) => ({
     ...p,
@@ -391,6 +406,7 @@ function newRound(state) {
   return openRecordRound({
     ...state,
     players,
+    deck: renew ? deckBuild() : state.deck,
     discard,
     resume: [],
     // Keep bust/freeze/flip7 FX so the UI can finish animating into the next round.
@@ -402,7 +418,7 @@ function newRound(state) {
     log: [
       ...state.log,
       { id: uid("l"), text: `Round complete. Scores kept: ${totals}.` },
-      { id: uid("l"), text: `Round ${state.round + 1} starts.` }
+      { id: uid("l"), text: renew ? `Round ${state.round + 1} starts with a new deck.` : `Round ${state.round + 1} starts.` }
     ]
   });
 }
