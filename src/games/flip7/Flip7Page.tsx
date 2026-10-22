@@ -520,6 +520,14 @@ function bustAvg(sums: number[]): string {
   return Number.isInteger(avg) ? String(avg) : avg.toFixed(1);
 }
 
+function chanceText(chance: number): string {
+  const pct = chance * 100;
+  if (pct >= 99.95) return "100%";
+  if (pct <= 0.05) return "0%";
+  const rounded = pct.toFixed(1);
+  return `${rounded.endsWith(".0") ? rounded.slice(0, -2) : rounded}%`;
+}
+
 function resultText(round: FlipRoundRecord): string {
   if (!round.result) return "drawing";
   if (round.result === "bust") return "Bust 0";
@@ -532,6 +540,8 @@ function SoloRecord({ record }: { record: FlipSoloRecord }) {
   const rounds = [...record.rounds].reverse();
   const pops = record.rounds.flatMap((round) => round.draws).filter((draw) => draw.note === "bust" || draw.note === "saved");
   const sums = pops.map((draw) => draw.at ?? 0);
+  const done = record.rounds.filter((round) => round.result);
+  const flips = done.filter((round) => round.result === "flip7").length;
   return (
     <aside className="side flip-record" aria-label="Solo record">
       <div>
@@ -539,6 +549,10 @@ function SoloRecord({ record }: { record: FlipSoloRecord }) {
         <p className="flip-record-avg">
           <b>{bustAvg(sums)}</b>
           <span>avg number sum at bust</span>
+        </p>
+        <p className="flip-record-avg">
+          <b>{done.length ? chanceText(flips / done.length) : "—"}</b>
+          <span>{done.length ? `flip 7 · ${flips} of ${done.length}` : "flip 7 rounds"}</span>
         </p>
         <p>{sums.length ? sums.join(" · ") : "No bust yet. A Second Chance save counts as one."}</p>
       </div>
