@@ -234,7 +234,7 @@ function OppSeat({
     <div className={`seat ${className} ${opening ? "veiled" : ""}`}>
       <div className="seat-plaque">
         <b>{player.name}</b>
-        <span>{player.out ? (player.tiles.length > 0 && player.tiles.every((t) => t.revealed) ? "OUT" : "LEFT") : opening ? "Arrange" : turn ? "Turn" : "Wait"}</span>
+        <span>{player.out ? (tiles.length > 0 && tiles.every((t) => t.revealed) ? "OUT" : "LEFT") : opening ? "Arrange" : turn ? "Turn" : "Wait"}</span>
       </div>
       <div className="tiles-wrap">
         {opening ? (
