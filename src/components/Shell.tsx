@@ -10,7 +10,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="shell">
       <header className="topbar">
         <NavLink to="/" className="brand">
-          <strong>Axiom</strong>
+          <strong>ByteGame</strong>
           <span>Play</span>
         </NavLink>
         <nav className="nav">
@@ -33,7 +33,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <InviteToasts />
       <main>{children}</main>
       <footer className="foot">
-        <span>Axiom</span>
+        <span>ByteGame</span>
         <span>Invite duels · GitHub</span>
       </footer>
     </div>
