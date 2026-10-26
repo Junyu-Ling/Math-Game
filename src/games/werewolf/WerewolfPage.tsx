@@ -15,7 +15,7 @@ import {
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
-import { SeatTalk, TableChatBar } from "../../components/TableTalk";
+import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { forfeitText } from "../../lib/forfeit";
@@ -364,7 +364,6 @@ export function WerewolfPage() {
             </>
           )}
         </div>
-        <TableChatBar />
       </div>
     </div>
   );

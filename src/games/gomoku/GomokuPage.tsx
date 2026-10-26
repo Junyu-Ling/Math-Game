@@ -13,7 +13,7 @@ import {
 } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
-import { SeatTalk, TableChatBar } from "../../components/TableTalk";
+import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { forfeitText } from "../../lib/forfeit";
@@ -410,7 +410,6 @@ export function GomokuPage() {
             </div>
           )}
         </div>
-        <TableChatBar />
       </div>
     </div>
   );

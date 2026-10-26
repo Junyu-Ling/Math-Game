@@ -40,7 +40,7 @@ import { setPlayMeta } from "../../lib/playMeta";
 import { RulesButton } from "../../components/GameRules";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
-import { SeatTalk, TableChatBar } from "../../components/TableTalk";
+import { SeatTalk } from "../../components/TableTalk";
 
 type Flash = {
   kind: "hit" | "miss" | "win" | "lose";
@@ -1066,7 +1066,6 @@ export function DaVinciPage() {
           </div>
         </aside>
         </div> : null}
-        <TableChatBar />
       </div>
     </div>
   );

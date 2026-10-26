@@ -17,7 +17,7 @@ import { DeckStack, UnoColorPick, UnoFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
 import { RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
-import { SeatTalk, TableChatBar } from "../../components/TableTalk";
+import { SeatTalk } from "../../components/TableTalk";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -405,7 +405,6 @@ export function UnoPage() {
             </>
           )}
         </div>
-        <TableChatBar />
       </div>
     </div>
   );

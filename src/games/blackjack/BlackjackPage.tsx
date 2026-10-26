@@ -11,7 +11,7 @@ import { PokerFace } from "../../components/PlayingCard";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
-import { SeatTalk, TableChatBar } from "../../components/TableTalk";
+import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
@@ -163,7 +163,6 @@ export function BlackjackPage() {
             </>
           )}
         </div>
-        <TableChatBar />
       </div>
     </div>
   );

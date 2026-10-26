@@ -9,7 +9,7 @@ import {
   type ArmyState,
 } from "./engine";
 import { GameSetup } from "../../components/GameSetup";
-import { SeatTalk, TableChatBar } from "../../components/TableTalk";
+import { SeatTalk } from "../../components/TableTalk";
 import { ClickPop, RulesButton } from "../../components/GameRules";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -155,7 +155,6 @@ export function ArmyPage() {
             </div>
           )}
         </div>
-        <TableChatBar />
       </div>
     </div>
   );

@@ -584,6 +584,12 @@ async function getRoomRecord(roomId) {
 }
 
 async function saveRoom(room, opts = {}) {
+  const humans = humanSeatIds(room.seats);
+  let faces = Array.isArray(room.faces)
+    ? room.faces.filter((f) => f && humans.includes(String(f.id)))
+    : [];
+  if (faces.length !== humans.length) faces = await seatFaces(room.seats);
+  room.faces = faces;
   const rec = {
     id: room.id,
     game: room.game,
@@ -592,6 +598,7 @@ async function saveRoom(room, opts = {}) {
     endsAt: room.endsAt,
     cpuReadyAt: room.cpuReadyAt || null,
     seq: room.seq || 0,
+    faces,
   };
   const r = client();
   if (r) {
@@ -704,6 +711,10 @@ export async function snapshot(userId, light = false) {
       rec = await forfeitIfAbsent(rec, String(userId));
       if (rec) {
         await expireArrange(rec);
+        const humans = humanSeatIds(rec.seats);
+        if (!Array.isArray(rec.faces) || rec.faces.length !== humans.length) {
+          rec.faces = await seatFaces(rec.seats);
+        }
         room = publicRoom(rec, userId);
       }
     }
@@ -851,6 +862,10 @@ function startRoom(invite, from, to, mods) {
     id: uid("room"),
     game: invite.game,
     seats: [a.id, b.id],
+    faces: [
+      { id: a.id, name: from.name, avatar: from.avatar || "" },
+      { id: b.id, name: to.name || playerName(to), avatar: to.avatar || "" },
+    ],
     state,
     endsAt,
     seq: 1,
@@ -873,6 +888,7 @@ async function joinOpenTable(user, invite, mods) {
     rec.state = rebuildLobby(rec, joiner, mods);
     rec.seq = (rec.seq || 0) + 1;
     rec.mods = mods;
+    rec.faces = await seatFaces(rec.seats);
     await saveRoom(rec);
     return { ok: true, room: publicRoom(rec, user.id) };
   }
@@ -883,6 +899,7 @@ async function joinOpenTable(user, invite, mods) {
     id: uid("room"),
     game,
     seats: [hostId, joiner.id],
+    faces: await seatFaces([hostId, joiner.id]),
     state,
     endsAt: null,
     seq: 1,
@@ -1307,18 +1324,6 @@ export async function applyRoomAction(user, roomId, action, mods) {
   const rec = await getRoomRecord(roomId);
   if (!rec || !rec.seats.includes(user.id)) throw new Error("Game not found");
   const room = { ...rec, mods };
-  if (action && action.type === "chat") {
-    const text = String(action.text || "").replace(/\s+/g, " ").trim().slice(0, 80);
-    if (!text) throw new Error("Say something first");
-    const name = room.state?.players?.find((p) => p.id === user.id)?.name || playerName(user);
-    room.chat = [
-      ...(Array.isArray(room.chat) ? room.chat : []),
-      { id: uid("chat"), fromId: user.id, name, text, at: Date.now() },
-    ].slice(-24);
-    room.seq = (room.seq || 0) + 1;
-    await saveRoom(room, { skipRemember: true });
-    return publicRoom(room, user.id);
-  }
   await expireArrange(room);
   const before = room.state;
   if (room.game === "coda") {
@@ -1525,7 +1530,7 @@ function publicRoom(room, viewerId) {
   }
   view = withForfeitView(view, room.state, room.game, viewerId);
   if (view && typeof view === "object") {
-    view = { ...view, chat: Array.isArray(room.chat) ? room.chat.slice(-24) : [] };
+    view = { ...view, faces: Array.isArray(room.faces) ? room.faces : [] };
   }
   return {
     id: room.id,
@@ -1535,6 +1540,21 @@ function publicRoom(room, viewerId) {
     seq: room.seq || 0,
     view,
   };
+}
+
+async function seatFaces(seats) {
+  const ids = (seats || []).map(String).filter((id) => id && !isCpuId(id));
+  const out = [];
+  for (const id of ids) {
+    const live = (await readJson(`axiom:p:${id}`)) || {};
+    const saved = (await readJson(`axiom:u:${id}`)) || (await readJson(`axiom:acct:${id}`)) || {};
+    out.push({
+      id,
+      name: live.name || saved.name || saved.login || saved.email || "PLAYER",
+      avatar: live.avatar || saved.avatar || "",
+    });
+  }
+  return out;
 }
 
 /** Drop this user from a seat; close the room if they were host or last human. */
@@ -1550,10 +1570,11 @@ async function vacateSeat(userId, rec) {
     await wakeUsers(humanSeatIds(rec.seats));
     return;
   }
-  rec.seats = rec.seats.filter((x) => x !== id);
-  rec.state = rebuildLobby(rec, null, rec.mods);
-  rec.seq = (rec.seq || 0) + 1;
-  await saveRoom(rec);
+    rec.seats = rec.seats.filter((x) => x !== id);
+    rec.state = rebuildLobby(rec, null, rec.mods);
+    rec.seq = (rec.seq || 0) + 1;
+    rec.faces = await seatFaces(rec.seats);
+    await saveRoom(rec);
 }
 
 export async function adjustCpu(user, game, mode, mods, meta = {}) {
@@ -1581,6 +1602,7 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
       id: uid("room"),
       game,
       seats: [host.id],
+      faces: await seatFaces([host.id]),
       state: newLobbyState(game, [host], mods, meta),
       endsAt: null,
       seq: 1,
@@ -1600,6 +1622,7 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
       id: uid("room"),
       game,
       seats: [host.id],
+      faces: await seatFaces([host.id]),
       state: newLobbyState(game, [host], mods, meta),
       endsAt: null,
       seq: 1,
