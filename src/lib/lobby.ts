@@ -14,6 +14,8 @@ export type Invite = {
   meta?: Record<string, unknown>;
 };
 
+export type ChatLine = { id: string; fromId: string; name: string; text: string; at: number };
+
 export type RoomSnap = {
   id: string;
   game: string;

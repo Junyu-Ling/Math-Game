@@ -40,6 +40,7 @@ import { setPlayMeta } from "../../lib/playMeta";
 import { RulesButton } from "../../components/GameRules";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { SeatTalk, TableChatBar } from "../../components/TableTalk";
 
 type Flash = {
   kind: "hit" | "miss" | "win" | "lose";
@@ -210,7 +211,9 @@ function OppSeat({
   return (
     <div className={`seat ${className} ${opening ? "veiled" : ""}`}>
       <div className="seat-plaque">
-        <b>{player.name}</b>
+        <SeatTalk playerId={player.id} name={player.name}>
+          <b>{player.name}</b>
+        </SeatTalk>
         <span>{player.out ? (tiles.length > 0 && tiles.every((t) => t.revealed) ? "OUT" : "LEFT") : opening ? "Arrange" : turn ? "Turn" : "Wait"}</span>
       </div>
       <div className="tiles-wrap">
@@ -879,7 +882,9 @@ export function DaVinciPage() {
 
           <div className="seat seat-you">
             <div className="seat-plaque you">
-              <b>{you.name}</b>
+              <SeatTalk playerId={you.id} name={you.name}>
+                <b>{you.name}</b>
+              </SeatTalk>
               <span>
                 {you.out ? (you.tiles.length > 0 && you.tiles.every((t) => t.revealed) ? "OUT" : "LEFT") : opening ? "Arrange" : arranging ? "Insert" : me?.id === you.id ? "Turn" : "Wait"}
               </span>
@@ -1061,6 +1066,7 @@ export function DaVinciPage() {
           </div>
         </aside>
         </div> : null}
+        <TableChatBar />
       </div>
     </div>
   );

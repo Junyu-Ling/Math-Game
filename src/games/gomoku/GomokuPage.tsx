@@ -13,6 +13,7 @@ import {
 } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { SeatTalk, TableChatBar } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { forfeitText } from "../../lib/forfeit";
@@ -286,7 +287,13 @@ export function GomokuPage() {
               <p className="status-line">Winner plays black</p>
               <div className="rps-arena">
                 <div className="rps-side rival">
-                  <span className="rps-name">{rival?.name}</span>
+                  <span className="rps-name">
+                    {rival ? (
+                      <SeatTalk playerId={rival.id} name={rival.name}>
+                        {rival.name}
+                      </SeatTalk>
+                    ) : null}
+                  </span>
                   <RpsHand
                     key={`rival-${rpsBeat}-${rivalRpsKind}`}
                     kind={rivalRpsKind}
@@ -306,7 +313,11 @@ export function GomokuPage() {
                     pose={rpsPose}
                     won={youRpsWon}
                   />
-                  <span className="rps-name">{me.name}</span>
+                  <span className="rps-name">
+                    <SeatTalk playerId={me.id} name={me.name}>
+                      {me.name}
+                    </SeatTalk>
+                  </span>
                 </div>
               </div>
               <p className="status-line">
@@ -339,6 +350,16 @@ export function GomokuPage() {
             </div>
           ) : (
             <div className="kaiji-board-wrap">
+              <div className="board-talk">
+                {rival ? (
+                  <SeatTalk playerId={rival.id} name={rival.name}>
+                    {rival.name}
+                  </SeatTalk>
+                ) : null}
+                <SeatTalk playerId={me.id} name={me.name}>
+                  {me.name}
+                </SeatTalk>
+              </div>
               <p className="status-line">
                 {state.phase === "over"
                   ? forfeitText(state) ||
@@ -389,6 +410,7 @@ export function GomokuPage() {
             </div>
           )}
         </div>
+        <TableChatBar />
       </div>
     </div>
   );

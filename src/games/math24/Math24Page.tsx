@@ -4,6 +4,7 @@ import { PokerFace } from "../../components/PlayingCard";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { SeatTalk, TableChatBar } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 
@@ -129,6 +130,18 @@ export function Math24Page() {
             </>
           ) : (
             <>
+              <div className="board-talk">
+                {rival ? (
+                  <SeatTalk playerId={rival.id} name={rival.name}>
+                    {rival.name}
+                  </SeatTalk>
+                ) : null}
+                {me ? (
+                  <SeatTalk playerId={me.id} name={me.name}>
+                    {me.name}
+                  </SeatTalk>
+                ) : null}
+              </div>
               <div className="m24-board">
                 {(state.cards?.length
                   ? state.cards
@@ -170,6 +183,7 @@ export function Math24Page() {
             </>
           )}
         </div>
+        <TableChatBar />
       </div>
     </div>
   );

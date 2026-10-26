@@ -21,6 +21,7 @@ import { DeckStack, FlipFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
 import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { SeatTalk, TableChatBar } from "../../components/TableTalk";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -100,11 +101,15 @@ function FlipSeat({
         </div>
       ) : null}
       <div className={`seat-label${lead ? " is-lead" : ""}`}>
+        <SeatTalk playerId={player.id} name={player.name}>
+          <span>
         {player.name} · {mine ? `round ${scored.score} · total ${player.total}` : `${player.total} PTS · ${player.status.toUpperCase()}`}
         {player.area.some((c) => c.kind === "chance") ? " · 2ND CHANCE" : ""}
         {player.pendingFlip3 > 0 ? ` · FLIP ${player.pendingFlip3}` : ""}
         {turn ? " · TURN" : ""}
         {lead ? " · LEAD" : ""}
+          </span>
+        </SeatTalk>
       </div>
       <FitCards vertical={vertical} lockSize={lockSize}>
         {player.area.map((c) => {
@@ -504,6 +509,7 @@ export function Flip7Page() {
             </>
           ) : null}
         </div>
+        <TableChatBar />
       </div>
     </div>
   );

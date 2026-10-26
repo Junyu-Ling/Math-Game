@@ -926,17 +926,18 @@ function rebuildLobby(rec, joiner, mods) {
       state = mods.coda.applyAction(state, p.id, { type: "pick", black: p.black ?? 2, white: p.white ?? 2 });
       if (p.ready && !isCpuId(p.id)) state = mods.coda.applyAction(state, p.id, { type: "ready" });
     }
-    return readyCodaCpus(state, mods);
+    return mixCodaCpus(state, mods);
   }
   return rec.state;
 }
 
-function readyCodaCpus(state, mods) {
+function mixCodaCpus(state, mods) {
   let next = state;
   for (const p of next.players || []) {
     if (!isCpuPlayer(p)) continue;
-    next = mods.coda.applyAction(next, p.id, { type: "pick", black: 2, white: 2 });
-    next = mods.coda.applyAction(next, p.id, { type: "ready" });
+    const open = Math.max(1, (p.black ?? 0) + (p.white ?? 0) || 4);
+    const black = Math.min(open, Math.max(0, p.black ?? Math.floor(open / 2)));
+    next = mods.coda.applyAction(next, p.id, { type: "pick", black, white: open - black });
   }
   return next;
 }
@@ -1306,6 +1307,18 @@ export async function applyRoomAction(user, roomId, action, mods) {
   const rec = await getRoomRecord(roomId);
   if (!rec || !rec.seats.includes(user.id)) throw new Error("Game not found");
   const room = { ...rec, mods };
+  if (action && action.type === "chat") {
+    const text = String(action.text || "").replace(/\s+/g, " ").trim().slice(0, 80);
+    if (!text) throw new Error("Say something first");
+    const name = room.state?.players?.find((p) => p.id === user.id)?.name || playerName(user);
+    room.chat = [
+      ...(Array.isArray(room.chat) ? room.chat : []),
+      { id: uid("chat"), fromId: user.id, name, text, at: Date.now() },
+    ].slice(-24);
+    room.seq = (room.seq || 0) + 1;
+    await saveRoom(room, { skipRemember: true });
+    return publicRoom(room, user.id);
+  }
   await expireArrange(room);
   const before = room.state;
   if (room.game === "coda") {
@@ -1511,6 +1524,9 @@ function publicRoom(room, viewerId) {
     }
   }
   view = withForfeitView(view, room.state, room.game, viewerId);
+  if (view && typeof view === "object") {
+    view = { ...view, chat: Array.isArray(room.chat) ? room.chat.slice(-24) : [] };
+  }
   return {
     id: room.id,
     game: room.game,

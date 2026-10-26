@@ -15,6 +15,7 @@ import {
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { SeatTalk, TableChatBar } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { forfeitText } from "../../lib/forfeit";
@@ -219,7 +220,9 @@ export function WerewolfPage() {
               <ul className="wolf-roster">
                 {state.players.map((p) => (
                   <li key={p.id} className={`wolf-seat ${p.alive ? "alive" : "dead"} tone-${roleTone(p.role)}`}>
-                    <b>{p.name}</b>
+                    <SeatTalk playerId={p.id} name={p.name}>
+                      <b>{p.name}</b>
+                    </SeatTalk>
                     <span>
                       {!p.alive ? "out" : p.id === me.id ? roleLabel(p.role) : p.role ? roleLabel(p.role) : "alive"}
                       {p.voteFor ? " · voted" : ""}
@@ -361,6 +364,7 @@ export function WerewolfPage() {
             </>
           )}
         </div>
+        <TableChatBar />
       </div>
     </div>
   );

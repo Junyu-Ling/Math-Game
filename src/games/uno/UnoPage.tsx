@@ -17,6 +17,7 @@ import { DeckStack, UnoColorPick, UnoFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
 import { RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { SeatTalk, TableChatBar } from "../../components/TableTalk";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -90,8 +91,12 @@ function UnoSeat({
   return (
     <div className={`seat ${className}${vertical ? " seat-side" : ""}`}>
       <div className="seat-label">
-        {player.name} · {player.out ? "LEFT" : `${player.hand.length} cards`}{!player.out && turn ? " · TURN" : ""}
-        {player.calledUno ? " · UNO" : ""}
+        <SeatTalk playerId={player.id} name={player.name}>
+          <span>
+            {player.name} · {player.out ? "LEFT" : `${player.hand.length} cards`}{!player.out && turn ? " · TURN" : ""}
+            {player.calledUno ? " · UNO" : ""}
+          </span>
+        </SeatTalk>
       </div>
       <div className={`uno-seat-row ${vertical ? "is-vertical" : ""}`}>
         <UnoShoutButton rung={player.calledUno} armed={armed} mine={mine} onRing={onRing} />
@@ -400,6 +405,7 @@ export function UnoPage() {
             </>
           )}
         </div>
+        <TableChatBar />
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import {
   type ArmyState,
 } from "./engine";
 import { GameSetup } from "../../components/GameSetup";
+import { SeatTalk, TableChatBar } from "../../components/TableTalk";
 import { ClickPop, RulesButton } from "../../components/GameRules";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -115,6 +116,13 @@ export function ArmyPage() {
             />
           ) : (
             <div className="kaiji-board-wrap">
+              <div className="board-talk">
+                {state.players.map((p) => (
+                  <SeatTalk key={p.id} playerId={p.id} name={p.name}>
+                    {p.name}
+                  </SeatTalk>
+                ))}
+              </div>
               <p className="status-line">
                 {state.phase === "over"
                   ? forfeitText(state) || `${state.players.find((p) => p.id === state.winnerId)?.name} wins`
@@ -147,6 +155,7 @@ export function ArmyPage() {
             </div>
           )}
         </div>
+        <TableChatBar />
       </div>
     </div>
   );

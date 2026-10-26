@@ -304,7 +304,11 @@ export function readyCoda(state: CodaState, actorId: string): CodaState {
   if (!actor) return state;
   const next: CodaState = {
     ...state,
-    players: state.players.map((p) => (p.id === actorId ? { ...p, ready: true } : p)),
+    players: state.players.map((p) => {
+      if (p.id === actorId) return { ...p, ready: true };
+      if (!p.human) return { ...p, ready: true };
+      return p;
+    }),
     log: [...state.log, { id: uid("l"), text: `${actor.name} is ready.` }],
   };
   if (next.players.length >= 2 && next.players.every((p) => p.ready)) return dealCodaTable(next);

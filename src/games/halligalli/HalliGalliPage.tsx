@@ -18,6 +18,7 @@ import {
 } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { SeatTalk, TableChatBar } from "../../components/TableTalk";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -62,9 +63,13 @@ function HalliSeat({
   return (
     <div className={`seat ${className}`}>
       <div className="seat-label">
-        {player.name} · deck {player.deck.length} · score {player.score}
-        {player.out ? " · LEFT" : turn ? " · TURN" : ""}
-        {mine ? " · YOU" : ""}
+        <SeatTalk playerId={player.id} name={player.name}>
+          <span>
+            {player.name} · deck {player.deck.length} · score {player.score}
+            {player.out ? " · LEFT" : turn ? " · TURN" : ""}
+            {mine ? " · YOU" : ""}
+          </span>
+        </SeatTalk>
       </div>
       <div className="hg-seat-row">
         <div className="hg-deck-back" aria-hidden>
@@ -280,6 +285,7 @@ export function HalliGalliPage() {
             </>
           )}
         </div>
+        <TableChatBar />
       </div>
     </div>
   );

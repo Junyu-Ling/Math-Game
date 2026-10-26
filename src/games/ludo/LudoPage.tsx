@@ -27,6 +27,7 @@ import {
 } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { SeatTalk, TableChatBar } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { forfeitText } from "../../lib/forfeit";
@@ -436,7 +437,9 @@ export function LudoPage() {
                 {state.players.map((p) => (
                   <li key={p.id} className={cur?.id === p.id && state.phase !== "over" ? "on" : ""}>
                     <i className={`c-${p.color}`} />
-                    <b>{p.name}</b>
+                    <SeatTalk playerId={p.id} name={p.name}>
+                      <b>{p.name}</b>
+                    </SeatTalk>
                     <span>
                       {p.out ? "LEFT" : `${homeCount(p)}/4 home`}
                     </span>
@@ -461,6 +464,7 @@ export function LudoPage() {
             </div>
           )}
         </div>
+        <TableChatBar />
       </div>
     </div>
   );

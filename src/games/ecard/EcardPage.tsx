@@ -19,6 +19,7 @@ import {
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { SeatTalk, TableChatBar } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { forfeitText } from "../../lib/forfeit";
@@ -317,7 +318,11 @@ export function EcardPage() {
               <p className="kicker">Rock paper scissors</p>
               <div className="rps-arena">
                 <div className="rps-side rival">
-                  <span className="rps-name">{rival.name}</span>
+                  <span className="rps-name">
+                    <SeatTalk playerId={rival.id} name={rival.name}>
+                      {rival.name}
+                    </SeatTalk>
+                  </span>
                   <RpsHand
                     key={`rival-${rpsBeat}-${rivalRpsKind}`}
                     kind={rivalRpsKind}
@@ -337,7 +342,11 @@ export function EcardPage() {
                     pose={rpsPose}
                     won={youRpsWon}
                   />
-                  <span className="rps-name">{me.name}</span>
+                  <span className="rps-name">
+                    <SeatTalk playerId={me.id} name={me.name}>
+                      {me.name}
+                    </SeatTalk>
+                  </span>
                 </div>
               </div>
               <p>
@@ -406,11 +415,15 @@ export function EcardPage() {
                 </span>
                 <span className="ecard-vs">·</span>
                 <span>
-                  {me.name} · {(me.role || "?").toUpperCase()} · {state.score[me.id] || 0}
+                  <SeatTalk playerId={me.id} name={me.name}>
+                    {me.name} · {(me.role || "?").toUpperCase()} · {state.score[me.id] || 0}
+                  </SeatTalk>
                 </span>
                 <span className="ecard-vs">VS</span>
                 <span>
-                  {rival.name} · {(rival.role || "?").toUpperCase()} · {state.score[rival.id] || 0}
+                  <SeatTalk playerId={rival.id} name={rival.name}>
+                    {rival.name} · {(rival.role || "?").toUpperCase()} · {state.score[rival.id] || 0}
+                  </SeatTalk>
                 </span>
               </div>
               <div className="ecard-rival-row">
@@ -486,6 +499,7 @@ export function EcardPage() {
             </>
           )}
         </div>
+        <TableChatBar />
       </div>
     </div>
   );

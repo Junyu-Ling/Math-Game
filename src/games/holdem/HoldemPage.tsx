@@ -10,6 +10,7 @@ import { PokerFace } from "../../components/PlayingCard";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { SeatTalk, TableChatBar } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
@@ -139,9 +140,13 @@ export function HoldemPage() {
             <>
               <div className="seat">
                 <div className="seat-label">
+                  <SeatTalk playerId={rival.id} name={rival.name}>
+                    <span>
                   {rival.name} · {rival.chips}
                   {rival.folded ? " · folded" : ""}
                   {state.players[state.turn]?.id === rival.id ? " · TURN" : ""}
+                    </span>
+                  </SeatTalk>
                 </div>
                 <div className="pcards">
                   {rival.hole.map((c) => (
@@ -163,10 +168,14 @@ export function HoldemPage() {
                   Pot {state.pot} · {state.message}
                 </p>
               </div>
-              <div className="seat">
+              <div className="seat seat-you">
                 <div className="seat-label">
+                  <SeatTalk playerId={me.id} name={me.name}>
+                    <span>
                   {me.name} · {me.chips}
                   {myTurn ? " · TURN" : ""}
+                    </span>
+                  </SeatTalk>
                 </div>
                 <div className="pcards">
                   {me.hole.map((c) => (
@@ -213,6 +222,7 @@ export function HoldemPage() {
             </>
           )}
         </div>
+        <TableChatBar />
       </div>
     </div>
   );
