@@ -315,7 +315,11 @@ function SlotMini({ sym }: { sym: "cherry" | "lemon" | "seven" | "wild" }) {
 function HoldemRules() {
   return (
     <RuleSheet
-      lead="Heads-up Texas Hold’em. Blinds 5/10 → flop / turn / river → showdown. Best five cards from your 2 hole cards + the board wins. Two hands sit on each row, high to low."
+      lead="Heads-up no-limit Texas Hold’em. Blinds 5/10 → flop / turn / river → showdown. You choose the raise size. Best five cards from your 2 hole cards + the board wins. Two hands sit on each row, high to low."
+      notes={[
+        "No-limit: pick any raise from the street minimum up to your stack. There is no cap — you may put every chip in (all in) at any time.",
+        "Minimum: a raise must be at least the last full raise this street, or the big blind (10) if nobody has raised yet.",
+      ]}
       rows={HOLDEM_RANKS.map((row) => ({
         name: row.name,
         tip: row.tip,

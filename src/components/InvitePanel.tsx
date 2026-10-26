@@ -60,7 +60,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
         <p>Make 24 is heads-up. Open a table, add a CPU or invite one friend, then start. First to 3 points.</p>
       ) : null}
       {game === "holdem" ? (
-        <p>Hold’em is heads-up. Open a table, add a CPU or invite one friend, then start. Blinds 5 / 10.</p>
+        <p>No-limit Hold’em is heads-up. Open a table, add a CPU or invite one friend, then start. Blinds 5 / 10. Raise any amount from the min up to all in.</p>
       ) : null}
       {tableWait ? <p>Seated {seated.size}{max < 16 ? `/${max}` : ""}.</p> : null}
       {online.length === 0 ? (

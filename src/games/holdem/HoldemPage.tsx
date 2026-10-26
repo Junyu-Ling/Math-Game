@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   applyHoldemAction,
   holdemBotAct,
+  raiseBounds,
   startHoldemPractice,
   type HoldemAction,
   type HoldemState,
@@ -31,7 +32,20 @@ export function HoldemPage() {
   const myTurn = Boolean(
     state && me && state.players[state.turn]?.id === me.id && state.street !== "showdown" && state.street !== "over" && state.street !== "lobby",
   );
-  const toCall = me && state ? Math.max(0, state.currentBet - me.bet) : 0;
+  const bounds = me && state ? raiseBounds(state, me.id) : null;
+  const toCall = bounds?.toCall ?? 0;
+  const raiseMin = bounds?.min ?? 0;
+  const raiseMax = bounds?.max ?? 0;
+  const canRaise = Boolean(bounds?.canRaise);
+  const canFullRaise = Boolean(bounds?.canFullRaise);
+  const openingBet = Boolean(state && state.currentBet === 0);
+  const [raiseTo, setRaiseTo] = useState(0);
+  const raiseAmount =
+    bounds && raiseMax > 0 ? Math.min(raiseMax, Math.max(raiseMin, raiseTo || raiseMin)) : raiseMin;
+
+  useEffect(() => {
+    setRaiseTo(canFullRaise ? raiseMin : raiseMax);
+  }, [canFullRaise, raiseMin, raiseMax, myTurn, state?.street, state?.currentBet]);
 
   useEffect(() => {
     if (room) setLocal(null);
@@ -84,7 +98,7 @@ export function HoldemPage() {
     <div className="page-wide">
       <div className="game-head">
         <div>
-          <p className="kicker">05 / HOLD · Duel</p>
+          <p className="kicker">05 / HOLD · No-limit</p>
           <h1>Texas Hold’em</h1>
         </div>
         <div className="row-actions">
@@ -106,11 +120,11 @@ export function HoldemPage() {
               <LobbyDecor game="holdem" />
               <div className="coda-deal">
                 <p className="kicker">{waiting ? "TABLE" : "HOLD’EM"}</p>
-                <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Heads-up Texas Hold’em"}</h2>
+                <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Heads-up no-limit Hold’em"}</h2>
                 <p>
                   {waiting
-                    ? "Add a CPU or invite one friend, then start. Blinds 5 / 10."
-                    : "Practice vs CPU, or open a table to invite. Blinds 5 / 10. First to take the other’s chips."}
+                    ? "Add a CPU or invite one friend, then start. Blinds 5 / 10. Raise any amount from the min up to all in."
+                    : "No-limit. You choose the raise: at least the last full raise (or the big blind), with no cap. All in is always allowed. Blinds 5 / 10."}
                 </p>
                 {waiting && state ? (
                   <ul className="lobby-roster">
@@ -182,38 +196,90 @@ export function HoldemPage() {
                     <PokerFace key={c.id} card={c} />
                   ))}
                 </div>
-                <div className="row-actions">
+                <div className="holdem-nl">
                   {state.street === "over" ? null : state.street === "showdown" ? (
-                    <button className="btn" type="button" onClick={() => act({ type: "next" })}>
-                      Next hand
-                    </button>
+                    <div className="row-actions">
+                      <button className="btn" type="button" onClick={() => act({ type: "next" })}>
+                        Next hand
+                      </button>
+                    </div>
                   ) : (
                     <>
-                      <button className="btn btn-ghost" type="button" disabled={!myTurn} onClick={() => act({ type: "fold" })}>
-                        Fold
-                      </button>
-                      {toCall > 0 ? (
-                        <button className="btn" type="button" disabled={!myTurn} onClick={() => act({ type: "call" })}>
-                          Call {toCall}
+                      {canRaise && canFullRaise ? (
+                        <div className="holdem-raise">
+                          <input
+                            type="range"
+                            min={raiseMin}
+                            max={raiseMax}
+                            step={1}
+                            value={raiseAmount}
+                            disabled={!myTurn}
+                            aria-label="Raise amount"
+                            onChange={(e) => setRaiseTo(Number(e.target.value))}
+                          />
+                          <input
+                            type="number"
+                            min={raiseMin}
+                            max={raiseMax}
+                            step={1}
+                            value={raiseAmount}
+                            disabled={!myTurn}
+                            aria-label="Raise to"
+                            onChange={(e) => {
+                              const n = Number(e.target.value);
+                              if (!Number.isFinite(n)) return;
+                              setRaiseTo(Math.min(raiseMax, Math.max(raiseMin, Math.floor(n))));
+                            }}
+                          />
+                          <button className="btn btn-ghost" type="button" disabled={!myTurn} onClick={() => setRaiseTo(raiseMin)}>
+                            Min
+                          </button>
+                          <button
+                            className="btn btn-ghost"
+                            type="button"
+                            disabled={!myTurn}
+                            onClick={() =>
+                              setRaiseTo(Math.min(raiseMax, Math.max(raiseMin, state.pot + state.currentBet)))
+                            }
+                          >
+                            Pot
+                          </button>
+                          <p className="nl-hint">
+                            {`No-limit. Min ${raiseMin}${openingBet ? " to bet" : " to raise"}. No cap — all in is ${raiseMax}.`}
+                          </p>
+                        </div>
+                      ) : null}
+                      <div className="row-actions">
+                        <button className="btn btn-ghost" type="button" disabled={!myTurn} onClick={() => act({ type: "fold" })}>
+                          Fold
                         </button>
-                      ) : (
-                        <button className="btn" type="button" disabled={!myTurn} onClick={() => act({ type: "check" })}>
-                          Check
+                        {toCall > 0 ? (
+                          <button className="btn" type="button" disabled={!myTurn} onClick={() => act({ type: "call" })}>
+                            Call {toCall}
+                          </button>
+                        ) : (
+                          <button className="btn" type="button" disabled={!myTurn} onClick={() => act({ type: "check" })}>
+                            Check
+                          </button>
+                        )}
+                        {canRaise && canFullRaise ? (
+                          <button
+                            className="btn"
+                            type="button"
+                            disabled={!myTurn}
+                            onClick={() =>
+                              raiseAmount >= raiseMax
+                                ? act({ type: "allin" })
+                                : act({ type: "raise", amount: raiseAmount })
+                            }
+                          >
+                            {openingBet ? `Bet ${raiseAmount}` : `Raise to ${raiseAmount}`}
+                          </button>
+                        ) : null}
+                        <button className="btn btn-ghost" type="button" disabled={!myTurn || me.chips <= 0} onClick={() => act({ type: "allin" })}>
+                          All in
                         </button>
-                      )}
-                      <button
-                        className="btn"
-                        type="button"
-                        disabled={!myTurn}
-                        onClick={() =>
-                          act({ type: "raise", amount: state.currentBet + Math.max(state.bb * 2, Math.floor(state.pot / 2) || state.bb) })
-                        }
-                      >
-                        Raise
-                      </button>
-                      <button className="btn btn-ghost" type="button" disabled={!myTurn} onClick={() => act({ type: "allin" })}>
-                        All in
-                      </button>
+                      </div>
                     </>
                   )}
                 </div>

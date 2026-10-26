@@ -104,7 +104,7 @@ export const CATALOG: CatalogGame[] = [
     idx: "08",
     code: "HOLD",
     name: "Texas Hold’em",
-    blurb: "Heads-up Hold’em on a standard deck. Blinds, streets, showdown.",
+    blurb: "No-limit heads-up Hold’em. Raise any amount from the min up to all in.",
     preview: "hold",
     week: "math",
   },

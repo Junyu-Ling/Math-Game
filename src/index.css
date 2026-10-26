@@ -1016,6 +1016,42 @@ h1 {
 
 .game-head .row-actions { margin-top: 0; }
 
+.holdem-nl {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.holdem-raise {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.holdem-raise input[type="range"] {
+  flex: 1 1 140px;
+  min-width: 120px;
+}
+
+.holdem-raise input[type="number"] {
+  width: 88px;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.holdem-raise .nl-hint {
+  width: 100%;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .game-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);

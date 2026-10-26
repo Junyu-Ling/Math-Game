@@ -113,6 +113,25 @@ function post(s, i, amt) {
   s.pot += n;
   if (p.chips === 0) p.allIn = true;
 }
+function raiseBounds(s, playerId) {
+  const p = s.players[idxOf(s, playerId)];
+  const toCall = Math.max(0, s.currentBet - p.bet);
+  const max = p.bet + p.chips;
+  const minFull = s.currentBet + Math.max(s.lastRaise, s.bb);
+  const canRaise = p.chips > toCall;
+  const canFullRaise = max >= minFull;
+  return { min: canFullRaise ? minFull : max, max, minFull, toCall, canRaise, canFullRaise };
+}
+function putIn(s, i, add) {
+  const p = s.players[i];
+  const before = s.currentBet;
+  post(s, i, add);
+  if (p.bet <= before) return;
+  const increment = p.bet - before;
+  if (increment >= Math.max(s.lastRaise, BB)) s.lastRaise = increment;
+  s.currentBet = p.bet;
+  s.toAct = s.players.filter((x) => !x.folded && !x.allIn).length;
+}
 function dealHand(s) {
   s.deck = makeDeck();
   s.community = [];
@@ -317,26 +336,23 @@ function applyHoldemAction(s, playerId, action) {
     return next;
   }
   if (action.type === "raise") {
-    const total = Math.max(action.amount, next.currentBet + next.lastRaise);
-    const add = total - p.bet;
-    if (add <= 0) throw new Error("Raise more");
-    const before = next.currentBet;
-    post(next, i, add);
-    next.currentBet = p.bet;
-    next.lastRaise = Math.max(BB, next.currentBet - before);
-    next.toAct = next.players.filter((x) => !x.folded && !x.allIn).length;
-    next.message = `${p.name} raises to ${p.bet}.`;
+    const bounds = raiseBounds(next, playerId);
+    if (!bounds.canRaise) throw new Error("Nothing left to raise");
+    const want = Math.floor(Number(action.amount));
+    if (!Number.isFinite(want)) throw new Error("Bad raise");
+    const total = Math.min(bounds.max, want);
+    const goingAllIn = total >= bounds.max;
+    if (!goingAllIn && total < bounds.minFull) throw new Error(`Min raise is ${bounds.minFull}`);
+    if (!goingAllIn && total <= next.currentBet) throw new Error("Raise more");
+    const opened = next.currentBet === 0;
+    putIn(next, i, total - p.bet);
+    next.message = p.allIn ? `${p.name} is all in.` : opened ? `${p.name} bets ${p.bet}.` : `${p.name} raises to ${p.bet}.`;
     afterAct(next);
     return next;
   }
   if (action.type === "allin") {
-    const before = next.currentBet;
-    post(next, i, p.chips);
-    if (p.bet > next.currentBet) {
-      next.lastRaise = Math.max(BB, p.bet - before);
-      next.currentBet = p.bet;
-      next.toAct = next.players.filter((x) => !x.folded && !x.allIn).length;
-    }
+    if (p.chips <= 0) throw new Error("No chips");
+    putIn(next, i, p.chips);
     next.message = `${p.name} is all in.`;
     afterAct(next);
     return next;
@@ -352,19 +368,26 @@ function viewHoldem(s, viewerId) {
   return v;
 }
 function holdemBotAct(s, botId) {
-  const i = idxOf(s, botId);
-  const p = s.players[i];
-  const toCall = s.currentBet - p.bet;
+  const p = s.players[idxOf(s, botId)];
+  const bounds = raiseBounds(s, botId);
   const score = bestHand(p.hole, s.community);
-  if (toCall > 0 && score < 15 ** 5 && Math.random() < 0.35) return { type: "fold" };
-  if (toCall > 0) return { type: "call" };
-  if (score >= 2 * 15 ** 5 && p.chips > s.bb) return { type: "raise", amount: s.currentBet + Math.max(s.bb * 2, Math.floor(s.pot / 2)) };
+  if (bounds.toCall > 0 && score < 15 ** 5 && Math.random() < 0.35) return { type: "fold" };
+  if (bounds.canRaise && score >= 2 * 15 ** 5) {
+    if (Math.random() < 0.12 || !bounds.canFullRaise) return { type: "allin" };
+    const potTo = Math.min(bounds.max, Math.max(bounds.minFull, s.pot + s.currentBet));
+    return { type: "raise", amount: potTo };
+  }
+  if (bounds.toCall > 0) {
+    if (bounds.toCall >= p.chips) return { type: "allin" };
+    return { type: "call" };
+  }
   return { type: "check" };
 }
 export {
   applyHoldemAction,
   bestHand,
   holdemBotAct,
+  raiseBounds,
   startHoldemDuel,
   startHoldemLobby,
   startHoldemPractice,
