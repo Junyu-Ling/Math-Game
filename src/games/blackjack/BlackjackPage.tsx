@@ -9,8 +9,7 @@ import {
 } from "./engine";
 import { PokerFace } from "../../components/PlayingCard";
 import { LobbyDecor } from "../../components/LobbyDecor";
-import { InvitePanel } from "../../components/InvitePanel";
-import { GameRules } from "../../components/GameRules";
+import { RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -66,6 +65,7 @@ export function BlackjackPage() {
           <h1>Blackjack</h1>
         </div>
         <div className="row-actions">
+          <RulesButton game="bj" />
           {practice ? (
             <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
               RESET
@@ -153,12 +153,6 @@ export function BlackjackPage() {
               </div>
             </>
           )}
-        </div>
-        <div className="side-stack">
-          <InvitePanel game="bj" />
-          <aside className="side">
-            <GameRules game="bj" />
-          </aside>
         </div>
       </div>
     </div>

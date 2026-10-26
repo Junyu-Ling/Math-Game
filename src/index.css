@@ -66,8 +66,8 @@ button:disabled {
   min-height: 100dvh;
   background: var(--bg);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: visible;
 }
 
 .shell > main {
@@ -163,6 +163,118 @@ button:disabled {
   flex-wrap: wrap;
   justify-content: flex-end;
   min-width: 0;
+}
+
+.nav-invite {
+  position: relative;
+}
+
+.nav-invite-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(70dvh, 520px);
+  overflow: auto;
+  z-index: 40;
+}
+
+.nav-invite-panel .side {
+  max-height: none;
+}
+
+.nav-invite-panel .invite-dock p {
+  text-align: left;
+}
+
+.rules-pop {
+  position: relative;
+}
+
+.rules-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.rules-dot span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ink);
+}
+
+.rules-dot[aria-expanded="true"] {
+  background: var(--ink);
+}
+
+.rules-dot[aria-expanded="true"] span {
+  background: #fff;
+}
+
+.rules-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(440px, calc(100vw - 24px));
+  max-height: min(70dvh, 560px);
+  overflow: auto;
+  z-index: 40;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  text-align: left;
+}
+
+.rules-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  padding: 20px clamp(16px, 4vw, 48px) 40px;
+  overflow: auto;
+}
+
+.rules-screen-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.rules-screen-bar h2 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.rules-screen-body {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+.rules-screen-body li + li {
+  margin-top: 12px;
+}
+
+.rules-panel h3 {
+  margin: 0 0 8px;
+}
+
+.rules-panel ul,
+.rules-panel ol {
+  margin: 0;
+  padding-left: 1.1em;
 }
 
 .nav a, .nav button.linkish {
@@ -555,19 +667,23 @@ button:disabled {
 }
 
 .page-wide {
-  width: min(1400px, calc(100% - 2 * var(--gutter)));
+  width: calc(100% - 24px);
   margin: 0 auto;
-  padding: 12px 0 8px;
+  padding: 8px 0 0;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
 }
 
 .page-wide .game-head {
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   flex: none;
+}
+
+.page-wide .game-head h1 {
+  font-size: clamp(24px, 3vw, 32px);
 }
 
 .page-wide .game-layout {
@@ -575,6 +691,7 @@ button:disabled {
   min-height: 0;
   overflow: hidden;
   align-items: stretch;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -592,8 +709,38 @@ button:disabled {
 }
 
 .coda-page .game-layout {
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: stretch;
+  overflow: visible;
+}
+
+.coda-dock {
+  min-height: 0;
+  max-height: 30dvh;
+  overflow: auto;
+}
+
+.coda-dock .side {
+  max-height: none;
+}
+
+.coda-dock .log {
+  min-height: 0;
+  max-height: 88px;
+  flex: none;
+}
+
+.page-wide.coda-page {
+  overflow: auto;
+}
+
+.page-wide .table.table-coda,
+.page-wide .table.table-coda.coda-multi {
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: visible;
 }
 
 .hero {
@@ -1330,7 +1477,8 @@ h1 {
     grid-template-columns: 1fr;
   }
   .page-wide .game-layout {
-    grid-template-rows: minmax(0, 22dvh) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
   }
   .side {
     max-height: none;

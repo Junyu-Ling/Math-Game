@@ -11,8 +11,7 @@ import {
   type GState,
   type RpsThrow,
 } from "./engine";
-import { InvitePanel } from "../../components/InvitePanel";
-import { GameRules } from "../../components/GameRules";
+import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -227,6 +226,17 @@ export function GomokuPage() {
           <h1>Gomoku</h1>
         </div>
         <div className="row-actions">
+          <RulesButton game="gomoku" />
+          {state ? (
+            <ClickPop label="Log">
+              <h3>LOG</h3>
+              <div className="log">
+                {[...state.log].reverse().slice(0, 12).map((l) => (
+                  <div key={l.id}>{l.text}</div>
+                ))}
+              </div>
+            </ClickPop>
+          ) : null}
           {practice ? (
             <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
               RESET
@@ -378,22 +388,6 @@ export function GomokuPage() {
               </div>
             </div>
           )}
-        </div>
-        <div className="side-stack">
-          <InvitePanel game="gomoku" />
-          <aside className="side">
-            <GameRules game="gomoku" />
-            {state ? (
-              <div>
-                <h3>LOG</h3>
-                <div className="log">
-                  {[...state.log].reverse().slice(0, 12).map((l) => (
-                    <div key={l.id}>{l.text}</div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </aside>
         </div>
       </div>
     </div>

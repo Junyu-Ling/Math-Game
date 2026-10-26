@@ -9,8 +9,7 @@ import {
   type ArmyState,
 } from "./engine";
 import { GameSetup } from "../../components/GameSetup";
-import { InvitePanel } from "../../components/InvitePanel";
-import { GameRules } from "../../components/GameRules";
+import { ClickPop, RulesButton } from "../../components/GameRules";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { forfeitText } from "../../lib/forfeit";
@@ -83,6 +82,17 @@ export function ArmyPage() {
           <h1>Army Chess</h1>
         </div>
         <div className="row-actions">
+          <RulesButton game="army" />
+          {state ? (
+            <ClickPop label="Log">
+              <h3>LOG</h3>
+              <div className="log">
+                {[...state.log].reverse().slice(0, 12).map((l) => (
+                  <div key={l.id}>{l.text}</div>
+                ))}
+              </div>
+            </ClickPop>
+          ) : null}
           {practice ? (
             <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
               RESET
@@ -136,22 +146,6 @@ export function ArmyPage() {
               </div>
             </div>
           )}
-        </div>
-        <div className="side-stack">
-          <InvitePanel game="army" />
-          <aside className="side">
-            <GameRules game="army" />
-            {state ? (
-              <div>
-                <h3>LOG</h3>
-                <div className="log">
-                  {[...state.log].reverse().slice(0, 12).map((l) => (
-                    <div key={l.id}>{l.text}</div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </aside>
         </div>
       </div>
     </div>

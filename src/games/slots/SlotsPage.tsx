@@ -12,7 +12,7 @@ import {
   type SlotsState,
   type SymbolId,
 } from "./engine";
-import { GameRules } from "../../components/GameRules";
+import { RulesButton } from "../../components/GameRules";
 import { useAuth } from "../../context/AuthContext";
 
 const BETS = [1, 5, 10, 25, 50, 100];
@@ -92,6 +92,10 @@ export function SlotsPage() {
           <h1>Slot Machine</h1>
         </div>
         <div className="row-actions">
+          <RulesButton game="slots">
+            <h3>Solo practice</h3>
+            <p>Three-reel one-line slots vs the house. Logged-in chips sync after each spin; guests use a local stack.</p>
+          </RulesButton>
           <button
             className="btn btn-ghost"
             type="button"
@@ -188,15 +192,6 @@ export function SlotsPage() {
             </div>
           </div>
         </div>
-        <aside className="side">
-          <div>
-            <h3>Solo practice</h3>
-            <p>
-              Three-reel one-line slots vs the house. Logged-in chips sync after each spin; guests use a local stack.
-            </p>
-          </div>
-          <GameRules game="slots" />
-        </aside>
       </div>
     </div>
   );

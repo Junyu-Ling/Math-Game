@@ -1,3 +1,5 @@
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { PokerFace } from "./PlayingCard";
 import type { PokerCard, Rank, Suit } from "../lib/poker";
 
@@ -237,5 +239,91 @@ export function GameRules({ game }: { game: string }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+export function ClickPop({
+  label,
+  dot = false,
+  children,
+}: {
+  label: string;
+  dot?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="rules-pop" ref={rootRef}>
+      <button
+        className={dot ? "rules-dot" : "btn btn-ghost"}
+        type="button"
+        aria-label={label}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {dot ? <span /> : label}
+      </button>
+      {open ? (
+        <div className="rules-panel" role="dialog" aria-label={label}>
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function RulesButton({ game, children }: { game: string; children?: ReactNode }) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  return (
+    <>
+      <button className="btn btn-ghost" type="button" onClick={() => setOpen(true)}>
+        Rule
+      </button>
+      {open
+        ? createPortal(
+            <div className="rules-screen" role="dialog" aria-label="Rule">
+              <div className="rules-screen-bar">
+                <h2>Rule</h2>
+                <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>
+                  Close
+                </button>
+              </div>
+              <div className="rules-screen-body">
+                {children}
+                <GameRules game={game} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }

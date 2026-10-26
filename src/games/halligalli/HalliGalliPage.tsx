@@ -16,8 +16,7 @@ import {
   type HalliPlayer,
   type HalliState,
 } from "./engine";
-import { InvitePanel } from "../../components/InvitePanel";
-import { GameRules } from "../../components/GameRules";
+import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
@@ -174,6 +173,17 @@ export function HalliGalliPage() {
           <h1>Halli Galli</h1>
         </div>
         <div className="row-actions">
+          <RulesButton game="halli" />
+          {playing && state ? (
+            <ClickPop label="Log">
+              <h3>LOG</h3>
+              <div className="log">
+                {[...state.log].reverse().map((l) => (
+                  <div key={l.id}>{l.text}</div>
+                ))}
+              </div>
+            </ClickPop>
+          ) : null}
           {practice ? (
             <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
               RESET
@@ -269,22 +279,6 @@ export function HalliGalliPage() {
               <HalliSeat player={me} className="seat-you" turn={myTurn} mine />
             </>
           )}
-        </div>
-        <div className="side-stack">
-          <InvitePanel game="halli" />
-          <aside className="side">
-            <GameRules game="halli" />
-            <div>
-              <h3>LOG</h3>
-              <div className="log">
-                {playing && state
-                  ? [...state.log].reverse().map((l) => (
-                      <div key={l.id}>{l.text}</div>
-                    ))
-                  : null}
-              </div>
-            </div>
-          </aside>
         </div>
       </div>
     </div>

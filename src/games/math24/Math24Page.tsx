@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { applyM24Action, startM24Practice, type M24DuelState } from "./engine";
 import { PokerFace } from "../../components/PlayingCard";
 import { LobbyDecor } from "../../components/LobbyDecor";
-import { InvitePanel } from "../../components/InvitePanel";
-import { GameRules } from "../../components/GameRules";
+import { RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -80,6 +79,7 @@ export function Math24Page() {
           <h1>Make 24</h1>
         </div>
         <div className="row-actions">
+          <RulesButton game="m24" />
           {practice ? (
             <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
               RESET
@@ -169,12 +169,6 @@ export function Math24Page() {
               </p>
             </>
           )}
-        </div>
-        <div className="side-stack">
-          <InvitePanel game="m24" />
-          <aside className="side">
-            <GameRules game="m24" />
-          </aside>
         </div>
       </div>
     </div>

@@ -19,8 +19,7 @@ import {
 } from "./engine";
 import { DeckStack, FlipFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
-import { InvitePanel } from "../../components/InvitePanel";
-import { GameRules } from "../../components/GameRules";
+import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
@@ -339,6 +338,12 @@ export function Flip7Page() {
           <h1>Flip 7</h1>
         </div>
         <div className="row-actions">
+          <RulesButton game="flip7" />
+          {solo && state?.record ? (
+            <ClickPop label="Record">
+              <SoloRecord record={state.record} />
+            </ClickPop>
+          ) : null}
           {practice ? (
             <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
               RESET
@@ -498,13 +503,6 @@ export function Flip7Page() {
               {youSeat}
             </>
           ) : null}
-        </div>
-        <div className="side-stack">
-          <InvitePanel game="flip7" />
-          {solo && state?.record ? <SoloRecord record={state.record} /> : null}
-          <aside className="side">
-            <GameRules game="flip7" />
-          </aside>
         </div>
       </div>
     </div>

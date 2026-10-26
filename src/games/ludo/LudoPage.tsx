@@ -25,8 +25,7 @@ import {
   type LPlayer,
   type LState,
 } from "./engine";
-import { GameRules } from "../../components/GameRules";
-import { InvitePanel } from "../../components/InvitePanel";
+import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -263,6 +262,17 @@ export function LudoPage() {
           <h1>Flying Chess</h1>
         </div>
         <div className="row-actions">
+          <RulesButton game="ludo" />
+          {state && state.phase !== "lobby" ? (
+            <ClickPop label="Log">
+              <h3>LOG</h3>
+              <div className="log">
+                {[...state.log].reverse().slice(0, 14).map((l) => (
+                  <div key={l.id}>{l.text}</div>
+                ))}
+              </div>
+            </ClickPop>
+          ) : null}
           {practice ? (
             <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
               RESET
@@ -450,22 +460,6 @@ export function LudoPage() {
               </div>
             </div>
           )}
-        </div>
-        <div className="side-stack">
-          <InvitePanel game="ludo" />
-          <aside className="side">
-            <GameRules game="ludo" />
-            {state && state.phase !== "lobby" ? (
-              <div>
-                <h3>LOG</h3>
-                <div className="log">
-                  {[...state.log].reverse().slice(0, 14).map((l) => (
-                    <div key={l.id}>{l.text}</div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </aside>
         </div>
       </div>
     </div>

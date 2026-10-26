@@ -33,12 +33,11 @@ import {
 import { MahjongTile } from "../../components/MahjongTile";
 import { DeckStack } from "../../components/PlayingCard";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
-import { measureFit } from "../../components/FitCards";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 import { forfeitText } from "../../lib/forfeit";
-import { InvitePanel } from "../../components/InvitePanel";
-import { GameRules } from "../../components/GameRules";
+import { setPlayMeta } from "../../lib/playMeta";
+import { RulesButton } from "../../components/GameRules";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 
@@ -106,7 +105,7 @@ function Row({
   reserveSlot,
   fresh,
   vertical,
-  lockSize,
+  lockSize: _lockSize,
   markHidden,
 }: {
   tiles: CodaTile[];
@@ -125,9 +124,6 @@ function Row({
   lockSize?: boolean;
   markHidden?: boolean;
 }) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const rowRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(1);
   const gapSet = new Set(gaps ?? []);
   const cells: { key: string; node: ReactNode }[] = [];
   const max = tiles.length;
@@ -177,28 +173,9 @@ function Row({
       node: <span className="gap reserve" aria-hidden />,
     });
   }
-  useLayoutEffect(() => {
-    const wrap = wrapRef.current;
-    const row = rowRef.current;
-    if (!wrap || !row) return;
-    const fit = () => {
-      if (vertical || lockSize) {
-        setZoom((z) => (z === 1 ? z : 1));
-        return;
-      }
-      const next = measureFit(wrap, row, false);
-      if (next == null) return;
-      setZoom((z) => (Math.abs(z - next) < 0.004 ? z : next));
-    };
-    fit();
-    const ro = new ResizeObserver(() => requestAnimationFrame(fit));
-    ro.observe(wrap);
-    return () => ro.disconnect();
-  }, [tiles, gaps, ghostAt, reserveSlot, vertical, lockSize]);
-
   return (
-    <div className={`tiles-fit ${vertical ? "is-vertical" : ""}`} ref={wrapRef}>
-      <div className="tiles" ref={rowRef} style={{ zoom }}>
+    <div className={`tiles-fit ${vertical ? "is-vertical" : ""}`}>
+      <div className="tiles">
         {cells.map((c) => (
           <span key={c.key}>{c.node}</span>
         ))}
@@ -380,6 +357,10 @@ export function DaVinciPage() {
   const codaRoom = lobby.room?.game === "coda" ? lobby.room : null;
   const heldCoda = (!codaRoom && lobby.settlement?.game === "coda" ? lobby.settlement.view : null) as CodaState | null;
   const [jokers, setJokers] = useState(true);
+  useEffect(() => {
+    setPlayMeta({ useJokers: jokers });
+    return () => setPlayMeta({});
+  }, [jokers]);
   const [blackN, setBlackN] = useState(2);
   const [whiteN, setWhiteN] = useState(2);
   const [seats, setSeats] = useState(2);
@@ -644,6 +625,7 @@ export function DaVinciPage() {
           <h1>Da Vinci Code</h1>
         </div>
         <div className="row-actions">
+          <RulesButton game="coda" />
           <button
             className="btn btn-ghost"
             type="button"
@@ -989,8 +971,7 @@ export function DaVinciPage() {
           )}
         </div>
 
-        <div className="side-stack">
-        <InvitePanel game="coda" meta={{ useJokers: jokers }} />
+        {playing && state ? <div className="coda-dock">
         <aside className="side coda-panel">
           <div>
             <h3>STATUS</h3>
@@ -1074,9 +1055,8 @@ export function DaVinciPage() {
                 : null}
             </div>
           </div>
-          <GameRules game="coda" />
         </aside>
-        </div>
+        </div> : null}
       </div>
     </div>
   );

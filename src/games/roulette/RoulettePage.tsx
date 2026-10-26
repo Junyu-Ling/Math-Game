@@ -19,7 +19,7 @@ import {
   type BetKind,
   type RouletteState,
 } from "./engine";
-import { GameRules } from "../../components/GameRules";
+import { RulesButton } from "../../components/GameRules";
 import { useAuth } from "../../context/AuthContext";
 
 const CHIP_SIZES = [1, 5, 10, 25, 50, 100];
@@ -125,6 +125,13 @@ export function RoulettePage() {
           <h1>European Roulette</h1>
         </div>
         <div className="row-actions">
+          <RulesButton game="roulette">
+            <h3>Solo casino</h3>
+            <p>
+              Practice against the house on a European single-zero wheel. Logged-in chips sync after each spin; guests
+              use a local stack.
+            </p>
+          </RulesButton>
           <button className="btn btn-ghost" type="button" onClick={fresh}>
             RESET
           </button>
@@ -344,16 +351,6 @@ export function RoulettePage() {
             </div>
           </div>
         </div>
-        <aside className="side">
-          <div>
-            <h3>Solo casino</h3>
-            <p>
-              Practice against the house on a European single-zero wheel. Logged-in chips sync after each spin; guests
-              use a local stack.
-            </p>
-          </div>
-          <GameRules game="roulette" />
-        </aside>
       </div>
     </div>
   );

@@ -15,8 +15,7 @@ import {
 } from "./engine";
 import { DeckStack, UnoColorPick, UnoFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
-import { InvitePanel } from "../../components/InvitePanel";
-import { GameRules } from "../../components/GameRules";
+import { RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
@@ -244,6 +243,7 @@ export function UnoPage() {
           <h1>UNO</h1>
         </div>
         <div className="row-actions">
+          <RulesButton game="uno" />
           {practice ? (
             <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
               RESET
@@ -398,12 +398,6 @@ export function UnoPage() {
               />
             </>
           )}
-        </div>
-        <div className="side-stack">
-          <InvitePanel game="uno" />
-          <aside className="side">
-            <GameRules game="uno" />
-          </aside>
         </div>
       </div>
     </div>

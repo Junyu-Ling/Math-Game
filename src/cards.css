@@ -1112,8 +1112,8 @@
 }
 
 .table-coda .tiles-wrap {
-  --tile-w: 56px;
-  --tile-h: 84px;
+  --tile-w: 70px;
+  --tile-h: 104px;
   position: relative;
   min-height: 148px;
   overflow: visible;
@@ -2031,8 +2031,7 @@
 }
 
 .page-wide .table-uno.uno-multi,
-.page-wide .table-hg.hg-multi,
-.page-wide .table-coda.coda-multi {
+.page-wide .table-hg.hg-multi {
   height: 100%;
   min-height: 0;
   max-height: 100%;
@@ -2042,10 +2041,8 @@
 
 .page-wide .table-uno.uno-multi > .seat-partner,
 .page-wide .table-hg.hg-multi > .seat-partner,
-.page-wide .table-coda.coda-multi > .seat-partner,
 .page-wide .table-uno.uno-multi > .seat-you,
-.page-wide .table-hg.hg-multi > .seat-you,
-.page-wide .table-coda.coda-multi > .seat-you {
+.page-wide .table-hg.hg-multi > .seat-you {
   min-height: 0;
   height: 100%;
   overflow: hidden;

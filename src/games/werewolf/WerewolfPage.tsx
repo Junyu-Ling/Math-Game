@@ -13,8 +13,7 @@ import {
   type WState,
 } from "./engine";
 import { LobbyDecor } from "../../components/LobbyDecor";
-import { InvitePanel } from "../../components/InvitePanel";
-import { GameRules } from "../../components/GameRules";
+import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -128,6 +127,19 @@ export function WerewolfPage() {
           <h1>Werewolf</h1>
         </div>
         <div className="row-actions">
+          <RulesButton game="werewolf" />
+          {state?.log?.length ? (
+            <ClickPop label="Log">
+              <div className="wolf-log">
+                <h3>LOG</h3>
+                <ul>
+                  {[...state.log].slice(-12).reverse().map((e) => (
+                    <li key={e.id}>{e.text}</li>
+                  ))}
+                </ul>
+              </div>
+            </ClickPop>
+          ) : null}
           {practice ? (
             <button className="btn btn-ghost" type="button" onClick={() => setLocal(null)}>
               RESET
@@ -348,22 +360,6 @@ export function WerewolfPage() {
               </div>
             </>
           )}
-        </div>
-        <div className="side-stack">
-          <InvitePanel game="werewolf" />
-          <aside className="side">
-            <GameRules game="werewolf" />
-            {state?.log?.length ? (
-              <div className="wolf-log">
-                <h3>LOG</h3>
-                <ul>
-                  {[...state.log].slice(-12).reverse().map((e) => (
-                    <li key={e.id}>{e.text}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </aside>
         </div>
       </div>
     </div>
