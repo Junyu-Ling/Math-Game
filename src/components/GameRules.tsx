@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Children, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MahjongTile } from "./MahjongTile";
 import { FlipFace, PokerFace, UnoFace } from "./PlayingCard";
@@ -8,6 +8,8 @@ import { HALLI_EMOJI, type HalliFruit } from "../games/halligalli/engine";
 import type { FlipCard } from "../games/flip7/engine";
 import type { UnoCard } from "../games/uno/engine";
 import type { PokerCard, Rank, Suit } from "../lib/poker";
+import { LABEL as ANIMAL } from "../games/animal/engine";
+import { RANK_LABEL as ARMY } from "../games/army/engine";
 
 const RULES: Record<string, string[]> = {
   coda: [
@@ -217,6 +219,35 @@ function uno(id: string, color: UnoCard["color"], kind: UnoCard["kind"], value?:
   return { id, color, kind, value };
 }
 
+function useBeat(length: number, ms = 740) {
+  const [beat, setBeat] = useState(0);
+  useEffect(() => {
+    if (length < 2) return;
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setBeat(Math.max(0, length - 2));
+      return;
+    }
+    const id = window.setInterval(() => setBeat((n) => (n + 1) % length), ms);
+    return () => window.clearInterval(id);
+  }, [length, ms]);
+  return beat;
+}
+
+function DealIn({ children, extra = 2, ms = 720 }: { children: ReactNode; extra?: number; ms?: number }) {
+  const items = Children.toArray(children);
+  const beat = useBeat(Math.max(2, items.length + extra), ms);
+  const shown = Math.min(items.length, beat + 1);
+  return (
+    <>
+      {items.map((child, i) => (
+        <span key={i} className={`rule-deal${i < shown ? " in" : ""}`}>
+          {child}
+        </span>
+      ))}
+    </>
+  );
+}
+
 function Hand({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="rule-hand" aria-label={label}>
@@ -225,13 +256,21 @@ function Hand({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+type RuleRow = {
+  name: string;
+  tip: string;
+  cards?: ReactNode;
+  demo?: ReactNode;
+  live?: string;
+};
+
 function RuleSheet({
   lead,
   rows,
   notes,
 }: {
   lead: string;
-  rows: Array<{ name: string; tip: string; cards: ReactNode }>;
+  rows: RuleRow[];
   notes?: string[];
 }) {
   return (
@@ -244,7 +283,8 @@ function RuleSheet({
               <b>{row.name}</b>
               <span>{row.tip}</span>
             </div>
-            <Hand label={row.name}>{row.cards}</Hand>
+            <Hand label={row.name}>{row.demo ?? <DealIn>{row.cards}</DealIn>}</Hand>
+            {row.live ? <em className="rule-live">{row.live}</em> : null}
           </li>
         ))}
       </ol>
@@ -256,6 +296,19 @@ function RuleSheet({
         </ul>
       ) : null}
     </div>
+  );
+}
+
+function Piece({ children }: { children: ReactNode }) {
+  return <span className="rule-piece">{children}</span>;
+}
+
+function SlotMini({ sym }: { sym: "cherry" | "lemon" | "seven" | "wild" }) {
+  const glyph = { cherry: "🍒", lemon: "🍋", seven: "7", wild: "★" }[sym];
+  return (
+    <span className={`slots-symbol sym-${sym}`}>
+      <span className="slots-glyph">{glyph}</span>
+    </span>
   );
 }
 
@@ -298,6 +351,183 @@ function FruitSample({ fruit, count }: { fruit: HalliFruit; count: number }) {
   );
 }
 
+function CodaOrderDemo() {
+  const beat = useBeat(5, 800);
+  const show7 = beat >= 2;
+  return (
+    <>
+      <span className={`rule-deal${beat >= 0 ? " in" : ""}`}>{tile("white", 1, true)}</span>
+      <span className={`rule-deal${beat >= 1 ? " in" : ""}`}>{tile("black", 4, true)}</span>
+      <span className={`rule-deal${show7 ? " in" : ""}`}>{tile("black", 7, true)}</span>
+      <span className={`rule-deal${beat >= 1 ? " in" : ""}`}>{tile("white", 9, true)}</span>
+    </>
+  );
+}
+
+function CodaMissDemo() {
+  const beat = useBeat(5, 850);
+  return (
+    <>
+      <span className={`rule-deal${beat >= 0 ? " in" : ""}`}>{tile("black", 2, true)}</span>
+      <span className={`rule-deal${beat >= 1 ? " in" : ""}${beat >= 3 ? " down" : ""}`}>
+        <MahjongTile tile={{ color: "white", value: 6, revealed: true }} hide={false} down={beat >= 3} />
+      </span>
+      <span className={`rule-deal${beat >= 2 ? " in" : ""}`}>{tile("black", 11, true)}</span>
+    </>
+  );
+}
+
+function UnoMatchDemo() {
+  const beat = useBeat(4, 900);
+  return (
+    <>
+      <span className={`rule-deal${beat >= 0 ? " in" : ""}`}>
+        <UnoFace card={uno("u1", "red", "number", 7)} />
+      </span>
+      <span className={`rule-deal${beat >= 1 ? " in" : ""}${beat === 1 ? " hit" : ""}`}>
+        <UnoFace card={uno("u2", "red", "number", 5)} />
+      </span>
+      <span className={`rule-deal${beat >= 2 ? " in" : ""}${beat === 2 ? " hit" : ""}`}>
+        <UnoFace card={uno("u3", "blue", "number", 5)} />
+      </span>
+    </>
+  );
+}
+
+function UnoStackDemo() {
+  const beat = useBeat(5, 800);
+  return (
+    <>
+      <span className={`rule-deal${beat >= 0 ? " in" : ""}`}>
+        <UnoFace card={uno("d2", "red", "draw2")} />
+      </span>
+      <span className={`rule-deal${beat >= 1 ? " in" : ""}${beat === 1 ? " hit" : ""}`}>
+        <UnoFace card={uno("d2b", "blue", "draw2")} />
+      </span>
+      <span className={`rule-deal${beat >= 2 ? " in" : ""}${beat === 2 ? " hit" : ""}`}>
+        <UnoFace card={uno("w4", "black", "wild4")} />
+      </span>
+    </>
+  );
+}
+
+function BjHoleDemo() {
+  const beat = useBeat(4, 900);
+  return (
+    <>
+      <span className={`rule-deal${beat >= 0 ? " in" : ""}`}>
+        <PokerFace card={poker("10", "S", 8)} />
+      </span>
+      <span className={`rule-deal${beat >= 1 ? " in" : ""}`}>
+        <PokerFace card={poker("A", "D", 9, beat < 2)} />
+      </span>
+    </>
+  );
+}
+
+function HalliFiveDemo() {
+  const beat = useBeat(5, 850);
+  return (
+    <>
+      <span className={`rule-deal${beat >= 0 ? " in" : ""}`}>
+        <FruitSample fruit="banana" count={2} />
+      </span>
+      <span className={`rule-deal${beat >= 1 ? " in" : ""}`}>
+        <FruitSample fruit="banana" count={2} />
+      </span>
+      <span className={`rule-deal${beat >= 2 ? " in" : ""}`}>
+        <FruitSample fruit="banana" count={1} />
+      </span>
+      <span className={`rule-deal${beat >= 3 ? " in hit" : ""}`}>
+        <span className="rule-call">RING</span>
+      </span>
+    </>
+  );
+}
+
+function EcardClashDemo({ a, b, call }: { a: EKind; b: EKind; call: string }) {
+  const beat = useBeat(4, 900);
+  return (
+    <>
+      <span className={`rule-deal${beat >= 0 ? " in" : ""}`}>
+        <ESample kind={a} />
+      </span>
+      <span className={`rule-deal${beat >= 1 ? " in" : ""}`}>
+        <span className="rule-vs">VS</span>
+      </span>
+      <span className={`rule-deal${beat >= 1 ? " in" : ""}`}>
+        <ESample kind={b} />
+      </span>
+      <span className={`rule-deal${beat >= 2 ? " in hit" : ""}`}>
+        <span className="rule-call">{call}</span>
+      </span>
+    </>
+  );
+}
+
+function FlipBustDemo() {
+  const beat = useBeat(5, 800);
+  return (
+    <>
+      <span className={`rule-deal${beat >= 0 ? " in" : ""}`}>
+        <FlipFace card={flip("b4a", "number", 4)} />
+      </span>
+      <span className={`rule-deal${beat >= 1 ? " in" : ""}`}>
+        <FlipFace card={flip("b4b", "number", 4)} />
+      </span>
+      <span className={`rule-deal${beat >= 2 ? " in hit" : ""}`}>
+        <span className="rule-call">{beat >= 3 ? "SAVE" : "BUST"}</span>
+      </span>
+      <span className={`rule-deal${beat >= 3 ? " in" : ""}`}>
+        <FlipFace card={flip("chance", "chance")} />
+      </span>
+    </>
+  );
+}
+
+function GomokuFiveDemo() {
+  const beat = useBeat(7, 520);
+  return (
+    <div className="rule-gomo">
+      {Array.from({ length: 5 }, (_, i) => (
+        <span key={i} className={`gomoku-stone black rule-deal${i < beat ? " in" : ""}`} />
+      ))}
+    </div>
+  );
+}
+
+function RouletteDemo() {
+  const beat = useBeat(4, 900);
+  return (
+    <>
+      <span className={`rule-deal${beat >= 0 ? " in" : ""}`}>
+        <span className="rule-chip">17</span>
+      </span>
+      <span className={`rule-deal${beat >= 2 ? " in hit" : ""}`}>
+        <span className="rule-call">35:1</span>
+      </span>
+    </>
+  );
+}
+
+function SlotsDemo() {
+  const beat = useBeat(5, 700);
+  const syms = ["cherry", "lemon", "seven"] as const;
+  const land = beat >= 3 ? (["seven", "seven", "seven"] as const) : syms;
+  return (
+    <>
+      {land.map((sym, i) => (
+        <span key={i} className={`rule-deal${beat >= i ? " in" : ""}${beat >= 3 && i === 2 ? " hit" : ""}`}>
+          <SlotMini sym={sym} />
+        </span>
+      ))}
+      <span className={`rule-deal${beat >= 4 ? " in hit" : ""}`}>
+        <span className="rule-call">×80</span>
+      </span>
+    </>
+  );
+}
+
 const PICTURED = new Set(["holdem", "coda", "flip7", "uno", "bj", "m24", "ecard", "halli"]);
 
 export function GameRules({ game }: { game: string }) {
@@ -321,15 +551,8 @@ export function GameRules({ game }: { game: string }) {
           },
           {
             name: "In order",
-            tip: "Tiles stay sorted. A face-down tile still has a place between the numbers you can see.",
-            cards: (
-              <>
-                {tile("white", 1, true)}
-                {tile("black", 4, true)}
-                {tile("black", 7, true)}
-                {tile("white", 9, true)}
-              </>
-            ),
+            tip: "Tiles stay sorted. A new number slides into its place between the ones you can see.",
+            demo: <CodaOrderDemo />,
           },
           {
             name: "Dash",
@@ -344,13 +567,7 @@ export function GameRules({ game }: { game: string }) {
           {
             name: "A miss",
             tip: "Guess wrong and one of your own hidden tiles is knocked down. A hit lets you guess again or end the turn.",
-            cards: (
-              <>
-                {tile("black", 2, true)}
-                {tile("white", 6, true)}
-                {tile("black", 11, true)}
-              </>
-            ),
+            demo: <CodaMissDemo />,
           },
         ]}
         notes={[
@@ -380,23 +597,18 @@ export function GameRules({ game }: { game: string }) {
           {
             name: "Bust",
             tip: "The same number twice busts the round. Second Chance discards with that duplicate, once per player.",
-            cards: (
-              <>
-                <FlipFace card={flip("b4a", "number", 4)} />
-                <FlipFace card={flip("b4b", "number", 4)} />
-                <FlipFace card={flip("chance", "chance")} />
-              </>
-            ),
+            demo: <FlipBustDemo />,
           },
           {
             name: "Flip 7",
             tip: "Seven different numbers bank immediately, plus 15.",
-            cards: (
-              <>
+            demo: (
+              <DealIn extra={3} ms={420}>
                 {[0, 1, 2, 3, 4, 5, 6].map((n) => (
                   <FlipFace key={n} card={flip(`seven-${n}`, "number", n)} />
                 ))}
-              </>
+                <span className="rule-call">+15</span>
+              </DealIn>
             ),
           },
           {
@@ -424,13 +636,7 @@ export function GameRules({ game }: { game: string }) {
           {
             name: "Match",
             tip: "A red 5 can follow a red 7 or a blue 5.",
-            cards: (
-              <>
-                <UnoFace card={uno("u1", "red", "number", 7)} />
-                <UnoFace card={uno("u2", "red", "number", 5)} />
-                <UnoFace card={uno("u3", "blue", "number", 5)} />
-              </>
-            ),
+            demo: <UnoMatchDemo />,
           },
           {
             name: "No match",
@@ -455,13 +661,7 @@ export function GameRules({ game }: { game: string }) {
           {
             name: "Stack",
             tip: "+2 stacks on +2 or +4. +4 stacks only on +4. A wild chooses the next color.",
-            cards: (
-              <>
-                <UnoFace card={uno("d2", "red", "draw2")} />
-                <UnoFace card={uno("d2b", "blue", "draw2")} />
-                <UnoFace card={uno("w4", "black", "wild4")} />
-              </>
-            ),
+            demo: <UnoStackDemo />,
           },
         ]}
         notes={["2–4 players. The first empty hand wins."]}
@@ -476,11 +676,12 @@ export function GameRules({ game }: { game: string }) {
           {
             name: "21",
             tip: "An ace with a ten or a face card is 21.",
-            cards: (
-              <>
+            demo: (
+              <DealIn extra={3}>
                 <PokerFace card={poker("A", "S", 0)} />
                 <PokerFace card={poker("K", "H", 1)} />
-              </>
+                <span className="rule-call">21</span>
+              </DealIn>
             ),
           },
           {
@@ -508,12 +709,7 @@ export function GameRules({ game }: { game: string }) {
           {
             name: "Hole card",
             tip: "The rival’s hole card stays face down until they stand or bust.",
-            cards: (
-              <>
-                <PokerFace card={poker("10", "S", 8)} />
-                <PokerFace card={poker("A", "D", 9, true)} />
-              </>
-            ),
+            demo: <BjHoleDemo />,
           },
         ]}
       />
@@ -527,13 +723,14 @@ export function GameRules({ game }: { game: string }) {
           {
             name: "Make 24",
             tip: "8 ÷ (3 − 8 ÷ 3) = 24.",
-            cards: (
-              <>
+            demo: (
+              <DealIn extra={3}>
                 <PokerFace card={poker("8", "S", 0)} />
                 <PokerFace card={poker("8", "H", 1)} />
                 <PokerFace card={poker("3", "C", 2)} />
                 <PokerFace card={poker("3", "D", 3)} />
-              </>
+                <span className="rule-call">=24</span>
+              </DealIn>
             ),
           },
         ]}
@@ -559,32 +756,17 @@ export function GameRules({ game }: { game: string }) {
           {
             name: "Emperor on Citizen",
             tip: "+1, and the Emperor returns to hand. The round continues.",
-            cards: (
-              <>
-                <ESample kind="emperor" />
-                <ESample kind="citizen" />
-              </>
-            ),
+            demo: <EcardClashDemo a="emperor" b="citizen" call="+1" />,
           },
           {
             name: "Slave on Emperor",
             tip: "+5 and the round ends. The Emperor was played on the Slave, so it is not returned.",
-            cards: (
-              <>
-                <ESample kind="slave" />
-                <ESample kind="emperor" />
-              </>
-            ),
+            demo: <EcardClashDemo a="slave" b="emperor" call="+5" />,
           },
           {
             name: "Citizen on Citizen",
             tip: "+0. Both cards leave, and the round continues.",
-            cards: (
-              <>
-                <ESample kind="citizen" />
-                <ESample kind="citizen" />
-              </>
-            ),
+            demo: <EcardClashDemo a="citizen" b="citizen" call="+0" />,
           },
         ]}
         notes={[
@@ -602,13 +784,7 @@ export function GameRules({ game }: { game: string }) {
           {
             name: "Five bananas",
             tip: "2 + 2 + 1 across the table is five. Ring to take those cards.",
-            cards: (
-              <>
-                <FruitSample fruit="banana" count={2} />
-                <FruitSample fruit="banana" count={2} />
-                <FruitSample fruit="banana" count={1} />
-              </>
-            ),
+            demo: <HalliFiveDemo />,
           },
           {
             name: "Other fruits",
@@ -626,6 +802,217 @@ export function GameRules({ game }: { game: string }) {
           "Ring too early and you pay cards into the deck.",
           "Last player with cards, or first to the score goal, wins.",
         ]}
+      />
+    );
+  }
+  if (game === "gomoku") {
+    return (
+      <RuleSheet
+        lead="15×15. Rock-paper-scissors: winner plays black. First exact five in a row wins."
+        rows={[
+          {
+            name: "Five in a row",
+            tip: "Place stones. Five in a straight line — row, column, or diagonal — wins.",
+            demo: <GomokuFiveDemo />,
+          },
+          {
+            name: "Black fouls",
+            tip: "Double live three, double live four, or overline (six+) loses for black. White has no fouls.",
+            demo: (
+              <DealIn>
+                <span className="gomoku-stone black" />
+                <span className="gomoku-stone black" />
+                <span className="gomoku-stone black" />
+                <span className="rule-call">FOUL</span>
+              </DealIn>
+            ),
+          },
+        ]}
+        notes={RULES.gomoku}
+      />
+    );
+  }
+  if (game === "ludo") {
+    return (
+      <RuleSheet
+        lead="2–4 players. Roll to take off, race home. Practice is you (blue) plus CPUs."
+        rows={[
+          {
+            name: "Take off",
+            tip: "A 6 takes a plane from the hangar onto the ready square, then you roll again.",
+            demo: (
+              <DealIn>
+                <span className="rule-die">6</span>
+                <i className="c-blue" style={{ width: 18, height: 18, borderRadius: 4, background: "#3d7dff", display: "inline-block" }} />
+                <span className="rule-call">GO</span>
+              </DealIn>
+            ),
+          },
+          {
+            name: "Send home",
+            tip: "Land on one rival plane and it goes back to the hangar. Two of yours on a square is a block.",
+            demo: (
+              <DealIn>
+                <i className="c-blue" style={{ width: 18, height: 18, borderRadius: 4, background: "#3d7dff", display: "inline-block" }} />
+                <i className="c-red" style={{ width: 18, height: 18, borderRadius: 4, background: "#f04444", display: "inline-block" }} />
+                <span className="rule-call">OUT</span>
+              </DealIn>
+            ),
+          },
+        ]}
+        notes={RULES.ludo}
+      />
+    );
+  }
+  if (game === "werewolf") {
+    return (
+      <RuleSheet
+        lead="4–8 players. Night: wolves kill, Seer checks, Witch may save or poison. Day: vote someone out."
+        rows={[
+          {
+            name: "Night",
+            tip: "Wolves pick a target. Seer checks one. Witch has one save and one poison.",
+            demo: (
+              <DealIn>
+                <span className="rule-role wolf">Wolf</span>
+                <span className="rule-role seer">Seer</span>
+                <span className="rule-role witch">Witch</span>
+              </DealIn>
+            ),
+          },
+          {
+            name: "Day",
+            tip: "Vote to eliminate one. Wolves win if they equal the village; village wins when every wolf is gone.",
+            demo: (
+              <DealIn>
+                <span className="rule-role villager">Vote</span>
+                <span className="rule-call">OUT</span>
+              </DealIn>
+            ),
+          },
+        ]}
+        notes={RULES.werewolf}
+      />
+    );
+  }
+  if (game === "roulette") {
+    return (
+      <RuleSheet
+        lead="One bet per spin. You pick the box; the house pays ⌊36 ÷ n⌋ − 1 for the pockets that bet covers."
+        rows={[
+          {
+            name: "Single number",
+            tip: "Cover one pocket. House pays 35:1. Stake comes back with the profit if it hits.",
+            demo: <RouletteDemo />,
+          },
+          {
+            name: "Even money",
+            tip: "Red, black, odd, even, 1–18, 19–36 cover 18 pockets. House pays 1:1. Zero loses these.",
+            demo: (
+              <DealIn>
+                <span className="rule-chip" style={{ background: "#b91c1c" }}>
+                  R
+                </span>
+                <span className="rule-call">1:1</span>
+              </DealIn>
+            ),
+          },
+        ]}
+        notes={RULES.roulette}
+      />
+    );
+  }
+  if (game === "slots") {
+    return (
+      <RuleSheet
+        lead="Three reels, one line. Set a bet, spin. WILD fills in for a symbol except on a wild-only line."
+        rows={[
+          {
+            name: "Three 7s",
+            tip: "The top line. Three 7s pay ×80 the stake.",
+            demo: <SlotsDemo />,
+          },
+          {
+            name: "Wild",
+            tip: "WILD substitutes. Three WILDs pay ×50.",
+            demo: (
+              <DealIn>
+                <SlotMini sym="wild" />
+                <SlotMini sym="wild" />
+                <SlotMini sym="wild" />
+                <span className="rule-call">×50</span>
+              </DealIn>
+            ),
+          },
+        ]}
+        notes={RULES.slots}
+      />
+    );
+  }
+  if (game === "animal") {
+    return (
+      <RuleSheet
+        lead="Dou Shou Qi. Higher rank captures lower. Rat beats Elephant; Elephant cannot eat Rat. Enter the rival den to win."
+        rows={[
+          {
+            name: "Rat beats Elephant",
+            tip: "The exception: 鼠 captures 象. 象 cannot capture 鼠.",
+            demo: (
+              <DealIn>
+                <Piece>{ANIMAL.rat}</Piece>
+                <span className="rule-vs">VS</span>
+                <Piece>{ANIMAL.elephant}</Piece>
+                <span className="rule-call">鼠</span>
+              </DealIn>
+            ),
+          },
+          {
+            name: "River jump",
+            tip: "Lion and Tiger jump rivers. Land in the rival den to win.",
+            demo: (
+              <DealIn>
+                <Piece>{ANIMAL.lion}</Piece>
+                <Piece>{ANIMAL.tiger}</Piece>
+                <span className="rule-call">JUMP</span>
+              </DealIn>
+            ),
+          },
+        ]}
+        notes={RULES.animal}
+      />
+    );
+  }
+  if (game === "army") {
+    return (
+      <RuleSheet
+        lead="Open 军棋. Higher rank wins a clash. Equal ranks both fall. Capture the rival 军旗 to win."
+        rows={[
+          {
+            name: "Bomb",
+            tip: "炸弹 trades with anything, including itself.",
+            demo: (
+              <DealIn>
+                <Piece>{ARMY.bomb}</Piece>
+                <span className="rule-vs">VS</span>
+                <Piece>{ARMY.commander}</Piece>
+                <span className="rule-call">BOTH</span>
+              </DealIn>
+            ),
+          },
+          {
+            name: "Engineer",
+            tip: "Only 工兵 clears 地雷. Take the 军旗 to win.",
+            demo: (
+              <DealIn>
+                <Piece>{ARMY.engineer}</Piece>
+                <span className="rule-vs">VS</span>
+                <Piece>{ARMY.mine}</Piece>
+                <span className="rule-call">{ARMY.flag}</span>
+              </DealIn>
+            ),
+          },
+        ]}
+        notes={RULES.army}
       />
     );
   }
