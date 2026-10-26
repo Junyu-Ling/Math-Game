@@ -52,7 +52,15 @@ function UnoShoutButton({
       onClick={onRing}
       aria-label={rung ? "UNO called" : "Call UNO"}
     >
-      <b>UNO</b>
+      <svg viewBox="0 0 140 212" className="card-svg uno-svg" aria-hidden>
+        <rect x="1.5" y="1.5" width="137" height="209" rx="16" fill="#171717" stroke="#0c0c0c" strokeWidth="3" />
+        <g transform="rotate(-26 70 106)">
+          <ellipse className="uno-shout-mark" cx="70" cy="106" rx="50" ry="70" fill="#111" stroke="#E8C45A" strokeWidth="5" />
+          <text x="70" y="116" textAnchor="middle" fill="#fff" fontFamily="Nunito,Arial Black,sans-serif" fontWeight="900" fontSize="26" letterSpacing="1">
+            UNO
+          </text>
+        </g>
+      </svg>
     </button>
   );
 }
@@ -64,7 +72,6 @@ function UnoSeat({
   turn,
   mine,
   vertical,
-  lockSize,
   playable,
   onPlay,
   onRing,
@@ -75,7 +82,6 @@ function UnoSeat({
   turn: boolean;
   mine: boolean;
   vertical?: boolean;
-  lockSize?: boolean;
   playable?: (id: string) => boolean;
   onPlay?: (id: string) => void;
   onRing?: () => void;
@@ -89,7 +95,7 @@ function UnoSeat({
       </div>
       <div className={`uno-seat-row ${vertical ? "is-vertical" : ""}`}>
         <UnoShoutButton rung={player.calledUno} armed={armed} mine={mine} onRing={onRing} />
-        <FitCards vertical={vertical} lockSize={lockSize}>
+        <FitCards vertical={vertical} lockSize>
           {player.hand.map((c) => {
             const face = (
               <UnoFace
@@ -300,7 +306,6 @@ export function UnoPage() {
                   hidden
                   turn={cur?.id === seated.partner.id}
                   mine={false}
-                  lockSize={Boolean(seated.left)}
                 />
               ) : null}
               {seated.rival ? (
@@ -310,7 +315,6 @@ export function UnoPage() {
                   hidden={practice}
                   turn={cur?.id === seated.rival.id}
                   mine={false}
-                  lockSize={Boolean(seated.left)}
                 />
               ) : null}
               {seated.left ? (
@@ -321,7 +325,6 @@ export function UnoPage() {
                   vertical
                   turn={cur?.id === seated.left.id}
                   mine={false}
-                  lockSize={Boolean(seated.left)}
                 />
               ) : null}
               <div className="center-well">
@@ -379,7 +382,6 @@ export function UnoPage() {
                   vertical
                   turn={cur?.id === seated.right.id}
                   mine={false}
-                  lockSize={Boolean(seated.left)}
                 />
               ) : null}
               <UnoSeat
@@ -388,7 +390,6 @@ export function UnoPage() {
                 hidden={false}
                 turn={myTurn}
                 mine
-                lockSize={Boolean(seated.left)}
                 playable={(id) => {
                   const card = me.hand.find((c) => c.id === id);
                   return Boolean(myTurn && state.phase === "play" && card && canPlay(state, card));

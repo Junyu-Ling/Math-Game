@@ -709,26 +709,28 @@ button:disabled {
 }
 
 .coda-page .game-layout {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .coda-dock {
   min-height: 0;
-  max-height: 30dvh;
+  height: 100%;
+  max-height: 100%;
   overflow: auto;
 }
 
 .coda-dock .side {
-  max-height: none;
+  height: 100%;
+  max-height: 100%;
 }
 
 .coda-dock .log {
-  min-height: 0;
-  max-height: 88px;
-  flex: none;
+  min-height: 120px;
+  max-height: none;
+  flex: 1;
 }
 
 .page-wide.coda-page {
@@ -1472,13 +1474,18 @@ h1 {
 }
 
 @media (max-width: 1100px) {
-  .game-layout,
-  .coda-page .game-layout {
+  .game-layout {
     grid-template-columns: 1fr;
+  }
+  .coda-page .game-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(200px, 240px);
   }
   .page-wide .game-layout {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
+  }
+  .page-wide.coda-page .game-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(200px, 240px);
   }
   .side {
     max-height: none;
