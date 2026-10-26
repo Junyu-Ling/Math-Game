@@ -171,14 +171,14 @@ export function Home() {
           </p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
-            Eight tables are open for STEAM Week — cards, stones, wolves, no-limit Hold’em, and the wheel. Number games
-            wait for MATH WEEK.
+            Nine tables are open for STEAM Week, led by Da Vinci Code — plus cards, stones, wolves, no-limit Hold’em,
+            and the wheel. Number games wait for MATH WEEK.
           </p>
         </div>
         <div className="hero-stage" aria-hidden>
-          <UnoFace card={{ id: "h1", color: "red", kind: "number", value: 7 }} />
-          <UnoFace card={{ id: "h2", color: "yellow", kind: "skip" }} />
-          <UnoFace card={{ id: "h3", color: "black", kind: "wild4" }} />
+          <MahjongTile hide={false} tile={{ color: "black", value: 2, revealed: true }} />
+          <MahjongTile hide={false} tile={{ color: "white", value: 5, revealed: true }} />
+          <MahjongTile hide={false} tile={{ color: "white", value: "joker", revealed: true }} />
         </div>
       </section>
       {WEEK_SECTIONS.map((section) => (
@@ -192,8 +192,8 @@ export function Home() {
         </section>
       ))}
       <p className="section-note">
-        STEAM Week tables are open now — including Werewolf, Hold’em, roulette, and slots. Sign in to invite someone, or
-        practice vs CPU. MATH WEEK keeps Da Vinci, Flip 7, and Blackjack until that week starts.
+        STEAM Week tables are open now — including Da Vinci Code, Werewolf, Hold’em, roulette, and slots. Sign in to
+        invite someone, or practice vs CPU. MATH WEEK keeps Flip 7 and Blackjack until that week starts.
       </p>
     </div>
   );

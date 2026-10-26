@@ -38,8 +38,17 @@ export const MATH_WEEK = {
 
 export const CATALOG: CatalogGame[] = [
   {
-    to: "/play/uno",
+    to: "/play/davinci",
     idx: "01",
+    code: "CODA",
+    name: "Da Vinci Code",
+    blurb: "Black and white acrylic tiles. Choose a color to draw, then guess the numbers in your rival’s row.",
+    preview: "coda",
+    week: "steam",
+  },
+  {
+    to: "/play/uno",
+    idx: "02",
     code: "UNO",
     name: "UNO",
     blurb: "Classic four-color ovals. Empty your hand to win.",
@@ -48,7 +57,7 @@ export const CATALOG: CatalogGame[] = [
   },
   {
     to: "/play/halli",
-    idx: "02",
+    idx: "03",
     code: "HALLI",
     name: "Halli Galli",
     blurb: "Flip fruit cards. When five of one fruit show, ring the bell first.",
@@ -57,7 +66,7 @@ export const CATALOG: CatalogGame[] = [
   },
   {
     to: "/play/ecard",
-    idx: "03",
+    idx: "04",
     code: "ECARD",
     name: "E-Card",
     blurb: "Kaiji’s Emperor · Citizen · Slave. Psychological duel — Slave alone can kill the Emperor.",
@@ -66,7 +75,7 @@ export const CATALOG: CatalogGame[] = [
   },
   {
     to: "/play/gomoku",
-    idx: "04",
+    idx: "05",
     code: "GOMOKU",
     name: "Gomoku",
     blurb: "15×15. Place stones. First five in a row wins.",
@@ -75,7 +84,7 @@ export const CATALOG: CatalogGame[] = [
   },
   {
     to: "/play/werewolf",
-    idx: "05",
+    idx: "06",
     code: "WOLF",
     name: "Werewolf",
     blurb: "Night and day in a small village. Wolves hunt, the Seer checks, the Witch may save or poison.",
@@ -84,7 +93,7 @@ export const CATALOG: CatalogGame[] = [
   },
   {
     to: "/play/holdem",
-    idx: "06",
+    idx: "07",
     code: "HOLD",
     name: "Texas Hold’em",
     blurb: "No-limit heads-up Hold’em. Raise any amount from the min up to all in.",
@@ -93,7 +102,7 @@ export const CATALOG: CatalogGame[] = [
   },
   {
     to: "/play/roulette",
-    idx: "07",
+    idx: "08",
     code: "ROULETTE",
     name: "European Roulette",
     blurb: "Single-zero wheel 0–36. One bet per spin; the house sets the payout from how many pockets you cover.",
@@ -102,21 +111,12 @@ export const CATALOG: CatalogGame[] = [
   },
   {
     to: "/play/slots",
-    idx: "08",
+    idx: "09",
     code: "SLOTS",
     name: "Slot Machine",
     blurb: "Three-reel practice slots. Pick a bet, spin, and check the paytable.",
     preview: "slots",
     week: "steam",
-  },
-  {
-    to: "/play/davinci",
-    idx: "09",
-    code: "CODA",
-    name: "Da Vinci Code",
-    blurb: "Black and white acrylic tiles. Choose a color to draw, then guess the numbers in your rival’s row.",
-    preview: "coda",
-    week: "math",
   },
   {
     to: "/play/flip7",
