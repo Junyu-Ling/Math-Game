@@ -71,7 +71,8 @@ export const GAME_LABEL: Record<string, string> = {
   // werewolf: "Werewolf",
   roulette: "European Roulette",
   slots: "Slot Machine",
-  ludo: "Flying Chess",
+  // Deferred — Flying Chess
+  // ludo: "Flying Chess",
   // Deferred
   // animal: "Animal Chess",
   // army: "Army Chess",
@@ -149,7 +150,8 @@ export const GAME_PATH: Record<string, string> = {
   // werewolf: "/play/werewolf",
   roulette: "/play/roulette",
   slots: "/play/slots",
-  ludo: "/play/ludo",
+  // Deferred — Flying Chess
+  // ludo: "/play/ludo",
   // Deferred
   // animal: "/play/animal",
   // army: "/play/army",

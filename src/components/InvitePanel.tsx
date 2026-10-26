@@ -10,7 +10,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
   const view = room?.view as { phase?: string; street?: string } | undefined;
   const tableWait = Boolean(
     room &&
-      ["coda", "uno", "flip7", "halli", "gomoku", "ecard", "bj", "m24", "holdem", "werewolf", "ludo"].includes(
+      ["coda", "uno", "flip7", "halli", "gomoku", "ecard", "bj", "m24", "holdem", "werewolf"].includes(
         room.game,
       ) &&
       (view?.phase === "lobby" || view?.street === "lobby"),
@@ -40,7 +40,8 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       ) : null}
       {game === "coda" ? <p>Da Vinci Code is 2–4. Mix humans and CPUs, everyone picks black/white, then ready. 4 players start with 3 tiles.</p> : null}
       {game === "uno" ? <p>UNO is 2–4. Open a table, add CPUs or invite, then the host starts at 2+.</p> : null}
-      {game === "ludo" ? <p>Flying Chess is 2–4. Open a table, add CPUs or invite, then the host starts. Roll 6 to take off.</p> : null}
+      {/* Deferred — Flying Chess */}
+      {/* {game === "ludo" ? <p>Flying Chess is 2–4. Open a table, add CPUs or invite, then the host starts. Roll 6 to take off.</p> : null} */}
       {game === "flip7" ? <p>Flip 7 has no fixed seat count. Add CPUs or invite, then start with 2+.</p> : null}
       {game === "halli" ? <p>Halli Galli is 2–4. Open a table, add CPUs or invite, then start. Ring on five.</p> : null}
       {game === "ecard" ? (

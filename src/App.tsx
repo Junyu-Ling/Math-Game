@@ -21,7 +21,8 @@ import { GomokuPage } from "./games/gomoku/GomokuPage";
 // import { WerewolfPage } from "./games/werewolf/WerewolfPage";
 import { RoulettePage } from "./games/roulette/RoulettePage";
 import { SlotsPage } from "./games/slots/SlotsPage";
-import { LudoPage } from "./games/ludo/LudoPage";
+// Deferred — Flying Chess
+// import { LudoPage } from "./games/ludo/LudoPage";
 // Deferred: Animal Chess / Army Chess
 // import { AnimalPage } from "./games/animal/AnimalPage";
 // import { ArmyPage } from "./games/army/ArmyPage";
@@ -50,7 +51,7 @@ export function App() {
             {/* Deferred — Werewolf: /play/werewolf */}
             <Route path="/play/roulette" element={<RoulettePage />} />
             <Route path="/play/slots" element={<SlotsPage />} />
-            <Route path="/play/ludo" element={<LudoPage />} />
+            {/* Deferred — Flying Chess: /play/ludo */}
             {/* Deferred: /play/animal, /play/army */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

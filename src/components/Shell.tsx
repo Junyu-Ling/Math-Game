@@ -15,7 +15,8 @@ const GAME_BY_PATH: Record<string, string> = {
   "/play/halli": "halli",
   "/play/ecard": "ecard",
   "/play/gomoku": "gomoku",
-  "/play/ludo": "ludo",
+  // Deferred — Flying Chess
+  // "/play/ludo": "ludo",
   "/play/24": "m24",
   "/play/werewolf": "werewolf",
   "/play/animal": "animal",

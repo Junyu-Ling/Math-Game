@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { MahjongTile } from "../components/MahjongTile";
 import { FlipFace, MiniPoker, UnoFace } from "../components/PlayingCard";
-import { PlaneIcon } from "../games/ludo/LudoPage";
+// Deferred — Flying Chess
+// import { PlaneIcon } from "../games/ludo/LudoPage";
 import { SlotGlyph } from "../games/slots/SlotsPage";
 import type { SymbolId } from "../games/slots/engine";
 
@@ -89,14 +90,15 @@ const sections = [
         blurb: "15×15. Place stones. First five in a row wins.",
         preview: "gomoku" as const,
       },
-      {
-        to: "/play/ludo",
-        idx: "09",
-        code: "FLY",
-        name: "Flying Chess",
-        blurb: "Four planes each. Roll a 6 to take off, then race the colored track home.",
-        preview: "ludo" as const,
-      },
+      // Deferred — Flying Chess
+      // {
+      //   to: "/play/ludo",
+      //   idx: "09",
+      //   code: "FLY",
+      //   name: "Flying Chess",
+      //   blurb: "Four planes each. Roll a 6 to take off, then race the colored track home.",
+      //   preview: "ludo" as const,
+      // },
       // Deferred — Werewolf
       // {
       //   to: "/play/werewolf",
@@ -261,17 +263,18 @@ function Preview({ kind }: { kind: (typeof sections)[number]["games"][number]["p
       </div>
     );
   }
-  if (kind === "ludo") {
-    return (
-      <div className="preview-row fly-preview">
-        {(["blue", "red", "yellow", "green"] as const).map((c) => (
-          <span key={c} className={`fly-mini ${c}`}>
-            <PlaneIcon />
-          </span>
-        ))}
-      </div>
-    );
-  }
+  // Deferred — Flying Chess
+  // if (kind === "ludo") {
+  //   return (
+  //     <div className="preview-row fly-preview">
+  //       {(["blue", "red", "yellow", "green"] as const).map((c) => (
+  //         <span key={c} className={`fly-mini ${c}`}>
+  //           <PlaneIcon />
+  //         </span>
+  //       ))}
+  //     </div>
+  //   );
+  // }
   return (
     <div className="preview-row">
       <button className="m24-num" type="button" style={{ width: 52, height: 70, fontSize: 24 }}>
@@ -289,7 +292,7 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="kicker">Eleven tables · Invite play</p>
+          <p className="kicker">Ten tables · Invite play</p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
             Card art follows the physical decks. Practice against the CPU, or sign in and invite someone who is online.

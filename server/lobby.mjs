@@ -1326,7 +1326,8 @@ const OPEN_TABLES = new Set([
   "m24",
   "holdem",
   "werewolf",
-  "ludo",
+  // Deferred — Flying Chess
+  // "ludo",
 ]);
 
 export async function applyRoomAction(user, roomId, action, mods) {
