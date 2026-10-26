@@ -171,8 +171,7 @@ export function Home() {
           </p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
-            Nine tables are open for STEAM Week — cards, stones, wolves, no-limit Hold’em, and the wheel. Number games
-            wait for MATH WEEK.
+            Six tables are open for STEAM Week — cards, stones, and wolves. Number games wait for MATH WEEK.
           </p>
         </div>
         <div className="hero-stage" aria-hidden>
@@ -192,8 +191,8 @@ export function Home() {
         </section>
       ))}
       <p className="section-note">
-        STEAM Week tables are open now — including Da Vinci Code, Werewolf, Hold’em, roulette, and slots. Sign in to
-        invite someone, or practice vs CPU. MATH WEEK keeps Flip 7 and Blackjack until that week starts.
+        STEAM Week tables are open now — including Da Vinci Code and Werewolf. Sign in to invite someone, or practice vs
+        CPU. MATH WEEK keeps Flip 7, Blackjack, Hold’em, roulette, and slots until that week starts.
       </p>
     </div>
   );
