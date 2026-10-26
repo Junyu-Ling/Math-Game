@@ -9,6 +9,7 @@ export type CatalogPreview =
   | "bj"
   | "hold"
   | "gomoku"
+  | "wolf"
   | "roulette"
   | "slots";
 
@@ -73,8 +74,44 @@ export const CATALOG: CatalogGame[] = [
     week: "steam",
   },
   {
-    to: "/play/davinci",
+    to: "/play/werewolf",
     idx: "05",
+    code: "WOLF",
+    name: "Werewolf",
+    blurb: "Night and day in a small village. Wolves hunt, the Seer checks, the Witch may save or poison.",
+    preview: "wolf",
+    week: "steam",
+  },
+  {
+    to: "/play/holdem",
+    idx: "06",
+    code: "HOLD",
+    name: "Texas Hold’em",
+    blurb: "No-limit heads-up Hold’em. Raise any amount from the min up to all in.",
+    preview: "hold",
+    week: "steam",
+  },
+  {
+    to: "/play/roulette",
+    idx: "07",
+    code: "ROULETTE",
+    name: "European Roulette",
+    blurb: "Single-zero wheel 0–36. One bet per spin; the house sets the payout from how many pockets you cover.",
+    preview: "roulette",
+    week: "steam",
+  },
+  {
+    to: "/play/slots",
+    idx: "08",
+    code: "SLOTS",
+    name: "Slot Machine",
+    blurb: "Three-reel practice slots. Pick a bet, spin, and check the paytable.",
+    preview: "slots",
+    week: "steam",
+  },
+  {
+    to: "/play/davinci",
+    idx: "09",
     code: "CODA",
     name: "Da Vinci Code",
     blurb: "Black and white acrylic tiles. Choose a color to draw, then guess the numbers in your rival’s row.",
@@ -83,7 +120,7 @@ export const CATALOG: CatalogGame[] = [
   },
   {
     to: "/play/flip7",
-    idx: "06",
+    idx: "10",
     code: "FLIP7",
     name: "Flip 7",
     blurb: "Number wreaths. Seven distinct values score a bonus. First to 200 wins.",
@@ -92,38 +129,11 @@ export const CATALOG: CatalogGame[] = [
   },
   {
     to: "/play/blackjack",
-    idx: "07",
+    idx: "11",
     code: "BJ21",
     name: "Blackjack",
     blurb: "Head-to-head poker. The rival hole card stays down until they stand.",
     preview: "bj",
-    week: "math",
-  },
-  {
-    to: "/play/holdem",
-    idx: "08",
-    code: "HOLD",
-    name: "Texas Hold’em",
-    blurb: "No-limit heads-up Hold’em. Raise any amount from the min up to all in.",
-    preview: "hold",
-    week: "math",
-  },
-  {
-    to: "/play/roulette",
-    idx: "09",
-    code: "ROULETTE",
-    name: "European Roulette",
-    blurb: "Single-zero wheel 0–36. One bet per spin; the house sets the payout from how many pockets you cover.",
-    preview: "roulette",
-    week: "math",
-  },
-  {
-    to: "/play/slots",
-    idx: "10",
-    code: "SLOTS",
-    name: "Slot Machine",
-    blurb: "Three-reel practice slots. Pick a bet, spin, and check the paytable.",
-    preview: "slots",
     week: "math",
   },
 ];

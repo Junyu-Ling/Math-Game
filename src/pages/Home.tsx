@@ -104,6 +104,16 @@ function Preview({ kind }: { kind: CatalogPreview }) {
       </div>
     );
   }
+  if (kind === "wolf") {
+    return (
+      <div className="preview-row">
+        <span className="wolf-preview tone-wolf">W</span>
+        <span className="wolf-preview tone-seer">S</span>
+        <span className="wolf-preview tone-witch">K</span>
+        <span className="wolf-preview tone-villager">V</span>
+      </div>
+    );
+  }
   if (kind === "roulette") {
     return (
       <div className="preview-row">
@@ -161,8 +171,8 @@ export function Home() {
           </p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
-            Science, technology, engineering, art, and math — four tables are open for STEAM Week. Number games wait
-            for MATH WEEK.
+            Eight tables are open for STEAM Week — cards, stones, wolves, no-limit Hold’em, and the wheel. Number games
+            wait for MATH WEEK.
           </p>
         </div>
         <div className="hero-stage" aria-hidden>
@@ -182,8 +192,8 @@ export function Home() {
         </section>
       ))}
       <p className="section-note">
-        STEAM Week tables are open now. Sign in to invite someone, or practice vs CPU. MATH WEEK games stay in the
-        catalog until that week starts.
+        STEAM Week tables are open now — including Werewolf, Hold’em, roulette, and slots. Sign in to invite someone, or
+        practice vs CPU. MATH WEEK keeps Da Vinci, Flip 7, and Blackjack until that week starts.
       </p>
     </div>
   );

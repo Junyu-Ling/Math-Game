@@ -67,8 +67,7 @@ export const GAME_LABEL: Record<string, string> = {
   halli: "Halli Galli",
   ecard: "E-Card",
   gomoku: "Gomoku",
-  // Deferred — Werewolf
-  // werewolf: "Werewolf",
+  werewolf: "Werewolf",
   roulette: "European Roulette",
   slots: "Slot Machine",
   // Deferred — Flying Chess
@@ -146,8 +145,7 @@ export const GAME_PATH: Record<string, string> = {
   halli: "/play/halli",
   ecard: "/play/ecard",
   gomoku: "/play/gomoku",
-  // Deferred — Werewolf
-  // werewolf: "/play/werewolf",
+  werewolf: "/play/werewolf",
   roulette: "/play/roulette",
   slots: "/play/slots",
   // Deferred — Flying Chess
