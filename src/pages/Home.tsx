@@ -1,156 +1,25 @@
 import { Link } from "react-router-dom";
 import { MahjongTile } from "../components/MahjongTile";
 import { FlipFace, MiniPoker, UnoFace } from "../components/PlayingCard";
-// Deferred — Flying Chess
-// import { PlaneIcon } from "../games/ludo/LudoPage";
 import { SlotGlyph } from "../games/slots/SlotsPage";
 import type { SymbolId } from "../games/slots/engine";
+import {
+  MATH_WEEK,
+  STEAM_WEEK,
+  gamesFor,
+  isWeekOpen,
+  type CatalogGame,
+  type CatalogPreview,
+} from "../lib/weeks";
 
 const SLOT_PREVIEW: SymbolId[] = ["cherry", "seven", "bar", "wild", "lemon", "bell", "orange", "plum"];
 
-const sections = [
-  {
-    title: "Card games",
-    games: [
-      {
-        to: "/play/davinci",
-        idx: "01",
-        code: "CODA",
-        name: "Da Vinci Code",
-        blurb: "Black and white acrylic tiles. Choose a color to draw, then guess the numbers in your rival’s row.",
-        preview: "coda" as const,
-      },
-      {
-        to: "/play/flip7",
-        idx: "02",
-        code: "FLIP7",
-        name: "Flip 7",
-        blurb: "Number wreaths. Seven distinct values score a bonus. First to 200 wins.",
-        preview: "flip" as const,
-      },
-      {
-        to: "/play/uno",
-        idx: "03",
-        code: "UNO",
-        name: "UNO",
-        blurb: "Classic four-color ovals. Empty your hand to win.",
-        preview: "uno" as const,
-      },
-      {
-        to: "/play/halli",
-        idx: "04",
-        code: "HALLI",
-        name: "Halli Galli",
-        blurb: "Flip fruit cards. When five of one fruit show, ring the bell first.",
-        preview: "halli" as const,
-      },
-      {
-        to: "/play/ecard",
-        idx: "05",
-        code: "ECARD",
-        name: "E-Card",
-        blurb: "Kaiji’s Emperor · Citizen · Slave. Psychological duel — Slave alone can kill the Emperor.",
-        preview: "ecard" as const,
-      },
-      {
-        to: "/play/blackjack",
-        idx: "06",
-        code: "BJ21",
-        name: "Blackjack",
-        blurb: "Head-to-head poker. The rival hole card stays down until they stand.",
-        preview: "bj" as const,
-      },
-      // Deferred — Make 24
-      // {
-      //   to: "/play/24",
-      //   idx: "04",
-      //   code: "M24",
-      //   name: "Make 24",
-      //   blurb: "Same four poker cards. First to make 24 scores.",
-      //   preview: "m24" as const,
-      // },
-      {
-        to: "/play/holdem",
-        idx: "07",
-        code: "HOLD",
-        name: "Texas Hold’em",
-        blurb: "Heads-up Hold’em on a standard deck. Blinds, streets, showdown.",
-        preview: "hold" as const,
-      },
-    ],
-  },
-  {
-    title: "Board",
-    games: [
-      {
-        to: "/play/gomoku",
-        idx: "08",
-        code: "GOMOKU",
-        name: "Gomoku",
-        blurb: "15×15. Place stones. First five in a row wins.",
-        preview: "gomoku" as const,
-      },
-      // Deferred — Flying Chess
-      // {
-      //   to: "/play/ludo",
-      //   idx: "09",
-      //   code: "FLY",
-      //   name: "Flying Chess",
-      //   blurb: "Four planes each. Roll a 6 to take off, then race the colored track home.",
-      //   preview: "ludo" as const,
-      // },
-      // Deferred — Werewolf
-      // {
-      //   to: "/play/werewolf",
-      //   idx: "10",
-      //   code: "WOLF",
-      //   name: "Werewolf",
-      //   blurb: "Night kills, day votes. Werewolves, Seer, Witch, and villagers.",
-      //   preview: "werewolf" as const,
-      // },
-      // Deferred — Animal Chess / Army Chess
-      // {
-      //   to: "/play/animal",
-      //   idx: "14",
-      //   code: "ANIMAL",
-      //   name: "Animal Chess",
-      //   blurb: "Jungle ranks, rivers, and dens. Enter the rival den to win.",
-      //   preview: "animal" as const,
-      // },
-      // {
-      //   to: "/play/army",
-      //   idx: "15",
-      //   code: "ARMY",
-      //   name: "Army Chess",
-      //   blurb: "Open 军棋. Bombs, mines, and the flag. Capture 军旗 to win.",
-      //   preview: "army" as const,
-      // },
-    ],
-  },
-  {
-    title: "Casino",
-    games: [
-      {
-        to: "/play/roulette",
-        idx: "10",
-        code: "ROULETTE",
-        name: "European Roulette",
-        blurb: "Single-zero wheel 0–36. One bet per spin; the house sets the payout from how many pockets you cover.",
-        preview: "roulette" as const,
-      },
-      {
-        to: "/play/slots",
-        idx: "11",
-        code: "SLOTS",
-        name: "Slot Machine",
-        blurb: "Three-reel practice slots. Pick a bet, spin, and check the paytable.",
-        preview: "slots" as const,
-      },
-    ],
-  },
+const WEEK_SECTIONS = [
+  { week: "steam" as const, title: `${STEAM_WEEK.label} · ${STEAM_WEEK.dates}` },
+  { week: "math" as const, title: `${MATH_WEEK.label} · ${MATH_WEEK.dates}` },
 ];
 
-function Preview({ kind }: { kind: (typeof sections)[number]["games"][number]["preview"] }) {
+function Preview({ kind }: { kind: CatalogPreview }) {
   if (kind === "coda") {
     return (
       <div className="preview-row">
@@ -235,16 +104,6 @@ function Preview({ kind }: { kind: (typeof sections)[number]["games"][number]["p
       </div>
     );
   }
-  // Deferred — Werewolf
-  // if (kind === "werewolf") {
-  //   return (
-  //     <div className="preview-row">
-  //       <span className="wolf-preview tone-wolf">W</span>
-  //       <span className="wolf-preview tone-seer">S</span>
-  //       <span className="wolf-preview tone-witch">K</span>
-  //     </div>
-  //   );
-  // }
   if (kind === "roulette") {
     return (
       <div className="preview-row">
@@ -252,38 +111,43 @@ function Preview({ kind }: { kind: (typeof sections)[number]["games"][number]["p
       </div>
     );
   }
-  if (kind === "slots") {
+  return (
+    <div className="preview-row slots-home-preview">
+      {SLOT_PREVIEW.map((sym) => (
+        <span key={sym} className="slots-home-glyph" aria-hidden>
+          <SlotGlyph sym={sym} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function GameTile({ game }: { game: CatalogGame }) {
+  const open = isWeekOpen(game.week);
+  const body = (
+    <>
+      <div>
+        <div className="idx">
+          {game.idx} / {game.code}
+        </div>
+        <h2>{game.name}</h2>
+        <p>{game.blurb}</p>
+        <Preview kind={game.preview} />
+      </div>
+      <div className="enter">{open ? "Open →" : "MATH WEEK →"}</div>
+    </>
+  );
+  if (!open) {
     return (
-      <div className="preview-row slots-home-preview">
-        {SLOT_PREVIEW.map((sym) => (
-          <span key={sym} className="slots-home-glyph" aria-hidden>
-            <SlotGlyph sym={sym} />
-          </span>
-        ))}
+      <div className="game-card is-soon" aria-disabled="true">
+        {body}
       </div>
     );
   }
-  // Deferred — Flying Chess
-  // if (kind === "ludo") {
-  //   return (
-  //     <div className="preview-row fly-preview">
-  //       {(["blue", "red", "yellow", "green"] as const).map((c) => (
-  //         <span key={c} className={`fly-mini ${c}`}>
-  //           <PlaneIcon />
-  //         </span>
-  //       ))}
-  //     </div>
-  //   );
-  // }
   return (
-    <div className="preview-row">
-      <button className="m24-num" type="button" style={{ width: 52, height: 70, fontSize: 24 }}>
-        8
-      </button>
-      <button className="m24-num" type="button" style={{ width: 52, height: 70, fontSize: 24 }}>
-        3
-      </button>
-    </div>
+    <Link to={game.to} className="game-card">
+      {body}
+    </Link>
   );
 }
 
@@ -292,39 +156,35 @@ export function Home() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="kicker">Ten tables · Invite play</p>
+          <p className="kicker">
+            {STEAM_WEEK.label} · {STEAM_WEEK.dates}
+          </p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
-            Card art follows the physical decks. Practice against the CPU, or sign in and invite someone who is online.
+            Science, technology, engineering, art, and math — four tables are open for STEAM Week. Number games wait
+            for MATH WEEK.
           </p>
         </div>
         <div className="hero-stage" aria-hidden>
-          <FlipFace card={{ id: "h1", kind: "number", value: 12 }} />
-          <MahjongTile hide={false} tile={{ color: "white", value: "joker", revealed: true }} />
-          <UnoFace card={{ id: "h2", color: "black", kind: "wild4" }} />
+          <UnoFace card={{ id: "h1", color: "red", kind: "number", value: 7 }} />
+          <UnoFace card={{ id: "h2", color: "yellow", kind: "skip" }} />
+          <UnoFace card={{ id: "h3", color: "black", kind: "wild4" }} />
         </div>
       </section>
-      {sections.map((section) => (
-        <section key={section.title} className="game-section" aria-label={section.title}>
+      {WEEK_SECTIONS.map((section) => (
+        <section key={section.week} className="game-section" aria-label={section.title}>
           <p className="kicker">{section.title}</p>
           <div className="game-grid">
-            {section.games.map((g) => (
-              <Link key={g.code} to={g.to} className="game-card">
-                <div>
-                  <div className="idx">
-                    {g.idx} / {g.code}
-                  </div>
-                  <h2>{g.name}</h2>
-                  <p>{g.blurb}</p>
-                  <Preview kind={g.preview} />
-                </div>
-                <div className="enter">Open →</div>
-              </Link>
+            {gamesFor(section.week).map((g) => (
+              <GameTile key={g.code} game={g} />
             ))}
           </div>
         </section>
       ))}
-      <p className="section-note">Sign in to open a table, add CPUs or invite, then start. All games support online play.</p>
+      <p className="section-note">
+        STEAM Week tables are open now. Sign in to invite someone, or practice vs CPU. MATH WEEK games stay in the
+        catalog until that week starts.
+      </p>
     </div>
   );
 }

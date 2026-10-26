@@ -842,6 +842,20 @@ h1 {
   box-shadow: 0 8px 24px var(--shadow);
 }
 
+.game-card.is-soon {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.game-card.is-soon:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.game-card.is-soon .enter {
+  color: var(--faint);
+}
+
 .game-card .idx {
   font-size: 11px;
   font-weight: 500;

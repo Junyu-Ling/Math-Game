@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { LobbyProvider } from "./context/LobbyContext";
@@ -26,6 +27,12 @@ import { SlotsPage } from "./games/slots/SlotsPage";
 // Deferred: Animal Chess / Army Chess
 // import { AnimalPage } from "./games/animal/AnimalPage";
 // import { ArmyPage } from "./games/army/ArmyPage";
+import { isPathOpen } from "./lib/weeks";
+
+function WeekGate({ path, children }: { path: string; children: ReactNode }) {
+  if (!isPathOpen(path)) return <Navigate to="/" replace />;
+  return children;
+}
 
 export function App() {
   return (
@@ -39,18 +46,18 @@ export function App() {
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/register" element={<Register />} />
             <Route path="/account" element={<Account />} />
-            <Route path="/play/davinci" element={<DaVinciPage />} />
-            <Route path="/play/flip7" element={<Flip7Page />} />
-            <Route path="/play/blackjack" element={<BlackjackPage />} />
+            <Route path="/play/davinci" element={<WeekGate path="/play/davinci"><DaVinciPage /></WeekGate>} />
+            <Route path="/play/flip7" element={<WeekGate path="/play/flip7"><Flip7Page /></WeekGate>} />
+            <Route path="/play/blackjack" element={<WeekGate path="/play/blackjack"><BlackjackPage /></WeekGate>} />
             {/* Deferred — Make 24: /play/24 */}
-            <Route path="/play/holdem" element={<HoldemPage />} />
-            <Route path="/play/uno" element={<UnoPage />} />
-            <Route path="/play/halli" element={<HalliGalliPage />} />
-            <Route path="/play/ecard" element={<EcardPage />} />
-            <Route path="/play/gomoku" element={<GomokuPage />} />
+            <Route path="/play/holdem" element={<WeekGate path="/play/holdem"><HoldemPage /></WeekGate>} />
+            <Route path="/play/uno" element={<WeekGate path="/play/uno"><UnoPage /></WeekGate>} />
+            <Route path="/play/halli" element={<WeekGate path="/play/halli"><HalliGalliPage /></WeekGate>} />
+            <Route path="/play/ecard" element={<WeekGate path="/play/ecard"><EcardPage /></WeekGate>} />
+            <Route path="/play/gomoku" element={<WeekGate path="/play/gomoku"><GomokuPage /></WeekGate>} />
             {/* Deferred — Werewolf: /play/werewolf */}
-            <Route path="/play/roulette" element={<RoulettePage />} />
-            <Route path="/play/slots" element={<SlotsPage />} />
+            <Route path="/play/roulette" element={<WeekGate path="/play/roulette"><RoulettePage /></WeekGate>} />
+            <Route path="/play/slots" element={<WeekGate path="/play/slots"><SlotsPage /></WeekGate>} />
             {/* Deferred — Flying Chess: /play/ludo */}
             {/* Deferred: /play/animal, /play/army */}
             <Route path="*" element={<Navigate to="/" replace />} />
