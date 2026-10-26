@@ -299,7 +299,7 @@ export function LudoPage() {
                 <ul className="lobby-roster">
                   {state.players.map((p, i) => (
                     <li key={p.id}>
-                      <b>{p.name}</b>
+                      <SeatTalk playerId={p.id} name={p.name} />
                       <span>
                         {p.color} · {seatTag(p, i, state.players[0]?.id)}
                       </span>
@@ -437,9 +437,7 @@ export function LudoPage() {
                 {state.players.map((p) => (
                   <li key={p.id} className={cur?.id === p.id && state.phase !== "over" ? "on" : ""}>
                     <i className={`c-${p.color}`} />
-                    <SeatTalk playerId={p.id} name={p.name}>
-                      <b>{p.name}</b>
-                    </SeatTalk>
+                    <SeatTalk playerId={p.id} name={p.name} />
                     <span>
                       {p.out ? "LEFT" : `${homeCount(p)}/4 home`}
                     </span>

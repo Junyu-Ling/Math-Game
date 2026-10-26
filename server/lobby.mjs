@@ -363,6 +363,7 @@ export async function rememberPlayer(user) {
   const rec = {
     id,
     name: playerName(user),
+    login: user.login || "",
     avatar: user.avatar || "",
     email: user.email || "",
   };
@@ -563,7 +564,9 @@ async function listRoster(viewerId) {
     out.push({
       id,
       name,
+      login: liveP?.login || saved?.login || "",
       avatar,
+      email: liveP?.email || saved?.email || "",
       online: Boolean(liveP),
       roomId: liveP?.roomId || null,
     });
@@ -630,6 +633,7 @@ async function rememberSeats(room) {
     await rememberPlayer({
       id,
       name: p.name || live.name,
+      login: p.login || live.login || "",
       avatar: p.avatar || live.avatar || "",
       email: live.email || p.email || "",
     });
@@ -654,6 +658,7 @@ export async function touchPresence(user, href = "") {
   const rec = {
     id,
     name: playerName(user),
+    login: user.login || "",
     email: user.email || "",
     avatar: user.avatar || "",
     seenAt: Date.now(),
@@ -868,8 +873,8 @@ function startRoom(invite, from, to, mods) {
     game: invite.game,
     seats: [a.id, b.id],
     faces: [
-      { id: a.id, name: from.name, avatar: from.avatar || "" },
-      { id: b.id, name: to.name || playerName(to), avatar: to.avatar || "" },
+      { id: a.id, name: from.name, login: from.login || "", avatar: from.avatar || "" },
+      { id: b.id, name: to.name || playerName(to), login: to.login || "", avatar: to.avatar || "" },
     ],
     state,
     endsAt,
@@ -1557,7 +1562,9 @@ async function seatFaces(seats) {
     out.push({
       id,
       name: live.name || saved.name || saved.login || saved.email || "PLAYER",
+      login: live.login || saved.login || "",
       avatar: live.avatar || saved.avatar || "",
+      email: live.email || saved.email || "",
     });
   }
   return out;

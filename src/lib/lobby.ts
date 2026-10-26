@@ -1,6 +1,14 @@
 const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
-export type OnlinePlayer = { id: string; name: string; avatar?: string; online?: boolean; roomId?: string | null };
+export type OnlinePlayer = {
+  id: string;
+  name: string;
+  login?: string;
+  avatar?: string;
+  email?: string;
+  online?: boolean;
+  roomId?: string | null;
+};
 
 export type Invite = {
   id: string;

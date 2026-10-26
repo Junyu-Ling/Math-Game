@@ -103,7 +103,7 @@ function FlipSeat({
       <div className={`seat-label${lead ? " is-lead" : ""}`}>
         <SeatTalk playerId={player.id} name={player.name}>
           <span>
-        {player.name} · {mine ? `round ${scored.score} · total ${player.total}` : `${player.total} PTS · ${player.status.toUpperCase()}`}
+        {mine ? `round ${scored.score} · total ${player.total}` : `${player.total} PTS · ${player.status.toUpperCase()}`}
         {player.area.some((c) => c.kind === "chance") ? " · 2ND CHANCE" : ""}
         {player.pendingFlip3 > 0 ? ` · FLIP ${player.pendingFlip3}` : ""}
         {turn ? " · TURN" : ""}
@@ -379,7 +379,7 @@ export function Flip7Page() {
                   <ul className="lobby-roster">
                     {state.players.map((p, i) => (
                       <li key={p.id}>
-                        <b>{p.name}</b>
+                        <SeatTalk playerId={p.id} name={p.name} />
                         <span>{seatTag(p, i, state.players[0]?.id)}</span>
                       </li>
                     ))}
@@ -457,7 +457,9 @@ export function Flip7Page() {
                 <div className="flip-extras" aria-label="Other players">
                   {seated.extras.map((p) => (
                     <span key={p.id} className={`${cur?.id === p.id ? "on" : ""}${leadId === p.id ? " lead" : ""}`}>
-                      {p.name} · {p.total}
+                      <SeatTalk playerId={p.id} name={p.name}>
+                        {p.total}
+                      </SeatTalk>
                     </span>
                   ))}
                 </div>

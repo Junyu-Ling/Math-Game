@@ -168,7 +168,7 @@ export function WerewolfPage() {
                   <ul className="lobby-roster">
                     {state.players.map((p, i) => (
                       <li key={p.id}>
-                        <b>{p.name}</b>
+                        <SeatTalk playerId={p.id} name={p.name} />
                         <span>{seatTag(p, i, state.players[0]?.id)}</span>
                       </li>
                     ))}
@@ -220,9 +220,7 @@ export function WerewolfPage() {
               <ul className="wolf-roster">
                 {state.players.map((p) => (
                   <li key={p.id} className={`wolf-seat ${p.alive ? "alive" : "dead"} tone-${roleTone(p.role)}`}>
-                    <SeatTalk playerId={p.id} name={p.name}>
-                      <b>{p.name}</b>
-                    </SeatTalk>
+                    <SeatTalk playerId={p.id} name={p.name} />
                     <span>
                       {!p.alive ? "out" : p.id === me.id ? roleLabel(p.role) : p.role ? roleLabel(p.role) : "alive"}
                       {p.voteFor ? " · voted" : ""}

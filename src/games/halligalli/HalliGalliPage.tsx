@@ -65,9 +65,8 @@ function HalliSeat({
       <div className="seat-label">
         <SeatTalk playerId={player.id} name={player.name}>
           <span>
-            {player.name} · deck {player.deck.length} · score {player.score}
+            deck {player.deck.length} · score {player.score}
             {player.out ? " · LEFT" : turn ? " · TURN" : ""}
-            {mine ? " · YOU" : ""}
           </span>
         </SeatTalk>
       </div>
@@ -216,7 +215,7 @@ export function HalliGalliPage() {
                   <ul className="lobby-roster">
                     {state.players.map((p, i) => (
                       <li key={p.id}>
-                        <b>{p.name}</b>
+                        <SeatTalk playerId={p.id} name={p.name} />
                         <span>{seatTag(p, i, state.players[0]?.id)}</span>
                       </li>
                     ))}

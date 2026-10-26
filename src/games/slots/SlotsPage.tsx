@@ -13,6 +13,7 @@ import {
   type SymbolId,
 } from "./engine";
 import { RulesButton } from "../../components/GameRules";
+import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 
 const BETS = [1, 5, 10, 25, 50, 100];
@@ -109,6 +110,7 @@ export function SlotsPage() {
         <div className="table table-slots">
           <div className="slots-machine">
             <div className="slots-bank">
+              <SeatTalk playerId={user?.id || "you"} name={user?.login || user?.name || user?.email || "YOU"} />
               <span>
                 Chips <b>{state.chips}</b>
               </span>

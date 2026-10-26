@@ -108,7 +108,7 @@ export function Math24Page() {
                   <ul className="lobby-roster">
                     {state.players.map((p, i) => (
                       <li key={p.id}>
-                        <b>{p.name}</b>
+                        <SeatTalk playerId={p.id} name={p.name} />
                         <span>{seatTag(p, i, state.players[0]?.id)}</span>
                       </li>
                     ))}
@@ -132,14 +132,10 @@ export function Math24Page() {
             <>
               <div className="board-talk">
                 {rival ? (
-                  <SeatTalk playerId={rival.id} name={rival.name}>
-                    {rival.name}
-                  </SeatTalk>
+                  <SeatTalk playerId={rival.id} name={rival.name} />
                 ) : null}
                 {me ? (
-                  <SeatTalk playerId={me.id} name={me.name}>
-                    {me.name}
-                  </SeatTalk>
+                  <SeatTalk playerId={me.id} name={me.name} />
                 ) : null}
               </div>
               <div className="m24-board">

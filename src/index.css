@@ -1253,6 +1253,24 @@ h1 {
   box-shadow: 0 0 0 2px #fff;
 }
 
+.seat-talk-id {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.seat-talk-meta {
+  min-width: 0;
+}
+
+.seat-talk-meta::before {
+  content: "·";
+  margin: 0 6px 0 2px;
+  opacity: 0.4;
+}
+
 .board-talk {
   display: flex;
   justify-content: center;

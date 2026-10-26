@@ -93,7 +93,7 @@ function UnoSeat({
       <div className="seat-label">
         <SeatTalk playerId={player.id} name={player.name}>
           <span>
-            {player.name} · {player.out ? "LEFT" : `${player.hand.length} cards`}{!player.out && turn ? " · TURN" : ""}
+            {player.out ? "LEFT" : `${player.hand.length} cards`}{!player.out && turn ? " · TURN" : ""}
             {player.calledUno ? " · UNO" : ""}
           </span>
         </SeatTalk>
@@ -282,7 +282,7 @@ export function UnoPage() {
                 <ul className="lobby-roster">
                   {state.players.map((p, i) => (
                     <li key={p.id}>
-                      <b>{p.name}</b>
+                      <SeatTalk playerId={p.id} name={p.name} />
                       <span>{seatTag(p, i, state.players[0]?.id)}</span>
                     </li>
                   ))}

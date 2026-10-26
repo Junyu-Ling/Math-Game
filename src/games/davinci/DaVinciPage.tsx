@@ -211,9 +211,7 @@ function OppSeat({
   return (
     <div className={`seat ${className} ${opening ? "veiled" : ""}`}>
       <div className="seat-plaque">
-        <SeatTalk playerId={player.id} name={player.name}>
-          <b>{player.name}</b>
-        </SeatTalk>
+        <SeatTalk playerId={player.id} name={player.name} />
         <span>{player.out ? (tiles.length > 0 && tiles.every((t) => t.revealed) ? "OUT" : "LEFT") : opening ? "Arrange" : turn ? "Turn" : "Wait"}</span>
       </div>
       <div className="tiles-wrap">
@@ -685,7 +683,7 @@ export function DaVinciPage() {
                 <ul className="lobby-roster">
                   {state.players.map((p, i) => (
                     <li key={p.id}>
-                      <b>{p.name}</b>
+                      <SeatTalk playerId={p.id} name={p.name} />
                       <span>
                         {seatTag(p, i, state.players[0]?.id)}
                         {" · "}
@@ -887,9 +885,7 @@ export function DaVinciPage() {
 
           <div className="seat seat-you">
             <div className="seat-plaque you">
-              <SeatTalk playerId={you.id} name={you.name}>
-                <b>{you.name}</b>
-              </SeatTalk>
+              <SeatTalk playerId={you.id} name={you.name} />
               <span>
                 {you.out ? (you.tiles.length > 0 && you.tiles.every((t) => t.revealed) ? "OUT" : "LEFT") : opening ? "Arrange" : arranging ? "Insert" : me?.id === you.id ? "Turn" : "Wait"}
               </span>

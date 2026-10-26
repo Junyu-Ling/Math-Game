@@ -293,7 +293,7 @@ export function EcardPage() {
                   <ul className="lobby-roster">
                     {state.players.map((p, i) => (
                       <li key={p.id}>
-                        <b>{p.name}</b>
+                        <SeatTalk playerId={p.id} name={p.name} />
                         <span>{seatTag(p, i, state.players[0]?.id)}</span>
                       </li>
                     ))}
@@ -319,9 +319,7 @@ export function EcardPage() {
               <div className="rps-arena">
                 <div className="rps-side rival">
                   <span className="rps-name">
-                    <SeatTalk playerId={rival.id} name={rival.name}>
-                      {rival.name}
-                    </SeatTalk>
+                    <SeatTalk playerId={rival.id} name={rival.name} />
                   </span>
                   <RpsHand
                     key={`rival-${rpsBeat}-${rivalRpsKind}`}
@@ -343,9 +341,7 @@ export function EcardPage() {
                     won={youRpsWon}
                   />
                   <span className="rps-name">
-                    <SeatTalk playerId={me.id} name={me.name}>
-                      {me.name}
-                    </SeatTalk>
+                    <SeatTalk playerId={me.id} name={me.name} />
                   </span>
                 </div>
               </div>
@@ -416,13 +412,13 @@ export function EcardPage() {
                 <span className="ecard-vs">·</span>
                 <span>
                   <SeatTalk playerId={me.id} name={me.name}>
-                    {me.name} · {(me.role || "?").toUpperCase()} · {state.score[me.id] || 0}
+                    {(me.role || "?").toUpperCase()} · {state.score[me.id] || 0}
                   </SeatTalk>
                 </span>
                 <span className="ecard-vs">VS</span>
                 <span>
                   <SeatTalk playerId={rival.id} name={rival.name}>
-                    {rival.name} · {(rival.role || "?").toUpperCase()} · {state.score[rival.id] || 0}
+                    {(rival.role || "?").toUpperCase()} · {state.score[rival.id] || 0}
                   </SeatTalk>
                 </span>
               </div>

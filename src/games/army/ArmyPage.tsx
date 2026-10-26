@@ -118,9 +118,7 @@ export function ArmyPage() {
             <div className="kaiji-board-wrap">
               <div className="board-talk">
                 {state.players.map((p) => (
-                  <SeatTalk key={p.id} playerId={p.id} name={p.name}>
-                    {p.name}
-                  </SeatTalk>
+                  <SeatTalk key={p.id} playerId={p.id} name={p.name} />
                 ))}
               </div>
               <p className="status-line">

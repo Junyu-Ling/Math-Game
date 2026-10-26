@@ -94,7 +94,7 @@ export function BlackjackPage() {
                   <ul className="lobby-roster">
                     {state.players.map((p, i) => (
                       <li key={p.id}>
-                        <b>{p.name}</b>
+                        <SeatTalk playerId={p.id} name={p.name} />
                         <span>{seatTag(p, i, state.players[0]?.id)}</span>
                       </li>
                     ))}
@@ -120,7 +120,7 @@ export function BlackjackPage() {
                 <div className="seat-label">
                   <SeatTalk playerId={rival.id} name={rival.name}>
                     <span>
-                  {rival.name} · {rival.stood || state.phase === "over" ? hardSoft(rival.cards).total : "-"}
+                  {rival.stood || state.phase === "over" ? hardSoft(rival.cards).total : "-"}
                   {state.players[state.turn]?.id === rival.id ? " · TURN" : ""}
                     </span>
                   </SeatTalk>
@@ -141,7 +141,7 @@ export function BlackjackPage() {
                 <div className="seat-label">
                   <SeatTalk playerId={me.id} name={me.name}>
                     <span>
-                  {me.name} · {hardSoft(me.cards).total}
+                  {hardSoft(me.cards).total}
                   {myTurn ? " · TURN" : ""}
                     </span>
                   </SeatTalk>

@@ -263,7 +263,7 @@ export function GomokuPage() {
                 <ul className="lobby-roster">
                   {state.players.map((p, i) => (
                     <li key={p.id}>
-                      <b>{p.name}</b>
+                      <SeatTalk playerId={p.id} name={p.name} />
                       <span>{seatTag(p, i, state.players[0]?.id)}</span>
                     </li>
                   ))}
@@ -289,9 +289,7 @@ export function GomokuPage() {
                 <div className="rps-side rival">
                   <span className="rps-name">
                     {rival ? (
-                      <SeatTalk playerId={rival.id} name={rival.name}>
-                        {rival.name}
-                      </SeatTalk>
+                      <SeatTalk playerId={rival.id} name={rival.name} />
                     ) : null}
                   </span>
                   <RpsHand
@@ -314,9 +312,7 @@ export function GomokuPage() {
                     won={youRpsWon}
                   />
                   <span className="rps-name">
-                    <SeatTalk playerId={me.id} name={me.name}>
-                      {me.name}
-                    </SeatTalk>
+                    <SeatTalk playerId={me.id} name={me.name} />
                   </span>
                 </div>
               </div>
@@ -352,13 +348,9 @@ export function GomokuPage() {
             <div className="kaiji-board-wrap">
               <div className="board-talk">
                 {rival ? (
-                  <SeatTalk playerId={rival.id} name={rival.name}>
-                    {rival.name}
-                  </SeatTalk>
+                  <SeatTalk playerId={rival.id} name={rival.name} />
                 ) : null}
-                <SeatTalk playerId={me.id} name={me.name}>
-                  {me.name}
-                </SeatTalk>
+                <SeatTalk playerId={me.id} name={me.name} />
               </div>
               <p className="status-line">
                 {state.phase === "over"

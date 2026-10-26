@@ -20,6 +20,7 @@ import {
   type RouletteState,
 } from "./engine";
 import { RulesButton } from "../../components/GameRules";
+import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 
 const CHIP_SIZES = [1, 5, 10, 25, 50, 100];
@@ -182,6 +183,7 @@ export function RoulettePage() {
 
             <div className="roulette-board-wrap">
               <div className="roulette-bank">
+                <SeatTalk playerId={user?.id || "you"} name={user?.login || user?.name || user?.email || "YOU"} />
                 <span>
                   Chips <b>{state.chips}</b>
                 </span>
