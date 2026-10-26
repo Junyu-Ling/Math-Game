@@ -326,8 +326,8 @@ export function GameRules({ game }: { game: string }) {
               <>
                 {tile("white", 1, true)}
                 {tile("black", 4, true)}
-                {tile("white", 7, false)}
-                {tile("black", 9, true)}
+                {tile("black", 7, false)}
+                {tile("white", 9, true)}
               </>
             ),
           },
@@ -337,7 +337,7 @@ export function GameRules({ game }: { game: string }) {
             cards: (
               <>
                 {tile("black", "joker", true)}
-                {tile("white", "joker", false)}
+                {tile("white", "joker", true)}
               </>
             ),
           },
