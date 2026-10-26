@@ -672,13 +672,17 @@ export async function watchLobby(user, seq = 0, inviteCount = -1, href = "", tim
   ensureSub();
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
-    let cpuIn = 0;
+    let soonest = 0;
     const rid = await getSeat(id);
     if (rid) {
       const rec = await attachMods(await getRoomRecord(rid));
       if (rec?.cpuReadyAt) {
         if (Date.now() + 40 >= rec.cpuReadyAt) await pumpCpu(rec);
-        else cpuIn = rec.cpuReadyAt - Date.now();
+        else soonest = rec.cpuReadyAt - Date.now();
+      }
+      if (rec?.endsAt) {
+        const until = rec.endsAt - Date.now() + 25;
+        if (until > 0) soonest = soonest > 0 ? Math.min(soonest, until) : until;
       }
     }
     const snap = await snapshot(id, true);
@@ -686,7 +690,7 @@ export async function watchLobby(user, seq = 0, inviteCount = -1, href = "", tim
     if (roomSeq !== wantSeq) return snap;
     if (wantInv >= 0 && snap.invites.length !== wantInv) return snap;
     const left = timeoutMs - (Date.now() - started);
-    const slice = cpuIn > 0 ? Math.min(left, cpuIn) : left;
+    const slice = soonest > 0 ? Math.min(left, soonest) : left;
     if (slice < 20) break;
     await waitWake(id, slice);
   }
@@ -739,6 +743,7 @@ async function expireArrange(room) {
       room.state = room.mods.coda.finishArrange(room.state);
       if (room.state.phase === "arrange" && room.state.arrangeId !== before) {
         room.endsAt = Date.now() + (room.mods.coda.ARRANGE_MS || 5000);
+        room.seq = (room.seq || 0) + 1;
         await saveRoom(room);
         return;
       }
@@ -1325,6 +1330,7 @@ export async function applyRoomAction(user, roomId, action, mods) {
   if (!rec || !rec.seats.includes(user.id)) throw new Error("Game not found");
   const room = { ...rec, mods };
   await expireArrange(room);
+  if (action && action.type === "tick") return publicRoom(room, user.id);
   const before = room.state;
   if (room.game === "coda") {
     room.state = mods.coda.applyAction(room.state, user.id, action);

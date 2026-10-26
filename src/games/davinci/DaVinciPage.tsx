@@ -467,12 +467,17 @@ export function DaVinciPage() {
     const roomEnds = online ? codaRoom?.endsAt ?? endsAtRef.current : null;
     const deadline = roomEnds && roomEnds > Date.now() ? roomEnds : Date.now() + ARRANGE_MS;
     let id = 0;
+    let flushed = false;
     const tick = () => {
       const left = Math.max(0, deadline - Date.now());
       setRemain(left / 1000);
       if (left <= 0) {
         window.clearInterval(id);
         if (!online) setState((s) => (s ? finishArrange(s) : s));
+        else if (!flushed) {
+          flushed = true;
+          void lobby.sendAction({ type: "tick" });
+        }
       }
     };
     tick();

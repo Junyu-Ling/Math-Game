@@ -326,7 +326,7 @@ export function GameRules({ game }: { game: string }) {
               <>
                 {tile("white", 1, true)}
                 {tile("black", 4, true)}
-                {tile("black", 7, false)}
+                {tile("black", 7, true)}
                 {tile("white", 9, true)}
               </>
             ),
