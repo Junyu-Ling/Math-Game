@@ -644,7 +644,7 @@ export function DaVinciPage() {
           </button>
         </div>
       </div>
-      <div className="game-layout">
+      <div className={`game-layout${playing && state ? " coda-live" : ""}`}>
         <div
           className={`table table-coda ${flash ? `table-${flash.kind}` : ""}${
             playing && state?.phase === "over" && flash?.kind !== "win" && flash?.kind !== "lose" ? " table-showdown" : ""

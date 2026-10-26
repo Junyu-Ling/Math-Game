@@ -257,7 +257,7 @@ button:disabled {
 }
 
 .rules-screen-body {
-  width: min(760px, 100%);
+  width: min(1040px, 100%);
   margin: 0 auto;
   font-size: 17px;
   line-height: 1.75;
@@ -709,10 +709,14 @@ button:disabled {
 }
 
 .coda-page .game-layout {
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
   overflow: hidden;
+}
+
+.coda-page .game-layout.coda-live {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
 }
 
 .coda-dock {
@@ -1124,7 +1128,8 @@ h1 {
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 28px;
 }
 
 .rule-rank {
@@ -1173,6 +1178,40 @@ h1 {
   flex: 0 0 auto;
   filter: drop-shadow(0 2px 4px rgba(17, 17, 17, 0.16));
   border-radius: 5px;
+}
+
+.rules-screen .rule-lead {
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.rules-screen .rule-rank-text b {
+  font-size: 16px;
+}
+
+.rules-screen .rule-rank-text span {
+  font-size: 14px;
+}
+
+.rules-screen .rule-hand {
+  --cw: 56px;
+  --ch: 82px;
+}
+
+.rules-screen .rule-hand .mj {
+  --w: 52px;
+  --h: 78px;
+}
+
+.rule-notes {
+  margin: 22px 0 0;
+  padding-left: 18px;
+}
+
+@media (max-width: 860px) {
+  .rule-rank-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .log {
@@ -1477,15 +1516,13 @@ h1 {
   .game-layout {
     grid-template-columns: 1fr;
   }
-  .coda-page .game-layout {
+  .coda-page .game-layout.coda-live,
+  .page-wide.coda-page .game-layout.coda-live {
     grid-template-columns: minmax(0, 1fr) minmax(200px, 240px);
   }
   .page-wide .game-layout {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
-  }
-  .page-wide.coda-page .game-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(200px, 240px);
   }
   .side {
     max-height: none;
