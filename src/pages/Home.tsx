@@ -133,7 +133,7 @@ const sections = [
         idx: "10",
         code: "ROULETTE",
         name: "European Roulette",
-        blurb: "Single-zero wheel 0–36. Solo bets vs the house — straight through even money.",
+        blurb: "Single-zero wheel 0–36. One bet per spin; the house sets the payout from how many pockets you cover.",
         preview: "roulette" as const,
       },
       {

@@ -3860,6 +3860,14 @@ button.uno-card:disabled { cursor: default; filter: saturate(0.82); }
   cursor: default;
 }
 
+.rb-num.on,
+.rb-zero.on,
+.rb-out.on {
+  outline: 2px solid #fff;
+  box-shadow: 0 0 0 2px #111;
+  z-index: 1;
+}
+
 .roulette-bet-list {
   list-style: none;
   margin: 0;

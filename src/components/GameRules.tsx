@@ -75,9 +75,9 @@ const RULES: Record<string, string[]> = {
     "Simplified party rules — no Hunter, Guard, or speech timer. Practice is you plus 3–7 CPUs.",
   ],
   roulette: [
-    "Solo European roulette (single zero 0–36) against the house. Place chips, then spin.",
-    "Payouts are net odds (win returns stake + profit): Straight 35:1 · Split 17:1 · Street 11:1 · Corner 8:1 · Six line 5:1 · Column/Dozen 2:1 · Even money 1:1.",
-    "On 0, even-money bets (Red/Black, Odd/Even, 1–18/19–36) lose. Inside bets that include 0 can still win.",
+    "Solo European roulette (single zero 0–36) against the house. One bet per spin — a new click replaces the last stake.",
+    "You pick the box. The house pays ⌊36 ÷ n⌋ − 1, where n is how many pockets that bet covers (a single number 35:1, a dozen 2:1, even money 1:1).",
+    "Win returns stake plus that profit. 0 loses even-money outside bets; a straight on 0 can still win.",
   ],
   slots: [
     "Solo 3-reel practice slots. One payline. Set bet size, then spin.",

@@ -16,17 +16,15 @@ export function pocketColor(n: number): PocketColor {
   return RED_NUMBERS.has(n) ? "red" : "black";
 }
 
-/** Net odds (profit multiple of stake). Total return on win = stake × (odds + 1). */
-export const PAYOUTS = {
-  straight: 35,
-  split: 17,
-  street: 11,
-  corner: 8,
-  sixline: 5,
-  column: 2,
-  dozen: 2,
-  even: 1,
-} as const;
+/**
+ * House net odds for a bet that covers `n` pockets on a European wheel.
+ * Pays as 36 numbers (0 is the edge): profit = stake × (⌊36/n⌋ − 1),
+ * and a win returns stake + profit.
+ */
+export function houseOdds(cover: number): number {
+  if (cover < 1) return 0;
+  return Math.max(0, Math.floor(36 / cover) - 1);
+}
 
 export type BetKind =
   | "straight"
@@ -84,7 +82,7 @@ export function startRoulette(chips = 1000): RouletteState {
     result: null,
     wheelDeg: 0,
     lastWin: 0,
-    message: "Place bets on the European board, then spin. Single zero · house edge on 0.",
+    message: "One bet per spin. Pick a number or an outside box — the house sets the payout.",
     history: [],
   };
 }
@@ -151,14 +149,8 @@ export function coveredNumbers(bet: Bet): number[] {
   return [];
 }
 
-function oddsFor(kind: BetKind): number {
-  if (kind === "straight") return PAYOUTS.straight;
-  if (kind === "split") return PAYOUTS.split;
-  if (kind === "street") return PAYOUTS.street;
-  if (kind === "corner") return PAYOUTS.corner;
-  if (kind === "sixline") return PAYOUTS.sixline;
-  if (kind === "column" || kind === "dozen") return PAYOUTS.column;
-  return PAYOUTS.even;
+export function oddsForBet(bet: Bet): number {
+  return houseOdds(coveredNumbers(bet).length);
 }
 
 export function totalStake(state: RouletteState): number {
@@ -172,7 +164,8 @@ export function placeBet(
 ): RouletteState {
   if (state.phase !== "bet") return state;
   const stake = state.chipSize;
-  if (stake <= 0 || state.chips < stake) {
+  const bank = state.chips + totalStake(state);
+  if (stake <= 0 || bank < stake) {
     return { ...state, message: "Not enough chips." };
   }
 
@@ -205,11 +198,15 @@ export function placeBet(
   }
 
   const bet: Bet = { id: betId(), kind, numbers, index, stake };
+  const odds = oddsForBet(bet);
+  const replaced = state.bets.length > 0;
   return {
     ...state,
-    chips: state.chips - stake,
-    bets: [...state.bets, bet],
-    message: `Bet ${stake} on ${labelBet(bet)}.`,
+    chips: bank - stake,
+    bets: [bet],
+    message: replaced
+      ? `One bet: ${stake} on ${labelBet(bet)}. Previous stake returned.`
+      : `One bet: ${stake} on ${labelBet(bet)}. House pays ${odds}:1.`,
   };
 }
 
@@ -236,20 +233,21 @@ export function undoBet(state: RouletteState): RouletteState {
 }
 
 export function labelBet(bet: Bet): string {
-  if (bet.kind === "straight") return `${bet.numbers[0]} (35:1)`;
-  if (bet.kind === "split") return `Split ${bet.numbers.join("-")} (17:1)`;
-  if (bet.kind === "street") return `Street ${bet.numbers[0]}-${bet.numbers[2]} (11:1)`;
-  if (bet.kind === "corner") return `Corner ${bet.numbers[0]} (8:1)`;
-  if (bet.kind === "sixline") return `Six line ${bet.numbers[0]}-${bet.numbers[5]} (5:1)`;
-  if (bet.kind === "column") return `Column ${bet.index} (2:1)`;
-  if (bet.kind === "dozen") return `Dozen ${bet.index} (2:1)`;
-  if (bet.kind === "red") return "Red (1:1)";
-  if (bet.kind === "black") return "Black (1:1)";
-  if (bet.kind === "odd") return "Odd (1:1)";
-  if (bet.kind === "even") return "Even (1:1)";
-  if (bet.kind === "low") return "1–18 (1:1)";
-  if (bet.kind === "high") return "19–36 (1:1)";
-  return bet.kind;
+  const odds = `${oddsForBet(bet)}:1`;
+  if (bet.kind === "straight") return `${bet.numbers[0]} (${odds})`;
+  if (bet.kind === "split") return `Split ${bet.numbers.join("-")} (${odds})`;
+  if (bet.kind === "street") return `Street ${bet.numbers[0]}-${bet.numbers[2]} (${odds})`;
+  if (bet.kind === "corner") return `Corner ${bet.numbers[0]} (${odds})`;
+  if (bet.kind === "sixline") return `Six line ${bet.numbers[0]}-${bet.numbers[5]} (${odds})`;
+  if (bet.kind === "column") return `Column ${bet.index} (${odds})`;
+  if (bet.kind === "dozen") return `Dozen ${bet.index} (${odds})`;
+  if (bet.kind === "red") return `Red (${odds})`;
+  if (bet.kind === "black") return `Black (${odds})`;
+  if (bet.kind === "odd") return `Odd (${odds})`;
+  if (bet.kind === "even") return `Even (${odds})`;
+  if (bet.kind === "low") return `1–18 (${odds})`;
+  if (bet.kind === "high") return `19–36 (${odds})`;
+  return `${bet.kind} (${odds})`;
 }
 
 function betWins(bet: Bet, result: number): boolean {
@@ -264,7 +262,7 @@ export function settleBets(bets: Bet[], result: number): { win: number; details:
   const details: string[] = [];
   for (const bet of bets) {
     if (!betWins(bet, result)) continue;
-    const odds = oddsFor(bet.kind);
+    const odds = oddsForBet(bet);
     const payout = bet.stake * (odds + 1);
     win += payout;
     details.push(`${labelBet(bet)} → +${payout}`);
@@ -310,7 +308,7 @@ export function wheelDegForPocket(currentDeg: number, index: number, extraTurns:
  */
 export function beginSpin(state: RouletteState, result?: number): RouletteState {
   if (state.phase !== "bet") return state;
-  if (!state.bets.length) return { ...state, message: "Place at least one bet." };
+  if (!state.bets.length) return { ...state, message: "Place your one bet first." };
   const pocket =
     result !== undefined && result >= 0 && result <= 36
       ? result
@@ -352,7 +350,7 @@ export function nextRound(state: RouletteState): RouletteState {
     phase: "bet",
     result: null,
     lastWin: 0,
-    message: state.chips > 0 ? "Place your bets." : "Out of chips — reset practice stack.",
+    message: state.chips > 0 ? "One bet per spin. The house sets the payout." : "Out of chips — reset practice stack.",
   };
 }
 

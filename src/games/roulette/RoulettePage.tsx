@@ -3,19 +3,18 @@ import {
   WHEEL_ORDER,
   beginSpin,
   clearBets,
+  coveredNumbers,
   finishSpin,
   labelBet,
   nextRound,
+  oddsForBet,
   placeBet,
   pocketColor,
   resetStack,
   setChipSize,
-  sixlineFromLow,
   startRoulette,
-  streetOf,
   totalStake,
   undoBet,
-  cornerFromLow,
   type BetKind,
   type RouletteState,
 } from "./engine";
@@ -25,13 +24,9 @@ import { useAuth } from "../../context/AuthContext";
 
 const CHIP_SIZES = [1, 5, 10, 25, 50, 100];
 
-type InsideMode = "straight" | "split" | "street" | "corner" | "sixline";
-
 export function RoulettePage() {
   const { user, setChips } = useAuth();
   const [state, setState] = useState<RouletteState>(() => startRoulette(user?.chips ?? 1000));
-  const [mode, setMode] = useState<InsideMode>("straight");
-  const [splitPick, setSplitPick] = useState<number | null>(null);
 
   useEffect(() => {
     if (state.phase !== "spinning") return;
@@ -56,49 +51,7 @@ export function RoulettePage() {
 
   function onNumber(n: number) {
     if (state.phase !== "bet") return;
-    if (mode === "straight") {
-      setState((s) => placeBet(s, "straight", { numbers: [n] }));
-      return;
-    }
-    if (mode === "street") {
-      const st = n === 0 ? null : streetOf(n);
-      if (!st) {
-        setState((s) => ({ ...s, message: "Street is for 1–36 rows." }));
-        return;
-      }
-      setState((s) => placeBet(s, "street", { numbers: st }));
-      return;
-    }
-    if (mode === "sixline") {
-      const st = n === 0 ? null : streetOf(n);
-      if (!st) return;
-      const lo = st[0]! <= 31 ? st[0]! : null;
-      const six = lo != null ? sixlineFromLow(lo) : null;
-      if (!six) {
-        setState((s) => ({ ...s, message: "No six-line from the last street." }));
-        return;
-      }
-      setState((s) => placeBet(s, "sixline", { numbers: six }));
-      return;
-    }
-    if (mode === "corner") {
-      const c = n === 0 ? null : cornerFromLow(n);
-      if (!c) {
-        setState((s) => ({ ...s, message: "Corner: click the lower-left number of a 2×2." }));
-        return;
-      }
-      setState((s) => placeBet(s, "corner", { numbers: c }));
-      return;
-    }
-    if (mode === "split") {
-      if (splitPick === null) {
-        setSplitPick(n);
-        setState((s) => ({ ...s, message: `Split: now pick a neighbor of ${n}.` }));
-        return;
-      }
-      setState((s) => placeBet(s, "split", { numbers: [splitPick, n] }));
-      setSplitPick(null);
-    }
+    setState((s) => placeBet(s, "straight", { numbers: [n] }));
   }
 
   function outside(kind: BetKind, index?: 1 | 2 | 3) {
@@ -106,15 +59,16 @@ export function RoulettePage() {
   }
 
   function spin() {
-    setSplitPick(null);
     setState((s) => beginSpin(s));
   }
 
   function fresh() {
     const chips = user?.chips ?? 1000;
-    setSplitPick(null);
     setState(resetStack(state, chips));
   }
+
+  const bet = state.bets[0] ?? null;
+  const coverSet = new Set(bet ? coveredNumbers(bet) : []);
 
   const streets = Array.from({ length: 12 }, (_, i) => [3 * i + 1, 3 * i + 2, 3 * i + 3] as const);
 
@@ -129,8 +83,8 @@ export function RoulettePage() {
           <RulesButton game="roulette">
             <h3>Solo casino</h3>
             <p>
-              Practice against the house on a European single-zero wheel. Logged-in chips sync after each spin; guests
-              use a local stack.
+              One bet per spin. Click a number or an outside box; the house pays ⌊36 ÷ n⌋ − 1, where n is how many
+              pockets that bet covers. Logged-in chips sync after each spin.
             </p>
           </RulesButton>
           <button className="btn btn-ghost" type="button" onClick={fresh}>
@@ -190,6 +144,11 @@ export function RoulettePage() {
                 <span>
                   Stake <b>{totalStake(state)}</b>
                 </span>
+                {bet ? (
+                  <span>
+                    House <b>{oddsForBet(bet)}:1</b>
+                  </span>
+                ) : null}
                 {state.lastWin > 0 ? (
                   <span>
                     Won <b>{state.lastWin}</b>
@@ -211,35 +170,10 @@ export function RoulettePage() {
                 ))}
               </div>
 
-              <div className="roulette-mode-row">
-                {(
-                  [
-                    ["straight", "Straight 35:1"],
-                    ["split", "Split 17:1"],
-                    ["street", "Street 11:1"],
-                    ["corner", "Corner 8:1"],
-                    ["sixline", "Six 5:1"],
-                  ] as const
-                ).map(([m, label]) => (
-                  <button
-                    key={m}
-                    type="button"
-                    className={`btn btn-ghost${mode === m ? " on" : ""}`}
-                    disabled={state.phase !== "bet"}
-                    onClick={() => {
-                      setMode(m);
-                      setSplitPick(null);
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
               <div className="roulette-felt" role="grid" aria-label="Betting board">
                 <button
                   type="button"
-                  className="rb-zero tone-green"
+                  className={`rb-zero tone-green${coverSet.has(0) ? " on" : ""}`}
                   disabled={state.phase !== "bet"}
                   onClick={() => onNumber(0)}
                 >
@@ -252,7 +186,7 @@ export function RoulettePage() {
                         <button
                           key={n}
                           type="button"
-                          className={`rb-num tone-${pocketColor(n)}`}
+                          className={`rb-num tone-${pocketColor(n)}${coverSet.has(n) ? " on" : ""}`}
                           disabled={state.phase !== "bet"}
                           onClick={() => onNumber(n)}
                         >
@@ -267,11 +201,11 @@ export function RoulettePage() {
                     <button
                       key={col}
                       type="button"
-                      className="rb-out"
+                      className={`rb-out${bet?.kind === "column" && bet.index === col ? " on" : ""}`}
                       disabled={state.phase !== "bet"}
                       onClick={() => outside("column", col)}
                     >
-                      2:1
+                      Col {col}
                     </button>
                   ))}
                 </div>
@@ -280,7 +214,7 @@ export function RoulettePage() {
                     <button
                       key={d}
                       type="button"
-                      className="rb-out"
+                      className={`rb-out${bet?.kind === "dozen" && bet.index === d ? " on" : ""}`}
                       disabled={state.phase !== "bet"}
                       onClick={() => outside("dozen", d)}
                     >
@@ -289,15 +223,25 @@ export function RoulettePage() {
                   ))}
                 </div>
                 <div className="rb-even">
-                  <button type="button" className="rb-out" disabled={state.phase !== "bet"} onClick={() => outside("low")}>
+                  <button
+                    type="button"
+                    className={`rb-out${bet?.kind === "low" ? " on" : ""}`}
+                    disabled={state.phase !== "bet"}
+                    onClick={() => outside("low")}
+                  >
                     1–18
                   </button>
-                  <button type="button" className="rb-out" disabled={state.phase !== "bet"} onClick={() => outside("even")}>
+                  <button
+                    type="button"
+                    className={`rb-out${bet?.kind === "even" ? " on" : ""}`}
+                    disabled={state.phase !== "bet"}
+                    onClick={() => outside("even")}
+                  >
                     Even
                   </button>
                   <button
                     type="button"
-                    className="rb-out tone-red"
+                    className={`rb-out tone-red${bet?.kind === "red" ? " on" : ""}`}
                     disabled={state.phase !== "bet"}
                     onClick={() => outside("red")}
                   >
@@ -305,28 +249,39 @@ export function RoulettePage() {
                   </button>
                   <button
                     type="button"
-                    className="rb-out tone-black"
+                    className={`rb-out tone-black${bet?.kind === "black" ? " on" : ""}`}
                     disabled={state.phase !== "bet"}
                     onClick={() => outside("black")}
                   >
                     Black
                   </button>
-                  <button type="button" className="rb-out" disabled={state.phase !== "bet"} onClick={() => outside("odd")}>
+                  <button
+                    type="button"
+                    className={`rb-out${bet?.kind === "odd" ? " on" : ""}`}
+                    disabled={state.phase !== "bet"}
+                    onClick={() => outside("odd")}
+                  >
                     Odd
                   </button>
-                  <button type="button" className="rb-out" disabled={state.phase !== "bet"} onClick={() => outside("high")}>
+                  <button
+                    type="button"
+                    className={`rb-out${bet?.kind === "high" ? " on" : ""}`}
+                    disabled={state.phase !== "bet"}
+                    onClick={() => outside("high")}
+                  >
                     19–36
                   </button>
                 </div>
               </div>
 
               <ul className="roulette-bet-list">
-                {state.bets.length === 0 ? <li>No bets yet.</li> : null}
-                {state.bets.map((b) => (
-                  <li key={b.id}>
-                    {b.stake} · {labelBet(b)}
+                {bet ? (
+                  <li>
+                    {bet.stake} · {labelBet(bet)} · house {oddsForBet(bet)}:1
                   </li>
-                ))}
+                ) : (
+                  <li>No bet yet. One stake per spin.</li>
+                )}
               </ul>
 
               <div className="row-actions" style={{ justifyContent: "center", flexWrap: "wrap" }}>
