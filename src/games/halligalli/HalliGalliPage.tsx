@@ -217,7 +217,7 @@ export function HalliGalliPage() {
                     ))}
                   </ul>
                 ) : null}
-                <MixedCpuBar game="halli" onPractice={() => setLocal(startHalliPractice())} />
+                <MixedCpuBar game="halli" onPractice={(cpus) => setLocal(startHalliPractice(cpus + 1))} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
                   {waiting ? (
                     host && (state?.players.length ?? 0) >= 2 ? (

@@ -173,7 +173,7 @@ export function WerewolfPage() {
                     ))}
                   </ul>
                 ) : null}
-                <MixedCpuBar game="werewolf" onPractice={() => setLocal(startWerewolfPractice())} />
+                <MixedCpuBar game="werewolf" onPractice={(cpus) => setLocal(startWerewolfPractice(cpus + 1))} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
                   {waiting ? (
                     host && (state?.players.length ?? 0) >= WOLF_MIN ? (

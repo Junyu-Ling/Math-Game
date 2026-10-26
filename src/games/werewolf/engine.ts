@@ -108,16 +108,16 @@ export function startWerewolfLobby(people: Array<{ id: string; name: string; hum
   };
 }
 
-/** Local guest practice — you + five CPUs. */
-export function startWerewolfPractice(): WState {
-  return beginWerewolfMatch([
-    { id: "you", name: "YOU" },
-    { id: "cpu-1", name: "CPU", human: false },
-    { id: "cpu-2", name: "CPU 2", human: false },
-    { id: "cpu-3", name: "CPU 3", human: false },
-    { id: "cpu-4", name: "CPU 4", human: false },
-    { id: "cpu-5", name: "CPU 5", human: false },
-  ]);
+/** Local guest practice — you plus CPUs. Default is five CPUs. */
+export function startWerewolfPractice(seats = 6): WState {
+  const n = Math.max(WOLF_MIN, Math.min(WOLF_MAX, Math.floor(seats) || 6));
+  return beginWerewolfMatch(
+    Array.from({ length: n }, (_, i) => ({
+      id: i === 0 ? "you" : `cpu-${i}`,
+      name: i === 0 ? "YOU" : i === 1 ? "CPU" : `CPU ${i}`,
+      human: i === 0,
+    })),
+  );
 }
 
 function beginWerewolfMatch(people: Array<{ id: string; name: string; human?: boolean }>): WState {

@@ -854,6 +854,12 @@
   color: #6b7280;
 }
 
+.cpu-count b {
+  min-width: 5.2em;
+  font-size: 14px;
+  font-weight: 650;
+}
+
 .lobby-roster {
   list-style: none;
   margin: 0 0 16px;

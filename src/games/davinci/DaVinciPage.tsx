@@ -377,6 +377,14 @@ export function DaVinciPage() {
   const waiting = Boolean(state?.phase === "lobby");
   const playing = state !== null && !waiting;
   const openN = openingCount(waiting && state ? state.players.length : seats);
+
+  function setTableSize(n: number) {
+    setSeats(n);
+    const next = openingCount(n);
+    const black = Math.min(blackN, next);
+    setBlackN(black);
+    setWhiteN(next - black);
+  }
   const you = state && (playing || waiting)
     ? (youId ? state.players.find((p) => p.id === youId) : state.players[0]) ?? state.players[0]
     : null;
@@ -723,13 +731,7 @@ export function DaVinciPage() {
                           key={n}
                           className={`btn ${seats === n ? "" : "btn-ghost"}`}
                           type="button"
-                          onClick={() => {
-                            setSeats(n);
-                            const next = openingCount(n);
-                            const black = Math.min(blackN, next);
-                            setBlackN(black);
-                            setWhiteN(next - black);
-                          }}
+                          onClick={() => setTableSize(n)}
                         >
                           {n}P{n === 4 ? " · 3 tiles" : ""}
                         </button>
@@ -739,6 +741,8 @@ export function DaVinciPage() {
                   <MixedCpuBar
                     game="coda"
                     meta={{ useJokers: jokers }}
+                    cpus={seats - 1}
+                    onCpus={(n) => setTableSize(n + 1)}
                     onPractice={() => {
                       setYouId("you");
                       setState(startCoda(jokers, blackN, whiteN, seats));

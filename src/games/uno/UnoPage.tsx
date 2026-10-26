@@ -283,7 +283,7 @@ export function UnoPage() {
                   ))}
                 </ul>
               ) : null}
-              <MixedCpuBar game="uno" onPractice={() => setLocal(startUnoPractice())} />
+              <MixedCpuBar game="uno" onPractice={(cpus) => setLocal(startUnoPractice(cpus + 1))} />
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {waiting ? (
                   host && (state?.players.length ?? 0) >= 2 ? (

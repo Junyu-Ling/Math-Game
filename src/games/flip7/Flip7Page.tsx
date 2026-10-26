@@ -8,7 +8,7 @@ import {
   currentFlip,
   cardLabel,
   liveTotal,
-  startFlip7Practice,
+  startFlip7,
   startFlip7Solo,
   type FlipAction,
   type FlipDraw,
@@ -383,7 +383,7 @@ export function Flip7Page() {
                 <MixedCpuBar
                   game="flip7"
                   onSolo={() => setLocal(startFlip7Solo())}
-                  onPractice={() => setLocal(startFlip7Practice())}
+                  onPractice={(cpus) => setLocal(startFlip7(cpus + 1))}
                 />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
                   {waiting ? (

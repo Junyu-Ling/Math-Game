@@ -306,7 +306,7 @@ export function LudoPage() {
                   ))}
                 </ul>
               ) : null}
-              <MixedCpuBar game="ludo" onPractice={() => setLocal(startLudoPractice())} />
+              <MixedCpuBar game="ludo" onPractice={(cpus) => setLocal(startLudoPractice(cpus + 1))} />
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {waiting ? (
                   host && (state?.players.length ?? 0) >= 2 ? (

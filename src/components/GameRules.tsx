@@ -55,7 +55,7 @@ const RULES: Record<string, string[]> = {
     "Black fouls: double live three (two live threes), double live four (two live fours with both ends open), or overline (six+). A blocked line is not live — sleeping threes and rush fours do not count. Exact five wins. White has no fouls.",
   ],
   ludo: [
-    "2–4 players. Each color has four planes. Practice is you (blue) against a red CPU. Open a table for a full set of seats.",
+    "2–4 players. Each color has four planes. Practice is you (blue) plus 1–3 CPUs.",
     "Roll a die. A 6 takes one plane from the hangar onto your ready square, or moves a plane 6 steps. A 6 gives another roll, up to three sixes; the third six still moves, then the turn passes.",
     "Move counter-clockwise on the shared track, then along your own colored home stretch. You need an exact roll to land on the center. First to bring all four planes home wins.",
     "Landing on one opponent plane sends it back to its hangar. Two or more of your own planes on a square stack into a block — opponents cannot land there, but they can move past it. Each plane still moves on its own.",
@@ -72,7 +72,7 @@ const RULES: Record<string, string[]> = {
   werewolf: [
     "4–8 players. Roles: Werewolf(s), Villager, Seer, Witch. Night: wolves kill, Seer checks one, Witch may save and/or poison once each.",
     "Dawn shows who died. Day vote eliminates one. Wolves win if they equal or outnumber the living village; village wins when all wolves are dead.",
-    "Simplified party rules — no Hunter, Guard, or speech timer. Practice seats you with five CPUs.",
+    "Simplified party rules — no Hunter, Guard, or speech timer. Practice is you plus 3–7 CPUs.",
   ],
   roulette: [
     "Solo European roulette (single zero 0–36) against the house. Place chips, then spin.",

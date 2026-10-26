@@ -8,17 +8,27 @@ export function MixedCpuBar({
   meta,
   onPractice,
   onSolo,
+  cpus: cpusProp,
+  onCpus,
 }: {
   game: string;
   meta?: Record<string, unknown>;
-  /** Local Practice vs CPU — no login / Open table required. */
-  onPractice?: () => void;
+  /** Local Practice vs CPU — no login / Open table required. Argument is how many CPUs. */
+  onPractice?: (cpus: number) => void;
   /** Local solo practice — no opponents. */
   onSolo?: () => void;
+  /** Controlled CPU count, when the page already tracks table size. */
+  cpus?: number;
+  onCpus?: (cpus: number) => void;
 }) {
   const { user } = useAuth();
   const { room, error, adjustCpu } = useLobby();
   const [busy, setBusy] = useState(false);
+  const cpuMax = Math.max(1, tableMax(game) - 1);
+  const cpuMin = Math.max(1, minStart(game) - 1);
+  const [ownCpus, setOwnCpus] = useState(() => (game === "werewolf" ? 5 : cpuMin));
+  const cpus = Math.max(cpuMin, Math.min(cpuMax, cpusProp ?? ownCpus));
+  const pickCpus = cpuMax > cpuMin;
   const here = Boolean(room && room.game === game);
   const host = Boolean(user && (!here || room?.seats[0] === user.id));
   const seats = here ? room?.seats || [] : [];
@@ -32,6 +42,17 @@ export function MixedCpuBar({
   const atTable = here && waiting && host;
   const canOpen = Boolean(user && !busy && (!here || !waiting || host));
   const showPractice = Boolean(onPractice && !atTable && !waiting);
+
+  function setCpus(next: number) {
+    const n = Math.max(cpuMin, Math.min(cpuMax, next));
+    onCpus?.(n);
+    if (cpusProp == null) setOwnCpus(n);
+  }
+
+  function practiceLabel() {
+    if (!pickCpus) return "Practice vs CPU";
+    return `Practice vs ${cpus} CPU${cpus === 1 ? "" : "s"}`;
+  }
 
   async function run(mode: "open" | "add" | "remove" | "fill") {
     if (busy) return;
@@ -57,14 +78,15 @@ export function MixedCpuBar({
         </p>
         {onPractice || onSolo ? (
           <div className="row-actions" style={{ justifyContent: "center" }}>
+            {showPractice && pickCpus ? <CpuCount cpus={cpus} min={cpuMin} max={cpuMax} onChange={setCpus} /> : null}
             {onSolo ? (
               <button className="btn btn-ghost" type="button" onClick={onSolo}>
                 Practice Solo
               </button>
             ) : null}
             {onPractice ? (
-              <button className="btn" type="button" onClick={onPractice}>
-                Practice vs CPU
+              <button className="btn" type="button" onClick={() => onPractice(cpus)}>
+                {practiceLabel()}
               </button>
             ) : null}
           </div>
@@ -89,14 +111,15 @@ export function MixedCpuBar({
               : `Add CPUs or invite humans, then start with ${minStart(game)}–${max}.`}
       </p>
       <div className="row-actions" style={{ justifyContent: "center" }}>
+        {showPractice && pickCpus ? <CpuCount cpus={cpus} min={cpuMin} max={cpuMax} onChange={setCpus} /> : null}
         {showPractice && onSolo ? (
           <button className="btn btn-ghost" type="button" onClick={onSolo}>
             Practice Solo
           </button>
         ) : null}
         {showPractice ? (
-          <button className="btn btn-ghost" type="button" onClick={onPractice}>
-            Practice vs CPU
+          <button className="btn btn-ghost" type="button" onClick={() => onPractice?.(cpus)}>
+            {practiceLabel()}
           </button>
         ) : null}
         {!atTable ? (
@@ -120,6 +143,32 @@ export function MixedCpuBar({
         )}
       </div>
       {error ? <p className="msg err">{error}</p> : null}
+    </div>
+  );
+}
+
+function CpuCount({
+  cpus,
+  min,
+  max,
+  onChange,
+}: {
+  cpus: number;
+  min: number;
+  max: number;
+  onChange: (next: number) => void;
+}) {
+  return (
+    <div className="deal-step cpu-count" role="group" aria-label="CPUs">
+      <button type="button" disabled={cpus <= min} onClick={() => onChange(cpus - 1)} aria-label="Fewer CPUs">
+        −
+      </button>
+      <b>
+        {cpus} CPU{cpus === 1 ? "" : "s"}
+      </b>
+      <button type="button" disabled={cpus >= max} onClick={() => onChange(cpus + 1)} aria-label="More CPUs">
+        +
+      </button>
     </div>
   );
 }
