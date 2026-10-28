@@ -52,12 +52,10 @@ function HalliSeat({
   player,
   className,
   turn,
-  mine,
 }: {
   player: HalliPlayer;
   className: string;
   turn: boolean;
-  mine?: boolean;
 }) {
   const top = topOpen(player);
   return (
@@ -280,7 +278,7 @@ export function HalliGalliPage() {
                 </div>
               </div>
               {seated.right ? <HalliSeat player={seated.right} className="seat-right" turn={cur?.id === seated.right.id} /> : null}
-              <HalliSeat player={me} className="seat-you" turn={myTurn} mine />
+              <HalliSeat player={me} className="seat-you" turn={myTurn} />
             </>
           )}
         </div>
