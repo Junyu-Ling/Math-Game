@@ -171,12 +171,12 @@ export function Home() {
           </p>
           <h1>Play on a quiet table.</h1>
           <p className="lede">
-            Six tables are open for STEAM Week — cards, stones, and wolves. Number games wait for MATH WEEK.
+            Every table is open. STEAM Week and MATH Week stay in two lists so you can find them later.
           </p>
         </div>
         <div className="hero-stage" aria-hidden>
-          <UnoFace card={{ id: "h1", color: "red", kind: "number", value: 7 }} />
-          <UnoFace card={{ id: "h2", color: "yellow", kind: "skip" }} />
+          <FlipFace card={{ id: "h1", kind: "number", value: 12 }} />
+          <MahjongTile hide={false} tile={{ color: "white", value: "joker", revealed: true }} />
           <UnoFace card={{ id: "h3", color: "black", kind: "wild4" }} />
         </div>
       </section>
@@ -191,8 +191,8 @@ export function Home() {
         </section>
       ))}
       <p className="section-note">
-        STEAM Week tables are open now — including Da Vinci Code and Werewolf. Sign in to invite someone, or practice vs
-        CPU. MATH WEEK keeps Flip 7, Blackjack, Hold’em, roulette, and slots until that week starts.
+        Every table is open. Sign in to invite someone, or practice vs CPU. STEAM Week and MATH Week stay listed
+        separately.
       </p>
     </div>
   );

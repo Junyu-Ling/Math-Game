@@ -23,8 +23,8 @@ export type CatalogGame = {
   week: EventWeek;
 };
 
-/** STEAM Week is live. Add "math" here when MATH WEEK opens the rest. */
-export const OPEN_WEEKS: readonly EventWeek[] = ["steam"];
+/** Both lists stay on the home page. Drop a week here if it should close later. */
+export const OPEN_WEEKS: readonly EventWeek[] = ["steam", "math"];
 
 export const STEAM_WEEK = {
   label: "STEAM Week",
@@ -33,7 +33,7 @@ export const STEAM_WEEK = {
 
 export const MATH_WEEK = {
   label: "MATH Week",
-  dates: "Coming next",
+  dates: "Open now",
 };
 
 export const CATALOG: CatalogGame[] = [
