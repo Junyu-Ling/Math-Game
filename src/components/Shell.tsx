@@ -5,6 +5,7 @@ import { usePlayMeta } from "../lib/playMeta";
 import { Avatar } from "./Avatar";
 import { InvitePanel } from "./InvitePanel";
 import { InviteToasts } from "./InviteToasts";
+import { RotateGate } from "./RotateGate";
 
 const GAME_BY_PATH: Record<string, string> = {
   "/play/davinci": "coda",
@@ -93,6 +94,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </nav>
       </header>
       <InviteToasts />
+      <RotateGate />
       <main>{children}</main>
     </div>
   );
