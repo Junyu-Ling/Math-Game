@@ -123,8 +123,10 @@ export function ArmyPage() {
               </div>
               <p className="status-line">
                 {state.phase === "over"
-                  ? forfeitText(state) || `${state.players.find((p) => p.id === state.winnerId)?.name} wins`
-                  : `${state.players[state.turn]?.name}'s turn`}
+                  ? forfeitText(state) || `${state.players.find((p) => p.id === state.winnerId)?.name} captured the flag.`
+                  : myTurn
+                    ? "Your turn. Tap a piece, then a square. Higher rank wins a clash; equal ranks both fall. Bomb trades with anything. Only Engineer clears mines. Capture the rival 军旗 to win."
+                    : `Wait — ${state.players[state.turn]?.name} is moving. Higher rank wins a clash; equal ranks both fall. Capture the rival flag to win.`}
               </p>
               <div className="army-board">
                 {Array.from({ length: ROWS }, (_, r) =>

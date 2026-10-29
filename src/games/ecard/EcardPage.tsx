@@ -379,8 +379,8 @@ export function EcardPage() {
               <h2>{iChooseRole ? "You won RPS — pick a side" : "Waiting for rival to pick"}</h2>
               <p className="status-line">
                 {iChooseRole
-                  ? "Winner chooses Emperor or Slave. The other side takes the remaining role."
-                  : `${state.players.find((p) => p.id === state.roleChooserId)?.name || "Rival"} is choosing.`}
+                  ? "You won RPS. Pick Emperor (E + 4 Citizens) or Slave (S + 4 Citizens). Emperor beats Citizen; Slave beats Emperor."
+                  : `${state.players.find((p) => p.id === state.roleChooserId)?.name || "Rival"} is choosing Emperor or Slave.`}
               </p>
               <div className="ecard-role-row">
                 <button
@@ -451,16 +451,16 @@ export function EcardPage() {
                       ? `${state.players.find((p) => p.id === state.winnerId)?.name || ""} wins ${state.score[me.id] || 0}–${state.score[rival.id] || 0}`
                       : `Draw ${state.score[me.id] || 0}–${state.score[rival.id] || 0}`)
                   : state.phase === "reveal"
-                    ? state.log.at(-1)?.text || "Reveal"
+                    ? `${state.log.at(-1)?.text || "Reveal"}. Emperor beats Citizen (+1, Emperor returns). Slave beats Emperor (+5, round ends). Citizen beats Slave (+1, round ends).`
                     : me.locked
                       ? rival.locked
-                        ? "Revealing…"
-                        : "Locked. Waiting for rival…"
+                        ? "Both locked. Cards will flip — remember Emperor > Citizen > Slave > Emperor."
+                        : "You locked. Wait for the rival to lock, then both cards flip."
                       : myTurnPick
-                        ? "Choose a card, then lock."
+                        ? "Pick one card from your hand, then press LOCK. Emperor beats Citizen; Citizen beats Slave; Slave beats Emperor."
                         : me.selectedId
-                          ? "Card selected — press LOCK when ready."
-                          : "Waiting…"}
+                          ? "Card selected. Press LOCK when you are sure — you cannot change after lock."
+                          : "Wait for the other side. You will pick one hidden card each round."}
               </p>
               <div className="ecard-hand">
                 {me.hand.map((c) => (

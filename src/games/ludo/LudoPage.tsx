@@ -324,10 +324,12 @@ export function LudoPage() {
             <div className="fly-wrap">
               <p className="status-line">
                 {state.phase === "over"
-                  ? forfeitText(state) || `${winner?.name ?? "Someone"} wins`
-                  : `${cur?.name ?? ""} · ${state.phase === "roll" ? "roll the die" : "choose a plane"}${
-                      state.sixes ? ` · six ${state.sixes}/3` : ""
-                    }${me ? ` · you are ${me.color}` : ""}`}
+                  ? forfeitText(state) || `${winner?.name ?? "Someone"} got all four planes home.`
+                  : `${cur?.name ?? ""} · ${
+                      state.phase === "roll"
+                        ? "roll the die. A 6 takes a plane off the hangar, or moves 6, and you roll again (max three sixes)."
+                        : "tap one of your planes that can move this roll. Land on a lone rival to send it home. Exact roll to enter the center."
+                    }${state.sixes ? ` · six ${state.sixes}/3` : ""}${me ? ` · you are ${me.color}` : ""}`}
               </p>
               <div className="fly-board">
                 <div className="fly-sheet">

@@ -181,6 +181,17 @@ export function HoldemPage() {
                 <p className="status-line">
                   Pot {state.pot} · {state.message}
                 </p>
+                <p className="coach-line">
+                  {state.street === "showdown"
+                    ? "Best five-card hand from your two hole cards plus the board. Tap Next hand to deal again."
+                    : state.street === "over"
+                      ? "One stack is gone, so the table is over."
+                      : !myTurn
+                        ? "Wait for the other seat. Fold gives up the pot. Call matches the bet. Raise makes them pay more. All in is your whole stack."
+                        : toCall > 0
+                          ? `To stay in, call ${toCall} (or all in if you have less). Fold throws these cards away. Raise to at least ${raiseMin}, or shove.`
+                          : `Nobody to call. Check to see the next card for free, or bet from ${raiseMin} up to all in.`}
+                </p>
               </div>
               <div className="seat seat-you">
                 <div className="seat-label">

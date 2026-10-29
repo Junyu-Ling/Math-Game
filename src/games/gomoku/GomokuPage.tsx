@@ -284,7 +284,7 @@ export function GomokuPage() {
             </div>
           ) : state.phase === "rps" ? (
             <div className="coda-deal coda-rps">
-              <p className="status-line">Winner plays black</p>
+              <p className="status-line">Rock-paper-scissors first. Winner plays black; loser plays white. First exact five in a row wins.</p>
               <div className="rps-arena">
                 <div className="rps-side rival">
                   <span className="rps-name">
@@ -326,8 +326,8 @@ export function GomokuPage() {
                   : rpsReveal
                     ? "…"
                     : myRpsThrow
-                      ? "Waiting for rival…"
-                      : "Throw. Winner plays black."}
+                      ? "Thrown. Waiting for the rival. Winner of rock-paper-scissors plays black."
+                      : "Throw rock, paper, or scissors. Winner plays black; loser plays white. First exact five in a row wins."}
               </p>
               <div className="rps-row">
                 {RPS_CHOICES.map((c) => (
@@ -356,11 +356,13 @@ export function GomokuPage() {
                 {state.phase === "over"
                   ? forfeitText(state) ||
                     (state.foul
-                      ? `Black foul (${foulLabel(state.foul.kind)}) — ${state.players.find((p) => p.id === state.winnerId)?.name || "White"} wins`
+                      ? `Black foul (${foulLabel(state.foul.kind)}) — ${state.players.find((p) => p.id === state.winnerId)?.name || "White"} wins. Black cannot make two live threes, two live fours, or six in a row.`
                       : state.winnerId
-                        ? `${state.players.find((p) => p.id === state.winnerId)?.name} wins`
-                        : "Draw")
-                  : `${state.players[state.turn]?.name}'s turn · you are ${me.stone === 1 ? "black" : "white"}`}
+                        ? `${state.players.find((p) => p.id === state.winnerId)?.name} gets exactly five in a row and wins.`
+                        : "Draw — the board filled with no five.")
+                  : myTurn
+                    ? `Your turn (${me.stone === 1 ? "black" : "white"}). Place one stone. First exact five in a row wins.${me.stone === 1 ? " Black cannot make two live threes, two live fours, or an overline (six+)." : " White has no fouls."}`
+                    : `Wait — ${state.players[state.turn]?.name} places a stone. You are ${me.stone === 1 ? "black" : "white"}.`}
               </p>
               {state.foul ? (
                 <p className="gomoku-foul-tip" role="alert">

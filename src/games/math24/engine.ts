@@ -220,7 +220,7 @@ export function startM24Duel(
     round: 1,
     goal: 3,
     winnerId: null,
-    message: "Same cards. First to make 24 scores. First to 3 points.",
+    message: "Same four cards for both. Use each number once with + − × ÷ and brackets to make 24. First correct submit scores. First to 3 points wins.",
   };
 }
 

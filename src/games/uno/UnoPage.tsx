@@ -358,25 +358,25 @@ export function UnoPage() {
                   {state.phase === "over"
                     ? forfeitText(state) ||
                       (state.winnerId
-                        ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+                        ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} emptied their hand and wins.`
                         : state.log.at(-1)?.text || "Game over")
                     : state.pendingDraw > 0
                       ? state.stackKind === "wild4"
-                        ? `+${state.pendingDraw} · stack +4 only`
-                        : `+${state.pendingDraw} · stack +2 or +4`
+                        ? `Draw pile is +${state.pendingDraw}. You may stack another +4, or take the cards.`
+                        : `Draw pile is +${state.pendingDraw}. Stack a +2 or +4 to pass it on, or take the cards.`
                       : shoutArmed && myTurn
                         ? drewPlayable
-                          ? "Tap UNO, then play or keep"
-                          : "Tap UNO, then play"
+                          ? "You are about to have one card. Tap UNO first, then play the drawn card or keep it."
+                          : "You are about to have one card. Tap UNO beside your hand, then play."
                         : drewPlayable
-                          ? "Play the drawn card, or keep it"
+                          ? "You drew a card that fits. Play it now, or keep it and end your turn. You cannot draw again."
                           : myTurn
                             ? state.phase === "color"
-                              ? "Pick a wild color"
+                              ? "Wild is down. Pick the color everyone must match next."
                               : legalCards(state, me.id).length
-                                ? "Play a matching card"
-                                : "No match — draw one"
-                            : `${cur?.name} is acting`}
+                                ? "Your turn. Play a card that matches the color or the number/symbol on the discard."
+                                : "No card matches. Draw one from the deck. If it fits you may play it or keep it."
+                            : `Wait — ${cur?.name} is playing. Match color or number when it comes back to you.`}
                 </div>
               </div>
               {seated.right ? (

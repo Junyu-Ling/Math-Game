@@ -215,7 +215,7 @@ function startM24Duel(a, b) {
     round: 1,
     goal: 3,
     winnerId: null,
-    message: "Same cards. First to make 24 scores. First to 3 points."
+    message: "Same four cards for both. Use each number once with + \u2212 \xD7 \xF7 and brackets to make 24. First correct submit scores. First to 3 points wins."
   };
 }
 function applyM24Action(state, actorId, action) {

@@ -233,7 +233,7 @@ export function WerewolfPage() {
               <div className="wolf-actions">
                 {myWolfTurn ? (
                   <>
-                    <p>Pick a villager to attack tonight.</p>
+                    <p>Night. You are a werewolf. Pick one living villager to attack. If wolves equal the village, you win.</p>
                     <div className="row-actions" style={{ flexWrap: "wrap", justifyContent: "center" }}>
                       {alive
                         .filter((p) => p.role !== "werewolf" && p.id !== me.id)
@@ -253,7 +253,7 @@ export function WerewolfPage() {
 
                 {mySeerTurn ? (
                   <>
-                    <p>Check one living player.</p>
+                    <p>Night. You are the Seer. Check one living player — you will learn if they are a werewolf.</p>
                     <div className="row-actions" style={{ flexWrap: "wrap", justifyContent: "center" }}>
                       {alive
                         .filter((p) => p.id !== me.id)
@@ -273,7 +273,7 @@ export function WerewolfPage() {
 
                 {myWitchTurn ? (
                   <>
-                    <p>Save the marked player, poison someone, both, or pass.</p>
+                    <p>Night. You are the Witch. One save and one poison for the whole game. Save the marked player, poison someone, both, or pass.</p>
                     <div className="row-actions" style={{ flexWrap: "wrap", justifyContent: "center" }}>
                       {state.witchSaveLeft && state.wolfTarget ? (
                         <button
@@ -326,7 +326,7 @@ export function WerewolfPage() {
 
                 {myVoteTurn ? (
                   <>
-                    <p>Vote someone out.</p>
+                    <p>Day vote. Tap one living player to eliminate. Village wins when every wolf is gone; wolves win if they equal the village.</p>
                     <div className="row-actions" style={{ flexWrap: "wrap", justifyContent: "center" }}>
                       {alive
                         .filter((p) => p.id !== me.id)
@@ -356,7 +356,9 @@ export function WerewolfPage() {
                 !canDawn &&
                 !myVoteTurn &&
                 state.phase !== "over" ? (
-                  <p className="status-line">Waiting for other players…</p>
+                  <p className="status-line">
+                    Night and day take turns. Wolves kill at night, Seer checks, Witch may save or poison. By day everyone votes. Wait for the others to finish this step.
+                  </p>
                 ) : null}
               </div>
             </>

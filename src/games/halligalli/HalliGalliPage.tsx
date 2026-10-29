@@ -263,13 +263,13 @@ export function HalliGalliPage() {
                   {state.phase === "over"
                     ? forfeitText(state) ||
                       (state.winnerId
-                        ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins`
+                        ? `${state.players.find((p) => p.id === state.winnerId)?.name ?? ""} wins — last cards or first to the score goal.`
                         : state.log.at(-1)?.text || "Game over")
                     : hot
-                      ? `Five ${HALLI_LABEL[hot].toLowerCase()} — ring now!`
+                      ? `Five ${HALLI_LABEL[hot].toLowerCase()} are showing. Anyone may ring. First correct ring takes those fruit cards. Ringing when it is not five costs you cards.`
                       : myTurn
-                        ? "Your flip"
-                        : `${cur?.name ?? ""} is flipping…`}
+                        ? "Your turn. Flip one fruit card onto the table. Watch the fruit totals — five of one fruit means ring."
+                        : `Wait — ${cur?.name ?? "someone"} is flipping. You can still ring if five of one fruit appear.`}
                 </div>
                 <div className="row-actions" style={{ justifyContent: "center" }}>
                   <button className="btn" type="button" disabled={!myTurn || state.phase !== "play"} onClick={() => act({ type: "flip" })}>

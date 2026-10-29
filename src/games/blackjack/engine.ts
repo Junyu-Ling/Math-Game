@@ -275,7 +275,7 @@ export function startBjDuel(
     turn: 0,
     phase: "play",
     winnerId: null,
-    message: `${a.name} acts first. Closest to 21 without going over.`,
+    message: `${a.name} acts first. Hit to take another card, stand to keep this total. Closest to 21 without going over wins. Face cards count 10; aces 1 or 11.`,
   };
 }
 
@@ -343,7 +343,10 @@ export function applyBjDuelAction(state: BjDuelState, actorId: string, action: B
       ...state,
       players,
       deck,
-      message: total > 21 ? `${me.name} busts.` : `${me.name} ${total}`,
+      message:
+        total > 21
+          ? `${me.name} busts — over 21, this hand is lost.`
+          : `${me.name} is at ${total}. Hit for another card, or stand. Closest to 21 without going over wins.`,
     };
     if (stood && players.every((p) => p.stood)) return settleDuel(next);
     if (stood) {
@@ -353,7 +356,11 @@ export function applyBjDuelAction(state: BjDuelState, actorId: string, action: B
     return next;
   }
   players = players.map((p) => (p.id === me.id ? { ...p, stood: true } : p));
-  const next: BjDuelState = { ...state, players, message: `${me.name} stands.` };
+  const next: BjDuelState = {
+    ...state,
+    players,
+    message: `${me.name} stands. The other seat now hits or stands. Closest to 21 without going over wins.`,
+  };
   if (players.every((p) => p.stood)) return settleDuel(next);
   return { ...next, turn: (state.turn + 1) % players.length };
 }

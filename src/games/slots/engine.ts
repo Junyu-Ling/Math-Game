@@ -66,7 +66,7 @@ export function startSlots(chips = 1000): SlotsState {
     phase: "idle",
     reels: ["cherry", "lemon", "orange"],
     lastWin: 0,
-    message: "Set bet, then spin. One payline across three reels.",
+    message: "Pick a bet size, then spin. One payline across three reels. Three of a kind pays; WILD can fill a symbol. Two cherries still pay ×2.",
     spinCount: 0,
   };
 }
@@ -127,7 +127,7 @@ export function finishSpin(state: SlotsState): SlotsState {
     phase: "result",
     chips: state.chips + win,
     lastWin: win,
-    message: win > 0 ? `${note} — win ${win}` : "No win. Try again.",
+    message: win > 0 ? `${note} — win ${win}. Set a bet and spin again.` : "No win this line. Change the bet if you like, then spin again.",
   };
 }
 

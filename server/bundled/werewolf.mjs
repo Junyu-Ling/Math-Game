@@ -71,15 +71,15 @@ function startWerewolfLobby(people) {
     ]
   };
 }
-function startWerewolfPractice() {
-  return beginWerewolfMatch([
-    { id: "you", name: "YOU" },
-    { id: "cpu-1", name: "CPU", human: false },
-    { id: "cpu-2", name: "CPU 2", human: false },
-    { id: "cpu-3", name: "CPU 3", human: false },
-    { id: "cpu-4", name: "CPU 4", human: false },
-    { id: "cpu-5", name: "CPU 5", human: false }
-  ]);
+function startWerewolfPractice(seats = 6) {
+  const n = Math.max(WOLF_MIN, Math.min(WOLF_MAX, Math.floor(seats) || 6));
+  return beginWerewolfMatch(
+    Array.from({ length: n }, (_, i) => ({
+      id: i === 0 ? "you" : `cpu-${i}`,
+      name: i === 0 ? "YOU" : i === 1 ? "CPU" : `CPU ${i}`,
+      human: i === 0
+    }))
+  );
 }
 function beginWerewolfMatch(people) {
   const n = Math.max(WOLF_MIN, Math.min(WOLF_MAX, people.length));

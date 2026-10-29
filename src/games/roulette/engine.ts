@@ -82,7 +82,7 @@ export function startRoulette(chips = 1000): RouletteState {
     result: null,
     wheelDeg: 0,
     lastWin: 0,
-    message: "One bet per spin. Pick a number or an outside box — the house sets the payout.",
+    message: "One bet per spin. Click a number or an outside box, then spin. The house pays ⌊36 ÷ n⌋ − 1, where n is how many pockets that box covers. Single zero: even-money bets lose on 0.",
     history: [],
   };
 }
@@ -350,7 +350,10 @@ export function nextRound(state: RouletteState): RouletteState {
     phase: "bet",
     result: null,
     lastWin: 0,
-    message: state.chips > 0 ? "One bet per spin. The house sets the payout." : "Out of chips — reset practice stack.",
+    message:
+      state.chips > 0
+        ? "Place your next one bet, then spin. A new click replaces the last stake. House pays ⌊36 ÷ n⌋ − 1."
+        : "Out of chips — reset the practice stack to keep spinning.",
   };
 }
 

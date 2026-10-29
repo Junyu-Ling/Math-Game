@@ -168,7 +168,7 @@ function dealHand(s: HoldemState) {
   post(s, bb, BB);
   s.turn = sb;
   s.toAct = 2;
-  s.message = "Preflop. Small blind acts.";
+  s.message = "Preflop. Two hole cards each. Small blind acts first — fold, call the big blind (10), or raise. Min raise is the last full raise (or 10).";
 }
 
 function emptyHoldemSeat(p: { id: string; name: string; human?: boolean }): Seat {
@@ -241,15 +241,15 @@ function nextStreet(s: HoldemState) {
   if (s.street === "preflop") {
     s.street = "flop";
     s.community.push(s.deck.pop()!, s.deck.pop()!, s.deck.pop()!);
-    s.message = "Flop.";
+    s.message = "Flop — three community cards. Check if nobody bet, or bet at least 10. Best five cards from your two plus the board.";
   } else if (s.street === "flop") {
     s.street = "turn";
     s.community.push(s.deck.pop()!);
-    s.message = "Turn.";
+    s.message = "Turn — a fourth community card. Same betting: check, bet, call, raise, or all in.";
   } else if (s.street === "turn") {
     s.street = "river";
     s.community.push(s.deck.pop()!);
-    s.message = "River.";
+    s.message = "River — last community card. After this street, remaining hands go to showdown.";
   } else {
     showdown(s);
   }

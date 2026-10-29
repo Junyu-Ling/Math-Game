@@ -123,8 +123,10 @@ export function AnimalPage() {
               </div>
               <p className="status-line">
                 {state.phase === "over"
-                  ? forfeitText(state) || `${state.players.find((p) => p.id === state.winnerId)?.name} wins`
-                  : `${state.players[state.turn]?.name}'s turn`}
+                  ? forfeitText(state) || `${state.players.find((p) => p.id === state.winnerId)?.name} entered the den or captured the last pieces.`
+                  : myTurn
+                    ? "Your turn. Tap one of your animals, then a legal square. Higher rank captures lower. Rat beats Elephant; Elephant cannot eat Rat. Enter the rival den to win."
+                    : `Wait — ${state.players[state.turn]?.name} is moving. Higher rank captures lower. Rat beats Elephant; enter the rival den to win.`}
               </p>
               <div className="animal-board">
                 {Array.from({ length: ROWS }, (_, r) =>

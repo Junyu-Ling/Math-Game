@@ -261,21 +261,23 @@ export function Flip7Page() {
     if (savePlaying) return "Second Chance!";
     if (state.phase === "target") {
       return myTurn
-        ? `Choose who gets ${state.pendingAction === "freeze" ? "Freeze" : "Flip Three"} — yourself included.`
+        ? `Choose who gets ${state.pendingAction === "freeze" ? "Freeze (they bank this round now)" : "Flip Three (they flip three cards at once)"} — you may pick yourself.`
         : cur?.name
-          ? `${cur.name} is choosing a target.`
+          ? `${cur.name} is choosing who receives the action, including themselves.`
           : "Choosing a target.";
     }
     if (cur && cur.pendingFlip3 > 0 && state.phase === "action") {
       const n = cur.pendingFlip3;
-      return myTurn ? `Flip Three: flipping ${n} more.` : `${cur.name} flips ${n} more from Flip Three.`;
+      return myTurn
+        ? `Flip Three is running: ${n} card${n === 1 ? "" : "s"} still to flip. A duplicate busts unless Second Chance saves you.`
+        : `${cur.name} still has ${n} Flip Three card${n === 1 ? "" : "s"} to reveal.`;
     }
     if (myTurn) {
       return playerN === 1
-        ? "Flip one card, or stay to bank this round."
-        : "Flip one card, then the next player. Stay to bank this round.";
+        ? "Hit to flip one card into your area, or Stay to bank this round. A duplicate number busts. Seven different numbers is Flip 7 (+15, bank at once)."
+        : "Hit to flip one card, then the next player goes. Stay banks this round so you cannot bust later. Duplicate number busts unless you hold Second Chance.";
     }
-    return `${cur?.name} is acting`;
+    return `Wait — ${cur?.name} is acting. Hit flips a card; Stay banks the round.`;
   })();
 
   const centerWell = state && me ? (

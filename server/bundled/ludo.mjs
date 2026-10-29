@@ -232,11 +232,16 @@ function startLudoTable(people) {
     ]
   };
 }
-function startLudoPractice() {
-  return startLudoTable([
-    { id: "you", name: "YOU", human: true },
-    { id: "cpu-1", name: "CPU", human: false }
-  ]);
+function startLudoPractice(seats = 2) {
+  const n = Math.max(2, Math.min(4, Math.floor(seats) || 2));
+  const names = ["CPU", "CPU 2", "CPU 3"];
+  return startLudoTable(
+    Array.from({ length: n }, (_, i) => ({
+      id: i === 0 ? "you" : `cpu-${i}`,
+      name: i === 0 ? "YOU" : names[i - 1],
+      human: i === 0
+    }))
+  );
 }
 function startLudoDuel(a, b) {
   return startLudoTable([

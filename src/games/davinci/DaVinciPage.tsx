@@ -61,33 +61,37 @@ function statusText(state: CodaState, myTurn: boolean, remain: number, matching:
     return w ? `Showdown — all codes revealed. ${w.name} wins.` : "Showdown — all codes revealed.";
   }
   if (state.phase === "rps") {
-    return "Rock-paper-scissors. The loser guesses first.";
+    return "Rock-paper-scissors. The loser has to guess first. Tap rock, paper, or scissors.";
   }
   if (state.phase === "arrange") {
     if (state.resume === "draw") {
       return ownDash
-        ? `Opening arrange ${remain.toFixed(1)}s · tile stays out — tap a gap to insert`
-        : `Opening arrange ${remain.toFixed(1)}s`;
+        ? `Opening arrange ${remain.toFixed(1)}s. Your new tile stays face-down — tap a gap so it sits in number order. Wait the full 5 seconds.`
+        : `Opening arrange ${remain.toFixed(1)}s. Tiles slide into order. Wait the full 5 seconds even after a slot is picked.`;
     }
-    return `Arrange ${remain.toFixed(1)}s · wait the full 5 seconds even after you pick a slot`;
+    return `Arrange ${remain.toFixed(1)}s. Insert the tile in order (small to large). The clock always runs the full 5 seconds.`;
   }
   if (state.phase === "penalty") {
     return myTurn
-      ? "Miss. Nothing was drawn — tap one of your hidden tiles to knock it down."
-      : `${currentPlayer(state).name} is choosing a hidden tile to knock down.`;
+      ? "Wrong guess. Tap one of your own hidden tiles to knock it face-up. You drew nothing this miss."
+      : `${currentPlayer(state).name} missed — they must knock down one of their hidden tiles.`;
   }
   if (state.phase === "guess" && state.selected) {
-    return myTurn ? "Tile locked. Guess the number. Both of you see the arrow." : "Your rival is aiming at a tile.";
+    return myTurn
+      ? "Tile locked (everyone sees the arrow). Guess its number 0–11 or dash. A hit lets you guess again; a miss knocks one of yours down."
+      : "A hidden tile is locked. Wait for the guess — you will see the same arrow.";
   }
-  if (!myTurn) return `${currentPlayer(state).name} is thinking…`;
-  if (state.phase === "draw") return myTurn ? "Pick black or white and draw that color." : "A rival is choosing a draw color.";
+  if (!myTurn) return `Wait — ${currentPlayer(state).name} is thinking. On your turn you will draw a color, then guess a hidden tile.`;
+  if (state.phase === "draw") return myTurn ? "Your turn. Pick black or white to draw that color. You cannot pick a color that is gone." : "A rival is choosing a draw color.";
   if (state.phase === "guess") {
     return state.deck.length === 0
-      ? "Deck is empty. Guess a hidden tile."
-      : "Tap a hidden tile, then guess its number.";
+      ? "The deck is empty. Skip the draw — tap a rival’s hidden tile, then guess its number."
+      : "Tap a hidden tile on a rival’s row, then type its number. Tiles stay sorted, so use the face-up numbers around it.";
   }
   if (state.phase === "continue") {
-    return state.drawn ? "Hit. Keep guessing, or stay and insert in secret." : "Hit. Guess again, or end the turn.";
+    return state.drawn
+      ? "Hit. Guess again, or stay — then insert your drawn tile in secret during the 5-second arrange."
+      : "Hit. Guess another hidden tile, or end the turn.";
   }
   return "";
 }
