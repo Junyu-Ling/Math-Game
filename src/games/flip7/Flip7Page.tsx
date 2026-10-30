@@ -20,7 +20,7 @@ import {
 import { DeckStack, FlipFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
 import { ClickPop, RulesButton } from "../../components/GameRules";
-import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
@@ -138,7 +138,6 @@ export function Flip7Page() {
   const ring = state && me && useRing ? ringOpponents(state.players, me.id) : null;
   const cur = state && state.phase !== "lobby" ? currentFlip(state) : null;
   const myTurn = Boolean(state && me && cur?.id === me.id && state.phase !== "over" && state.phase !== "lobby");
-  const host = Boolean(me && state?.players[0]?.id === me.id);
 
   const burst = state?.burst ?? null;
   const [fx, setFx] = useState<{ id: string; boom: boolean; spin: boolean } | null>(null);
@@ -235,7 +234,7 @@ export function Flip7Page() {
     }
     setLocal((s) => {
       if (!s || !me) return s;
-      const id = action.type === "start" ? me.id : currentFlip(s).id;
+      const id = action.type === "start" || action.type === "ready" ? me.id : currentFlip(s).id;
       return applyFlipAction(s, id, action);
     });
   }
@@ -374,7 +373,7 @@ export function Flip7Page() {
                 <h2>{waiting ? `Table ${state?.players.length ?? 0}` : "First to 200"}</h2>
                 <p>
                   {waiting
-                    ? "Open a table, add CPUs or invite people, then start with 2 or more. No fixed seat count."
+                    ? "Open a table, add CPUs or invite people, then everyone Ready with 2 or more. No fixed seat count."
                     : "Practice solo or vs CPU, or open a table. Hit or stay — Freeze and Flip Three can target anyone."}
                 </p>
                 {waiting && state ? (
@@ -382,7 +381,7 @@ export function Flip7Page() {
                     {state.players.map((p, i) => (
                       <li key={p.id}>
                         <SeatTalk playerId={p.id} name={p.name} />
-                        <span>{seatTag(p, i, state.players[0]?.id)}</span>
+                        <span>{seatTag(p, i, state.players[0]?.id, (state as { readyIds?: string[] }).readyIds)}</span>
                       </li>
                     ))}
                   </ul>
@@ -393,15 +392,15 @@ export function Flip7Page() {
                   onPractice={(cpus) => setLocal(startFlip7(cpus + 1))}
                 />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
-                  {waiting ? (
-                    host && (state?.players.length ?? 0) >= 2 ? (
-                      <button className="btn" type="button" onClick={() => act({ type: "start" })}>
-                        Start {state?.players.length}P
-                      </button>
-                    ) : (
-                      <p>{host ? "Need at least 2 players to start." : "Waiting for the host to start."}</p>
-                    )
-                  ) : null}
+                  <TableReadyControls
+                    waiting={waiting}
+                    game="flip7"
+                    players={state?.players ?? []}
+                    youId={youId}
+                    readyIds={(state as { readyIds?: string[] } | null)?.readyIds}
+                    matched={(state as { matched?: boolean } | null)?.matched}
+                    onReady={() => act({ type: "ready" })}
+                  />
                 </div>
               </div>
             </>

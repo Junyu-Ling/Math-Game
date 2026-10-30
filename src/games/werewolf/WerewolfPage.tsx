@@ -14,7 +14,7 @@ import {
 } from "./engine";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { ClickPop, RulesButton } from "../../components/GameRules";
-import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -71,7 +71,6 @@ export function WerewolfPage() {
   const youId = practice ? "you" : user?.id;
   const me = state?.players.find((p) => p.id === youId);
   const waiting = Boolean(state?.phase === "lobby");
-  const host = Boolean(me && state?.players[0]?.id === me.id);
   const alive = state?.players.filter((p) => p.alive) ?? [];
 
   useEffect(() => {
@@ -161,7 +160,7 @@ export function WerewolfPage() {
                 <h2>{waiting ? `Table ${state?.players.length ?? 0}/${WOLF_MAX}` : "Night and day"}</h2>
                 <p>
                   {waiting
-                    ? `Add CPUs or invite, then start with ${WOLF_MIN}–${WOLF_MAX}. Roles: Werewolf, Villager, Seer, Witch.`
+                    ? `Add CPUs or invite, then everyone Ready with ${WOLF_MIN}–${WOLF_MAX}. Roles: Werewolf, Villager, Seer, Witch.`
                     : `Practice vs CPU (${WOLF_MIN}+), or open a table. Simplified party Werewolf — night kills, day vote.`}
                 </p>
                 {waiting && state ? (
@@ -169,26 +168,22 @@ export function WerewolfPage() {
                     {state.players.map((p, i) => (
                       <li key={p.id}>
                         <SeatTalk playerId={p.id} name={p.name} />
-                        <span>{seatTag(p, i, state.players[0]?.id)}</span>
+                        <span>{seatTag(p, i, state.players[0]?.id, (state as { readyIds?: string[] }).readyIds)}</span>
                       </li>
                     ))}
                   </ul>
                 ) : null}
                 <MixedCpuBar game="werewolf" onPractice={(cpus) => setLocal(startWerewolfPractice(cpus + 1))} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
-                  {waiting ? (
-                    host && (state?.players.length ?? 0) >= WOLF_MIN ? (
-                      <button className="btn" type="button" onClick={() => act({ type: "start" })}>
-                        Start {state?.players.length}P
-                      </button>
-                    ) : (
-                      <p>
-                        {host
-                          ? `Need ${WOLF_MIN}–${WOLF_MAX} players to start.`
-                          : "Waiting for the host to start."}
-                      </p>
-                    )
-                  ) : null}
+                  <TableReadyControls
+                    waiting={waiting}
+                    game="werewolf"
+                    players={state?.players ?? []}
+                    youId={youId}
+                    readyIds={(state as { readyIds?: string[] } | null)?.readyIds}
+                    matched={(state as { matched?: boolean } | null)?.matched}
+                    onReady={() => act({ type: "ready" })}
+                  />
                 </div>
               </div>
             </>

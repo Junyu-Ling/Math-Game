@@ -17,7 +17,7 @@ import {
   type HalliState,
 } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
-import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { useAuth } from "../../context/AuthContext";
@@ -105,7 +105,6 @@ export function HalliGalliPage() {
   const me = state ? state.players.find((p) => p.id === youId) ?? (waiting ? state.players[0] : null) : null;
   const cur = state && state.phase === "play" ? currentHalli(state) : null;
   const myTurn = Boolean(me && cur?.id === me.id);
-  const host = Boolean(me && state?.players[0]?.id === me.id);
   const seated = state && me ? aroundYou(state.players, me.id) : null;
   const hot = state && state.phase === "play" ? ringingFruit(state) : null;
   const totals = state ? fruitTotals(state) : null;
@@ -206,7 +205,7 @@ export function HalliGalliPage() {
                 <h2>{waiting ? `Table ${state?.players.length ?? 0}` : "Ring on five"}</h2>
                 <p>
                   {waiting
-                    ? "Open a table, add CPUs or invite people, then start with 2–4. No need to pick a seat count first."
+                    ? "Open a table, add CPUs or invite people, then everyone Ready with 2–4. No need to pick a seat count first."
                     : "Practice vs CPU, or open a table. Flip fruit cards — ring when five of one fruit show."}
                 </p>
                 {waiting && state ? (
@@ -214,22 +213,22 @@ export function HalliGalliPage() {
                     {state.players.map((p, i) => (
                       <li key={p.id}>
                         <SeatTalk playerId={p.id} name={p.name} />
-                        <span>{seatTag(p, i, state.players[0]?.id)}</span>
+                        <span>{seatTag(p, i, state.players[0]?.id, (state as { readyIds?: string[] }).readyIds)}</span>
                       </li>
                     ))}
                   </ul>
                 ) : null}
                 <MixedCpuBar game="halli" onPractice={(cpus) => setLocal(startHalliPractice(cpus + 1))} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
-                  {waiting ? (
-                    host && (state?.players.length ?? 0) >= 2 ? (
-                      <button className="btn" type="button" onClick={() => act({ type: "start" })}>
-                        Start {state?.players.length}P
-                      </button>
-                    ) : (
-                      <p>{host ? "Need at least 2 players to start." : "Waiting for the host to start."}</p>
-                    )
-                  ) : null}
+                  <TableReadyControls
+                    waiting={waiting}
+                    game="halli"
+                    players={state?.players ?? []}
+                    youId={youId}
+                    readyIds={(state as { readyIds?: string[] } | null)?.readyIds}
+                    matched={(state as { matched?: boolean } | null)?.matched}
+                    onReady={() => act({ type: "ready" })}
+                  />
                 </div>
               </div>
             </>

@@ -260,7 +260,8 @@ export type UnoAction =
   | { type: "keep" }
   | { type: "uno" }
   | { type: "color"; color: UnoColor }
-  | { type: "start" };
+  | { type: "start" }
+  | { type: "ready" };
 
 function giveCards(state: UnoState, id: string, cards: UnoCard[]): UnoState {
   return withPlayer(state, id, (p) => {

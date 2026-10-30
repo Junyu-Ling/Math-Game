@@ -633,7 +633,8 @@ export type FlipAction =
   | { type: "hit" }
   | { type: "stay" }
   | { type: "target"; targetId: string }
-  | { type: "start" };
+  | { type: "start" }
+  | { type: "ready" };
 
 export function applyFlipAction(state: FlipState, actorId: string, action: FlipAction): FlipState {
   if (!state.players.some((p) => p.id === actorId)) return state;

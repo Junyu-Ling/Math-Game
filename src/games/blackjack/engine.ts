@@ -306,7 +306,7 @@ function settleDuel(state: BjDuelState): BjDuelState {
   return { ...state, phase: "over", winnerId, message };
 }
 
-export type BjDuelAction = { type: "start" } | { type: "hit" } | { type: "stand" };
+export type BjDuelAction = { type: "start" } | { type: "ready" } | { type: "hit" } | { type: "stand" };
 
 export function startBjPractice(): BjDuelState {
   return startBjDuel({ id: "you", name: "YOU" }, { id: "cpu", name: "CPU", human: false });

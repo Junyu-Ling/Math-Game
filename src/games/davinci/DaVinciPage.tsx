@@ -678,7 +678,9 @@ export function DaVinciPage() {
               <h2>{waiting ? `Table ${state?.players.length ?? 0}/4` : matching ? "Invite pending" : "Opening draw"}</h2>
               <p>
                 {waiting
-                  ? `Each player picks black and white (${openN} total${state && state.players.length >= 4 ? " · 4 players" : ""}), then ready. Add CPUs or invite, then start at 2+.`
+                  ? (state as { matched?: boolean } | null)?.matched
+                    ? "Table is open. Each player picks black and white, then Ready. The game starts when everyone is ready."
+                    : `Each player picks black and white (${openN} total${state && state.players.length >= 4 ? " · 4 players" : ""}), then Ready. Add CPUs or invite, then everyone Ready at 2+.`
                   : matching
                     ? "Waiting for them to accept."
                     : `Open a table, add CPUs or invite. 2–4 players. 4 players start with 3 tiles; otherwise ${openN}.`}

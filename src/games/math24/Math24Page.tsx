@@ -3,7 +3,7 @@ import { applyM24Action, startM24Practice, type M24DuelState } from "./engine";
 import { PokerFace } from "../../components/PlayingCard";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { RulesButton } from "../../components/GameRules";
-import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -24,7 +24,6 @@ export function Math24Page() {
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
   const waiting = Boolean(state?.phase === "lobby");
-  const host = Boolean(user && room?.seats?.[0] === user.id);
   const myScore = youId && state ? state.scores[youId] || 0 : 0;
   const playing = Boolean(state && me && !waiting);
 
@@ -65,8 +64,8 @@ export function Math24Page() {
     setUsed([false, false, false, false]);
   }
 
-  function actStart() {
-    if (room) void lobby.sendAction({ type: "start" });
+  function actReady() {
+    if (room) void lobby.sendAction({ type: "ready" });
   }
 
   return (
@@ -101,7 +100,7 @@ export function Math24Page() {
                 <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "First to make 24"}</h2>
                 <p>
                   {waiting
-                    ? "Add a CPU or invite one friend, then start. First to 3 points wins."
+                    ? "Add a CPU or invite one friend, then everyone Ready. First to 3 points wins."
                     : "Practice vs CPU (CPU submits in ~8s), or open a table. Same four cards — first to 3 wins."}
                 </p>
                 {waiting && state ? (
@@ -109,22 +108,22 @@ export function Math24Page() {
                     {state.players.map((p, i) => (
                       <li key={p.id}>
                         <SeatTalk playerId={p.id} name={p.name} />
-                        <span>{seatTag(p, i, state.players[0]?.id)}</span>
+                        <span>{seatTag(p, i, state.players[0]?.id, (state as { readyIds?: string[] }).readyIds)}</span>
                       </li>
                     ))}
                   </ul>
                 ) : null}
                 <MixedCpuBar game="m24" onPractice={() => setLocal(startM24Practice())} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
-                  {waiting ? (
-                    host && (state?.players.length ?? 0) >= 2 ? (
-                      <button className="btn" type="button" onClick={() => actStart()}>
-                        Start
-                      </button>
-                    ) : (
-                      <p>{host ? "Need 2 players to start." : "Waiting for the host to start."}</p>
-                    )
-                  ) : null}
+                  <TableReadyControls
+                    waiting={waiting}
+                    game="m24"
+                    players={state?.players ?? []}
+                    youId={youId}
+                    readyIds={(state as { readyIds?: string[] } | null)?.readyIds}
+                    matched={(state as { matched?: boolean } | null)?.matched}
+                    onReady={actReady}
+                  />
                 </div>
               </div>
             </>

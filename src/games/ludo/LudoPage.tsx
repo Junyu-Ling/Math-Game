@@ -26,7 +26,7 @@ import {
   type LState,
 } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
-import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -174,7 +174,6 @@ export function LudoPage() {
   const myTurn = Boolean(
     state && me && state.players[state.turn]?.id === me.id && (state.phase === "roll" || state.phase === "move"),
   );
-  const host = Boolean(user && state?.players[0]?.id === user.id);
   const waiting = state?.phase === "lobby";
 
   useEffect(() => {
@@ -292,7 +291,7 @@ export function LudoPage() {
               <h2>{waiting ? `Table ${state?.players.length ?? 0}` : "Race four planes home"}</h2>
               <p>
                 {waiting
-                  ? "Open a table, add CPUs or invite, then start with 2–4. Blue, red, yellow, and green sit in that order."
+                  ? "Open a table, add CPUs or invite, then everyone Ready with 2–4. Blue, red, yellow, and green sit in that order."
                   : "Practice as blue against a red CPU, or open a table. Roll 6 to take off. Exact count to finish."}
               </p>
               {waiting && state ? (
@@ -301,7 +300,7 @@ export function LudoPage() {
                     <li key={p.id}>
                       <SeatTalk playerId={p.id} name={p.name} />
                       <span>
-                        {p.color} · {seatTag(p, i, state.players[0]?.id)}
+                        {p.color} · {seatTag(p, i, state.players[0]?.id, (state as { readyIds?: string[] }).readyIds)}
                       </span>
                     </li>
                   ))}
@@ -309,15 +308,15 @@ export function LudoPage() {
               ) : null}
               <MixedCpuBar game="ludo" onPractice={(cpus) => setLocal(startLudoPractice(cpus + 1))} />
               <div className="row-actions" style={{ justifyContent: "center" }}>
-                {waiting ? (
-                  host && (state?.players.length ?? 0) >= 2 ? (
-                    <button className="btn" type="button" onClick={() => act({ type: "start" })}>
-                      Start {state?.players.length}P
-                    </button>
-                  ) : (
-                    <p>{host ? "Need at least 2 players to start." : "Waiting for the host to start."}</p>
-                  )
-                ) : null}
+                <TableReadyControls
+                  waiting={waiting}
+                  game="ludo"
+                  players={state?.players ?? []}
+                  youId={youId}
+                  readyIds={(state as { readyIds?: string[] } | null)?.readyIds}
+                  matched={(state as { matched?: boolean } | null)?.matched}
+                  onReady={() => act({ type: "ready" })}
+                />
               </div>
             </div>
           ) : (

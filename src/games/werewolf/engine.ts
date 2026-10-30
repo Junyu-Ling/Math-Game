@@ -41,6 +41,7 @@ export type WState = {
 
 export type WAction =
   | { type: "start" }
+  | { type: "ready" }
   | { type: "wolf_kill"; targetId: string }
   | { type: "seer_check"; targetId: string }
   | { type: "witch"; save?: boolean; poisonId?: string | null }

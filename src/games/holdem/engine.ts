@@ -32,6 +32,7 @@ export type HoldemState = {
 
 export type HoldemAction =
   | { type: "start" }
+  | { type: "ready" }
   | { type: "fold" }
   | { type: "check" }
   | { type: "call" }

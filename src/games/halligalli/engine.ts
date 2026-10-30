@@ -277,7 +277,7 @@ export function ringHalli(state: HalliState, actorId: string): HalliState {
   return next;
 }
 
-export type HalliAction = { type: "flip" } | { type: "ring" } | { type: "start" };
+export type HalliAction = { type: "flip" } | { type: "ring" } | { type: "start" } | { type: "ready" };
 
 export function applyHalliAction(state: HalliState, actorId: string, action: HalliAction): HalliState {
   if (state.phase === "over") return state;

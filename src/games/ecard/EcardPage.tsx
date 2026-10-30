@@ -18,7 +18,7 @@ import {
 } from "./engine";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { ClickPop, RulesButton } from "../../components/GameRules";
-import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -120,7 +120,6 @@ export function EcardPage() {
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
   const waiting = Boolean(state?.phase === "lobby");
-  const host = Boolean(user && room?.seats?.[0] === user.id);
   const myTurnPick = Boolean(state && me && state.phase === "pick" && !me.selectedId);
   const iChooseRole = Boolean(state && me && state.phase === "role" && state.roleChooserId === me.id);
 
@@ -286,7 +285,7 @@ export function EcardPage() {
                 <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Emperor · Citizen · Slave"}</h2>
                 <p>
                   {waiting
-                    ? "Add a CPU or invite one friend, then start. RPS picks the opening side."
+                    ? "Add a CPU or invite one friend, then everyone Ready. RPS picks the opening side."
                     : "Practice vs CPU, or open a table to invite. Emperor beats Citizen +1 and returns. Slave beats Emperor +5."}
                 </p>
                 {waiting && state ? (
@@ -294,22 +293,22 @@ export function EcardPage() {
                     {state.players.map((p, i) => (
                       <li key={p.id}>
                         <SeatTalk playerId={p.id} name={p.name} />
-                        <span>{seatTag(p, i, state.players[0]?.id)}</span>
+                        <span>{seatTag(p, i, state.players[0]?.id, (state as { readyIds?: string[] }).readyIds)}</span>
                       </li>
                     ))}
                   </ul>
                 ) : null}
                 <MixedCpuBar game="ecard" onPractice={() => setLocal(startEcardPractice())} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
-                  {waiting ? (
-                    host && (state?.players.length ?? 0) >= 2 ? (
-                      <button className="btn" type="button" onClick={() => act({ type: "start" })}>
-                        Start
-                      </button>
-                    ) : (
-                      <p>{host ? "Need 2 players to start." : "Waiting for the host to start."}</p>
-                    )
-                  ) : null}
+                  <TableReadyControls
+                    waiting={waiting}
+                    game="ecard"
+                    players={state?.players ?? []}
+                    youId={youId}
+                    readyIds={(state as { readyIds?: string[] } | null)?.readyIds}
+                    matched={(state as { matched?: boolean } | null)?.matched}
+                    onReady={() => act({ type: "ready" })}
+                  />
                 </div>
               </div>
             </>

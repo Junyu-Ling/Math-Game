@@ -49,6 +49,11 @@ function tableMax(game) {
   return 4;
 }
 
+function minStart(game) {
+  if (game === "werewolf") return 4;
+  return 2;
+}
+
 function isCpuId(id) {
   return /^(cpu|bot|ai)/i.test(String(id || ""));
 }
@@ -726,6 +731,8 @@ async function saveRoom(room, opts = {}) {
     cpuReadyAt: room.cpuReadyAt || null,
     seq: room.seq || 0,
     faces,
+    readyIds: Array.isArray(room.readyIds) ? room.readyIds.map(String) : [],
+    matched: Boolean(room.matched),
   };
   const r = client();
   if (r) {
@@ -1033,6 +1040,7 @@ async function joinOpenTable(user, invite, mods) {
     if (rec.seats.length >= tableMax(game)) throw new Error("The table is full");
     rec.seats = [...rec.seats, joiner.id];
     rec.state = rebuildLobby(rec, joiner, mods);
+    rec.readyIds = [];
     rec.seq = (rec.seq || 0) + 1;
     rec.mods = mods;
     rec.faces = await seatFaces(rec.seats);
@@ -1474,6 +1482,29 @@ export async function applyRoomAction(user, roomId, action, mods) {
   const room = { ...rec, mods };
   await expireArrange(room);
   if (action && action.type === "tick") return publicRoom(room, user.id);
+  if (
+    action &&
+    (action.type === "ready" || action.type === "start") &&
+    isLobbyState(room.state) &&
+    room.game !== "coda"
+  ) {
+    const id = String(user.id);
+    room.readyIds = [...new Set([...(room.readyIds || []).map(String), id])];
+    const humans = humanSeatIds(room.seats);
+    const need = minStart(room.game);
+    const allReady =
+      room.seats.length >= need &&
+      humans.length >= 1 &&
+      humans.every((hid) => room.readyIds.includes(String(hid)));
+    if (allReady) {
+      autoStartMatched(room, mods);
+      room.readyIds = [];
+      armCpuThink(room);
+    }
+    room.seq = (room.seq || 0) + 1;
+    await saveRoom(room, { skipRemember: true });
+    return publicRoom(room, user.id);
+  }
   const before = room.state;
   if (room.game === "coda") {
     room.state = mods.coda.applyAction(room.state, user.id, action);
@@ -1616,6 +1647,7 @@ export async function leaveRoom(userId) {
       }
       rec.seats = rec.seats.filter((id) => id !== userId);
       rec.state = rebuildLobby(rec, null, rec.mods);
+      rec.readyIds = [];
       await saveRoom(rec);
       return snapshot(userId);
     }
@@ -1680,7 +1712,12 @@ function publicRoom(room, viewerId) {
   }
   view = withForfeitView(view, room.state, room.game, viewerId);
   if (view && typeof view === "object") {
-    view = { ...view, faces: Array.isArray(room.faces) ? room.faces : [] };
+    view = {
+      ...view,
+      faces: Array.isArray(room.faces) ? room.faces : [],
+      readyIds: Array.isArray(room.readyIds) ? room.readyIds.map(String) : [],
+      matched: Boolean(room.matched),
+    };
   }
   return {
     id: room.id,
@@ -1724,6 +1761,7 @@ async function vacateSeat(userId, rec) {
   }
     rec.seats = rec.seats.filter((x) => x !== id);
     rec.state = rebuildLobby(rec, null, rec.mods);
+    rec.readyIds = [];
     rec.seq = (rec.seq || 0) + 1;
     rec.faces = await seatFaces(rec.seats);
     await saveRoom(rec);
@@ -1809,6 +1847,7 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
     rec.seats = rec.seats.filter((id) => id !== lastCpu);
     rec.state = rebuildLobby(rec, null, mods);
   }
+  rec.readyIds = [];
   armCpuThink(rec);
   rec.seq = (rec.seq || 0) + 1;
   await saveRoom(rec);
@@ -1979,8 +2018,9 @@ async function createMatchedRoom(tickets, game, mods) {
     endsAt: null,
     seq: 1,
     mods,
+    readyIds: [],
+    matched: true,
   };
-  autoStartMatched(room, mods);
   await saveRoom(room);
   return room;
 }

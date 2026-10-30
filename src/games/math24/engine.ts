@@ -224,7 +224,7 @@ export function startM24Duel(
   };
 }
 
-export type M24DuelAction = { type: "start" } | { type: "submit"; expr: string };
+export type M24DuelAction = { type: "start" } | { type: "ready" } | { type: "submit"; expr: string };
 
 export function applyM24Action(state: M24DuelState, actorId: string, action: M24DuelAction): M24DuelState {
   if (state.phase === "lobby") {

@@ -10,7 +10,7 @@ import {
 import { PokerFace } from "../../components/PlayingCard";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { RulesButton } from "../../components/GameRules";
-import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -28,7 +28,6 @@ export function HoldemPage() {
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
   const waiting = Boolean(state?.street === "lobby");
-  const host = Boolean(user && room?.seats?.[0] === user.id);
   const myTurn = Boolean(
     state && me && state.players[state.turn]?.id === me.id && state.street !== "showdown" && state.street !== "over" && state.street !== "lobby",
   );
@@ -123,7 +122,7 @@ export function HoldemPage() {
                 <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Heads-up no-limit Hold’em"}</h2>
                 <p>
                   {waiting
-                    ? "Add a CPU or invite one friend, then start. Blinds 5 / 10. Raise any amount from the min up to all in."
+                    ? "Add a CPU or invite one friend, then everyone Ready. Blinds 5 / 10. Raise any amount from the min up to all in."
                     : "No-limit. You choose the raise: at least the last full raise (or the big blind), with no cap. All in is always allowed. Blinds 5 / 10."}
                 </p>
                 {waiting && state ? (
@@ -131,22 +130,22 @@ export function HoldemPage() {
                     {state.players.map((p, i) => (
                       <li key={p.id}>
                         <SeatTalk playerId={p.id} name={p.name} />
-                        <span>{seatTag(p, i, state.players[0]?.id)}</span>
+                        <span>{seatTag(p, i, state.players[0]?.id, (state as { readyIds?: string[] }).readyIds)}</span>
                       </li>
                     ))}
                   </ul>
                 ) : null}
                 <MixedCpuBar game="holdem" onPractice={() => setLocal(startHoldemPractice())} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
-                  {waiting ? (
-                    host && (state?.players.length ?? 0) >= 2 ? (
-                      <button className="btn" type="button" onClick={() => act({ type: "start" })}>
-                        Start
-                      </button>
-                    ) : (
-                      <p>{host ? "Need 2 players to start." : "Waiting for the host to start."}</p>
-                    )
-                  ) : null}
+                  <TableReadyControls
+                    waiting={waiting}
+                    game="holdem"
+                    players={state?.players ?? []}
+                    youId={youId}
+                    readyIds={(state as { readyIds?: string[] } | null)?.readyIds}
+                    matched={(state as { matched?: boolean } | null)?.matched}
+                    onReady={() => act({ type: "ready" })}
+                  />
                 </div>
               </div>
             </>

@@ -12,7 +12,7 @@ import {
   type RpsThrow,
 } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
-import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -132,7 +132,6 @@ export function GomokuPage() {
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
   const waiting = Boolean(state?.phase === "lobby");
-  const host = Boolean(user && room?.seats?.[0] === user.id);
   const myTurn = Boolean(state && me && state.players[state.turn]?.id === me.id && state.phase === "play");
 
   useEffect(() => {
@@ -256,7 +255,7 @@ export function GomokuPage() {
               <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Five in a row"}</h2>
               <p>
                 {waiting
-                  ? "Add a CPU or invite one friend, then start. RPS winner plays black."
+                  ? "Add a CPU or invite one friend, then everyone Ready. RPS winner plays black."
                   : "15×15 Renju. Practice vs CPU, or open a table. Black fouls: double live three, double live four, overline."}
               </p>
               {waiting && state ? (
@@ -264,22 +263,22 @@ export function GomokuPage() {
                   {state.players.map((p, i) => (
                     <li key={p.id}>
                       <SeatTalk playerId={p.id} name={p.name} />
-                      <span>{seatTag(p, i, state.players[0]?.id)}</span>
+                      <span>{seatTag(p, i, state.players[0]?.id, (state as { readyIds?: string[] }).readyIds)}</span>
                     </li>
                   ))}
                 </ul>
               ) : null}
               <MixedCpuBar game="gomoku" onPractice={() => setLocal(startGomokuPractice())} />
               <div className="row-actions" style={{ justifyContent: "center" }}>
-                {waiting ? (
-                  host && (state?.players.length ?? 0) >= 2 ? (
-                    <button className="btn" type="button" onClick={() => act({ type: "start" })}>
-                      Start
-                    </button>
-                  ) : (
-                    <p>{host ? "Need 2 players to start." : "Waiting for the host to start."}</p>
-                  )
-                ) : null}
+                <TableReadyControls
+                  waiting={waiting}
+                  game="gomoku"
+                  players={state?.players ?? []}
+                  youId={youId}
+                  readyIds={(state as { readyIds?: string[] } | null)?.readyIds}
+                  matched={(state as { matched?: boolean } | null)?.matched}
+                  onReady={() => act({ type: "ready" })}
+                />
               </div>
             </div>
           ) : state.phase === "rps" ? (

@@ -63,7 +63,7 @@ export type LState = {
   winnerId: string | null;
   log: Array<{ id: string; text: string }>;
 };
-export type LAction = { type: "roll" } | { type: "move"; pieceId: string } | { type: "start" };
+export type LAction = { type: "roll" } | { type: "move"; pieceId: string } | { type: "start" } | { type: "ready" };
 
 type Landing = { pos: number; flew: boolean; captures: string[] };
 type Dir = "e" | "s" | "w" | "n";

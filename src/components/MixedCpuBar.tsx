@@ -36,16 +36,18 @@ export function MixedCpuBar({
   const cpuN = seats.filter(isCpuId).length;
   const max = tableMax(game);
   const full = seats.length >= max;
-  const view = here ? (room?.view as { phase?: string; street?: string } | undefined) : undefined;
+  const view = here ? (room?.view as { phase?: string; street?: string; matched?: boolean } | undefined) : undefined;
   const waiting = Boolean(here && (view?.phase === "lobby" || view?.street === "lobby"));
+  const matched = Boolean(view?.matched);
   const duel = max <= 2;
-  /** Only show add/remove after a live lobby table exists. */
-  const atTable = here && waiting && host;
+  const seatedHere = Boolean(here && waiting);
+  /** Host-only add/remove after a live lobby table exists. */
+  const atTable = seatedHere && host;
   const canOpen = Boolean(user && !busy && (!here || !waiting || host));
   const showPractice = Boolean(onPractice && !atTable && !waiting);
   const searching = Boolean(queue && queue.game === game);
   const need = matchNeed(game);
-  const canMatch = Boolean(user && !busy && !atTable && !waiting);
+  const canMatch = Boolean(user && !busy && !seatedHere);
 
   function setCpus(next: number) {
     const n = Math.max(cpuMin, Math.min(cpuMax, next));
@@ -131,17 +133,21 @@ export function MixedCpuBar({
           ? need > 2
             ? `Searching for ${GAME_LABEL[game] || game}. ${queue?.waiting ?? 1} of ${need} in queue.`
             : `Searching for a player. ${queue?.waiting ?? 1} in queue.`
-          : !atTable
-            ? showPractice
-              ? onSolo
-                ? "Practice, find a match, or open a table to add a CPU / invite."
-                : "Practice vs CPU, find a match, or open a table to invite."
-              : "Find a match, or open a table and invite from the player list."
-            : duel
-              ? "Add a CPU or invite one friend from the player list, then start."
-              : max >= 16
-                ? "Add CPUs or invite humans, then start with 2+."
-                : `Add CPUs or invite humans, then start with ${minStart(game)}–${max}.`}
+          : seatedHere && !host
+            ? "You're at the table. Ready up when you're set."
+            : !atTable
+              ? showPractice
+                ? onSolo
+                  ? "Practice, find a match, or open a table to add a CPU / invite."
+                  : "Practice vs CPU, find a match, or open a table to invite."
+                : "Find a match, or open a table and invite from the player list."
+              : matched
+                ? "Table is open. Ready up — the game starts when everyone is ready."
+                : duel
+                  ? "Add a CPU or invite one friend from the player list, then everyone Ready."
+                  : max >= 16
+                    ? "Add CPUs or invite humans, then everyone Ready with 2+."
+                    : `Add CPUs or invite humans, then everyone Ready with ${minStart(game)}–${max}.`}
       </p>
       <div className="row-actions" style={{ justifyContent: "center" }}>
         {showPractice && pickCpus ? <CpuCount cpus={cpus} min={cpuMin} max={cpuMax} onChange={setCpus} /> : null}
@@ -166,7 +172,7 @@ export function MixedCpuBar({
           <button className="btn" type="button" disabled={busy} onClick={() => void stopSearch()}>
             {busy ? "Canceling…" : "Cancel search"}
           </button>
-        ) : !atTable ? (
+        ) : seatedHere && !host ? null : !atTable ? (
           <>
             <button className="btn" type="button" disabled={!canMatch} onClick={() => void search()}>
               {busy ? "Searching…" : need > 2 ? `Find match · ${need}P` : "Find match"}
@@ -222,8 +228,55 @@ function CpuCount({
   );
 }
 
-export function seatTag(player: { id: string; human?: boolean }, index: number, hostId?: string) {
+export function seatTag(
+  player: { id: string; human?: boolean; ready?: boolean },
+  index: number,
+  hostId?: string,
+  readyIds?: string[],
+) {
   if (isCpuId(player.id) || player.human === false) return "cpu";
-  if (hostId ? player.id === hostId : index === 0) return "host";
+  const host = hostId ? player.id === hostId : index === 0;
+  const ready = Boolean(player.ready || readyIds?.includes(player.id));
+  if (ready) return host ? "host · ready" : "ready";
+  if (host) return "host";
   return "seated";
+}
+
+export function TableReadyControls({
+  waiting,
+  game,
+  players,
+  youId,
+  readyIds,
+  matched,
+  onReady,
+}: {
+  waiting: boolean;
+  game: string;
+  players: Array<{ id: string; human?: boolean; ready?: boolean }>;
+  youId?: string;
+  readyIds?: string[];
+  matched?: boolean;
+  onReady: () => void;
+}) {
+  if (!waiting) return null;
+  const need = minStart(game);
+  const humans = players.filter((p) => !isCpuId(p.id) && p.human !== false);
+  if (players.length < need) {
+    return <p>Need at least {need} players to start.</p>;
+  }
+  const marked = new Set([...(readyIds || []), ...players.filter((p) => p.ready).map((p) => p.id)]);
+  const mineReady = Boolean(youId && marked.has(youId));
+  const humanReady = humans.filter((p) => marked.has(p.id)).length;
+  return (
+    <>
+      {matched ? <p>Table is open. Ready up — the game starts when everyone is ready.</p> : null}
+      <button className="btn" type="button" disabled={mineReady} onClick={onReady}>
+        {mineReady ? "Waiting for others" : "Ready"}
+      </button>
+      <p>
+        {humanReady}/{humans.length} ready
+      </p>
+    </>
+  );
 }

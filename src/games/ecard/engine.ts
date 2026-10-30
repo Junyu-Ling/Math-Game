@@ -279,6 +279,7 @@ function playRps(state: EState, actorId: string, you: RpsThrow): EState {
 
 export type EAction =
   | { type: "start" }
+  | { type: "ready" }
   | { type: "rps"; throw: RpsThrow }
   | { type: "role"; role: ERole }
   | { type: "select"; cardId: string }

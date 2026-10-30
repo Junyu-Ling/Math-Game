@@ -10,7 +10,7 @@ import {
 import { PokerFace } from "../../components/PlayingCard";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { RulesButton } from "../../components/GameRules";
-import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
+import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
@@ -28,7 +28,6 @@ export function BlackjackPage() {
   const me = state?.players.find((p) => p.id === youId);
   const rival = state?.players.find((p) => p.id !== youId);
   const waiting = Boolean(state?.phase === "lobby");
-  const host = Boolean(user && room?.seats?.[0] === user.id);
   const myTurn = Boolean(state && me && state.players[state.turn]?.id === me.id && state.phase === "play");
 
   useEffect(() => {
@@ -87,7 +86,7 @@ export function BlackjackPage() {
                 <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Closest without going over 21"}</h2>
                 <p>
                   {waiting
-                    ? "Add a CPU or invite one friend, then start. Rival hole card stays hidden until they stand."
+                    ? "Add a CPU or invite one friend, then everyone Ready. Rival hole card stays hidden until they stand."
                     : "Practice vs CPU, or open a table to invite. Rival hole card stays hidden until they stand."}
                 </p>
                 {waiting && state ? (
@@ -95,22 +94,22 @@ export function BlackjackPage() {
                     {state.players.map((p, i) => (
                       <li key={p.id}>
                         <SeatTalk playerId={p.id} name={p.name} />
-                        <span>{seatTag(p, i, state.players[0]?.id)}</span>
+                        <span>{seatTag(p, i, state.players[0]?.id, (state as { readyIds?: string[] }).readyIds)}</span>
                       </li>
                     ))}
                   </ul>
                 ) : null}
                 <MixedCpuBar game="bj" onPractice={() => setLocal(startBjPractice())} />
                 <div className="row-actions" style={{ justifyContent: "center" }}>
-                  {waiting ? (
-                    host && (state?.players.length ?? 0) >= 2 ? (
-                      <button className="btn" type="button" onClick={() => act({ type: "start" })}>
-                        Start
-                      </button>
-                    ) : (
-                      <p>{host ? "Need 2 players to start." : "Waiting for the host to start."}</p>
-                    )
-                  ) : null}
+                  <TableReadyControls
+                    waiting={waiting}
+                    game="bj"
+                    players={state?.players ?? []}
+                    youId={youId}
+                    readyIds={(state as { readyIds?: string[] } | null)?.readyIds}
+                    matched={(state as { matched?: boolean } | null)?.matched}
+                    onReady={() => act({ type: "ready" })}
+                  />
                 </div>
               </div>
             </>

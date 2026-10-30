@@ -37,6 +37,7 @@ export type GState = {
 
 export type GAction =
   | { type: "start" }
+  | { type: "ready" }
   | { type: "rps"; throw: RpsThrow }
   | { type: "place"; r: number; c: number };
 
