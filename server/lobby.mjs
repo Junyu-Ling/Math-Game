@@ -10,7 +10,15 @@ const QUEUE_TTL = 60;
 const INVITE_COOLDOWN_MS = 5000;
 const USER_SEC = 90 * 24 * 3600;
 const PAIR_LUA = `
-if ARGV[2] ~= '' then redis.call('LREM', KEYS[1], 0, ARGV[2]) end
+local needle = ARGV[4]
+if needle ~= '' then
+  local items = redis.call('LRANGE', KEYS[1], 0, -1)
+  for _, raw in ipairs(items) do
+    if string.find(raw, needle, 1, true) then
+      redis.call('LREM', KEYS[1], 0, raw)
+    end
+  end
+end
 redis.call('LPUSH', KEYS[1], ARGV[1])
 redis.call('EXPIRE', KEYS[1], 120)
 local n = tonumber(ARGV[3])
@@ -1830,12 +1838,8 @@ function parseTicket(raw) {
 async function queueSnap(userId) {
   const game = await kvGet(`axiom:quser:${userId}`);
   if (!game) return null;
-  const waiting = await llen(qKey(game));
-  if (waiting < 1) {
-    await kvDel(`axiom:quser:${userId}`);
-    await kvDel(`axiom:qt:${userId}`);
-    return null;
-  }
+  // List can be empty for a moment while two players are being seated.
+  const waiting = Math.max(1, await llen(qKey(game)));
   return { game: String(game), waiting };
 }
 
@@ -1860,21 +1864,46 @@ export async function leaveQueue(userId) {
   if (game) await wakeQueue(game);
 }
 
-async function pushAndMaybePair(game, ticket, prevTicket, need) {
+function uniqueTickets(tickets) {
+  const seen = new Set();
+  const out = [];
+  for (const t of tickets || []) {
+    const id = String(t?.userId || "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(t);
+  }
+  return out;
+}
+
+async function dropUserFromQueue(game, userId) {
+  const id = String(userId || "");
+  if (!game || !id) return;
+  const raws = await lrangeAll(qKey(game));
+  for (const raw of raws) {
+    const t = parseTicket(raw);
+    if (t?.userId === id) await lremValue(qKey(game), raw);
+  }
+}
+
+async function pushAndMaybePair(game, ticket, userId, need) {
   const key = qKey(game);
   const r = client();
   if (r) {
     try {
-      const pair = await r.eval(PAIR_LUA, 1, key, ticket, prevTicket || "", String(need));
-      if (Array.isArray(pair) && pair.length >= need) {
-        return pair.map(parseTicket).filter(Boolean);
+      const needle = `"userId":"${String(userId)}"`;
+      const pair = await r.eval(PAIR_LUA, 1, key, ticket, "", String(need), needle);
+      if (Array.isArray(pair) && pair.length) {
+        const uniq = uniqueTickets(pair.map(parseTicket));
+        if (uniq.length >= need) return uniq;
+        for (const t of uniq.reverse()) await rpush(key, JSON.stringify(t), 120);
       }
-      if (pair) return null;
+      return null;
     } catch {
       /* memory */
     }
   }
-  if (prevTicket) await lremValue(key, prevTicket);
+  await dropUserFromQueue(game, userId);
   await lpush(key, ticket, 120);
   if ((await llen(key)) < need) return null;
   const taken = [];
@@ -1884,11 +1913,12 @@ async function pushAndMaybePair(game, ticket, prevTicket, need) {
     const t = parseTicket(raw);
     if (t) taken.push(t);
   }
-  if (taken.length < need) {
-    for (const t of taken.reverse()) await rpush(key, JSON.stringify(t), 120);
+  const uniq = uniqueTickets(taken);
+  if (uniq.length < need) {
+    for (const t of uniq.reverse()) await rpush(key, JSON.stringify(t), 120);
     return null;
   }
-  return taken;
+  return uniq;
 }
 
 function autoStartMatched(room, mods) {
@@ -1966,9 +1996,8 @@ export async function enqueueMatch(user, game, meta = {}) {
     if (rec && isLiveMatchState(rec.game, rec.state)) throw new Error("You are already in a game");
     if (rec) await vacateSeat(userId, rec);
   }
-  const prevTicket = (await kvGet(`axiom:qt:${userId}`)) || "";
   const prevGame = await kvGet(`axiom:quser:${userId}`);
-  if (prevGame && prevGame !== game && prevTicket) await lremValue(qKey(prevGame), prevTicket);
+  if (prevGame && prevGame !== game) await dropUserFromQueue(prevGame, userId);
   const ticket = JSON.stringify({
     userId,
     name: playerName(user),
@@ -1980,7 +2009,7 @@ export async function enqueueMatch(user, game, meta = {}) {
   await kvSet(`axiom:qt:${userId}`, ticket, QUEUE_TTL);
   await kvSet(`axiom:quser:${userId}`, game, QUEUE_TTL);
   const need = matchNeed(game);
-  const pair = await pushAndMaybePair(game, ticket, prevGame === game ? prevTicket : "", need);
+  const pair = await pushAndMaybePair(game, ticket, userId, need);
   if (pair && pair.length >= need) {
     const ready = [];
     for (const t of pair) {

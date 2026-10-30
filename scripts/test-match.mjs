@@ -12,6 +12,10 @@ assert.equal(first.room, null);
 assert.equal(first.queue?.game, "uno");
 assert.equal(first.queue?.waiting, 1);
 
+const again = await enqueueMatch(a, "uno");
+assert.equal(again.room, null);
+assert.equal(again.queue?.waiting, 1, "re-queue must not duplicate the same player");
+
 const second = await enqueueMatch(b, "uno");
 assert.ok(second.room, "second player should sit at a table");
 assert.equal(second.room.game, "uno");

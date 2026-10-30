@@ -140,7 +140,8 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         abort?.abort();
         abort = new AbortController();
         const inRoom = Boolean(snapRef.current.room);
-        if (document.hidden && !inRoom) {
+        const queued = Boolean(snapRef.current.queue);
+        if (document.hidden && !inRoom && !queued) {
           if (!stop) timer = window.setTimeout(tick, 20000);
           return;
         }
@@ -235,18 +236,12 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     const onHide = (ev: PageTransitionEvent) => {
       if (ev.persisted) return;
       const room = snapRef.current.room;
-      if (isLiveMatch(room)) {
-        dismissedRoomId.current = room!.id;
-        lobbyApi.leaveKeepalive(token);
-        roomSeq.current = 0;
-        setSnap((prev) => ({ ...prev, room: null, queue: null }));
-        roomGame.current = null;
-        return;
-      }
-      if (snapRef.current.queue) {
-        lobbyApi.unqueueKeepalive(token);
-        setSnap((prev) => ({ ...prev, queue: null }));
-      }
+      if (!isLiveMatch(room)) return;
+      dismissedRoomId.current = room!.id;
+      lobbyApi.leaveKeepalive(token);
+      roomSeq.current = 0;
+      setSnap((prev) => ({ ...prev, room: null, queue: null }));
+      roomGame.current = null;
     };
     window.addEventListener("pagehide", onHide);
     return () => window.removeEventListener("pagehide", onHide);
