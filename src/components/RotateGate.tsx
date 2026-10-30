@@ -8,7 +8,7 @@ function isPhone() {
 
 function tryLockLandscape() {
   if (!isPhone()) return;
-  const orientation = screen.orientation;
+  const orientation = screen.orientation as (ScreenOrientation & { lock?: (mode: string) => Promise<void> }) | undefined;
   if (!orientation || typeof orientation.lock !== "function") return;
   void orientation.lock("landscape").catch(() => undefined);
 }

@@ -1,16 +1,19 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
-import { GAME_PATH, lobbyApi, type Invite, type LobbySnap, type OnlinePlayer, type RoomSnap, type Settlement } from "../lib/lobby";
+import { GAME_PATH, lobbyApi, type Invite, type LobbySnap, type OnlinePlayer, type QueueSnap, type RoomSnap, type Settlement } from "../lib/lobby";
 
 type LobbyCtx = {
   online: OnlinePlayer[];
   invites: Invite[];
   room: RoomSnap | null;
+  queue: QueueSnap | null;
   error: string;
   store: "redis" | "memory" | "";
   inviteCooldownMs: number;
   invite: (toId: string, game: string, meta?: Record<string, unknown>) => Promise<void>;
+  findMatch: (game: string, meta?: Record<string, unknown>) => Promise<void>;
+  cancelMatch: () => Promise<void>;
   respond: (id: string, accept: boolean) => Promise<void>;
   sendAction: (action: object) => Promise<void>;
   adjustCpu: (game: string, mode: "add" | "remove" | "fill" | "open", meta?: Record<string, unknown>) => Promise<void>;
@@ -56,7 +59,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   const { token, user } = useAuth();
   const nav = useNavigate();
   const loc = useLocation();
-  const [snap, setSnap] = useState<LobbySnap>({ online: [], invites: [], room: null, store: "memory" });
+  const [snap, setSnap] = useState<LobbySnap>({ online: [], invites: [], room: null, store: "memory", queue: null });
   const [settlement, setSettlement] = useState<Settlement | null>(null);
   const [error, setError] = useState("");
   const [inviteUntil, setInviteUntil] = useState(0);
@@ -95,7 +98,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!token || !user) {
-      setSnap({ online: [], invites: [], room: null, store: "memory" });
+      setSnap({ online: [], invites: [], room: null, store: "memory", queue: null });
       setSettlement(null);
       roomSeq.current = 0;
       dismissedRoomId.current = null;
@@ -117,6 +120,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
           invites: next.invites,
           room,
           store: next.store || prev.store,
+          queue: next.queue ?? null,
         };
       });
       setError("");
@@ -148,6 +152,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
               snapRef.current.room?.seq ?? 0,
               snapRef.current.invites.length,
               window.location.pathname,
+              snapRef.current.queue?.waiting ?? 0,
               abort.signal,
             );
         if (stop) return;
@@ -230,12 +235,18 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     const onHide = (ev: PageTransitionEvent) => {
       if (ev.persisted) return;
       const room = snapRef.current.room;
-      if (!isLiveMatch(room)) return;
-      dismissedRoomId.current = room!.id;
-      lobbyApi.leaveKeepalive(token);
-      roomSeq.current = 0;
-      setSnap((prev) => ({ ...prev, room: null }));
-      roomGame.current = null;
+      if (isLiveMatch(room)) {
+        dismissedRoomId.current = room!.id;
+        lobbyApi.leaveKeepalive(token);
+        roomSeq.current = 0;
+        setSnap((prev) => ({ ...prev, room: null, queue: null }));
+        roomGame.current = null;
+        return;
+      }
+      if (snapRef.current.queue) {
+        lobbyApi.unqueueKeepalive(token);
+        setSnap((prev) => ({ ...prev, queue: null }));
+      }
     };
     window.addEventListener("pagehide", onHide);
     return () => window.removeEventListener("pagehide", onHide);
@@ -292,6 +303,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       online: snap.online,
       invites: snap.invites,
       room: snap.room,
+      queue: snap.queue ?? null,
       settlement,
       clearSettlement() {
         setSettlement(null);
@@ -310,6 +322,36 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
           ...next,
           online: next.online?.length ? next.online : prev.online,
           room: takeRoom(next.room, prev.room),
+          queue: next.queue ?? null,
+        }));
+      },
+      async findMatch(game, meta = {}) {
+        if (!token) throw new Error("Sign in first");
+        dismissedRoomId.current = null;
+        settledRoom.current = null;
+        setSettlement(null);
+        const next = await lobbyApi.queue(token, game, meta);
+        acceptRoom(next.room);
+        setSnap((prev) => ({
+          ...next,
+          online: next.online?.length ? next.online : prev.online,
+          room: takeRoom(next.room, prev.room),
+          queue: next.queue ?? null,
+        }));
+        if (next.room) {
+          roomSeq.current = next.room.seq || roomSeq.current;
+          const path = GAME_PATH[next.room.game];
+          if (path) nav(path);
+        }
+      },
+      async cancelMatch() {
+        if (!token) return;
+        const next = await lobbyApi.unqueue(token);
+        setSnap((prev) => ({
+          ...next,
+          online: next.online?.length ? next.online : prev.online,
+          room: takeRoom(next.room, prev.room),
+          queue: next.queue ?? null,
         }));
       },
       async respond(id, accept) {
@@ -323,6 +365,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
           ...next,
           online: next.online?.length ? next.online : prev.online,
           room: next.room ? takeRoom(next.room, prev.room) : null,
+          queue: next.queue ?? null,
         }));
         if (accept && next.room) {
           roomSeq.current = next.room.seq || roomSeq.current;
@@ -355,6 +398,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
           ...next,
           online: next.online?.length ? next.online : prev.online,
           room: takeRoom(next.room as RoomSnap | null | undefined, prev.room),
+          queue: next.queue ?? null,
         }));
       },
       async leave() {

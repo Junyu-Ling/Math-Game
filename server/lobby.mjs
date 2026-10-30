@@ -6,8 +6,21 @@ import { SOLO_GAMES, applyForfeit, isLiveMatchState, isLobbyState, withForfeitVi
 const ONLINE_SEC = 20;
 const INVITE_SEC = 60;
 const ROOM_SEC = 7200;
+const QUEUE_TTL = 60;
 const INVITE_COOLDOWN_MS = 5000;
 const USER_SEC = 90 * 24 * 3600;
+const PAIR_LUA = `
+if ARGV[2] ~= '' then redis.call('LREM', KEYS[1], 0, ARGV[2]) end
+redis.call('LPUSH', KEYS[1], ARGV[1])
+redis.call('EXPIRE', KEYS[1], 120)
+local n = tonumber(ARGV[3])
+if redis.call('LLEN', KEYS[1]) >= n then
+  local out = {}
+  for i = 1, n do out[i] = redis.call('RPOP', KEYS[1]) end
+  return out
+end
+return false
+`;
 
 const mem = new Map();
 let redis = null;
@@ -294,6 +307,108 @@ async function smembers(key) {
   return JSON.parse(memGet(key) || "[]");
 }
 
+function memList(key) {
+  try {
+    const rows = JSON.parse(memGet(key) || "[]");
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+function memListSave(key, rows, ttlSec) {
+  memSet(key, JSON.stringify(rows), ttlSec || 0);
+}
+
+async function lpush(key, value, ttlSec = 120) {
+  const r = client();
+  if (r) {
+    try {
+      await r.lpush(key, value);
+      if (ttlSec) await r.expire(key, ttlSec);
+      return;
+    } catch {
+      /* memory */
+    }
+  }
+  const rows = memList(key);
+  rows.unshift(value);
+  memListSave(key, rows, ttlSec);
+}
+
+async function rpop(key) {
+  const r = client();
+  if (r) {
+    try {
+      return await r.rpop(key);
+    } catch {
+      /* memory */
+    }
+  }
+  const rows = memList(key);
+  const v = rows.pop();
+  memListSave(key, rows, 120);
+  return v ?? null;
+}
+
+async function rpush(key, value, ttlSec = 120) {
+  const r = client();
+  if (r) {
+    try {
+      await r.rpush(key, value);
+      if (ttlSec) await r.expire(key, ttlSec);
+      return;
+    } catch {
+      /* memory */
+    }
+  }
+  const rows = memList(key);
+  rows.push(value);
+  memListSave(key, rows, ttlSec);
+}
+
+async function llen(key) {
+  const r = client();
+  if (r) {
+    try {
+      return Number(await r.llen(key)) || 0;
+    } catch {
+      /* memory */
+    }
+  }
+  return memList(key).length;
+}
+
+async function lrangeAll(key) {
+  const r = client();
+  if (r) {
+    try {
+      return await r.lrange(key, 0, -1);
+    } catch {
+      /* memory */
+    }
+  }
+  return memList(key);
+}
+
+async function lremValue(key, value) {
+  if (value == null || value === "") return;
+  const r = client();
+  if (r) {
+    try {
+      await r.lrem(key, 0, value);
+      return;
+    } catch {
+      /* memory */
+    }
+  }
+  memListSave(
+    key,
+    memList(key).filter((row) => row !== value),
+    120,
+  );
+}
+
 async function getMods() {
   if (!modsCache) modsCache = await loadMods();
   return modsCache;
@@ -569,6 +684,7 @@ async function listRoster(viewerId) {
       email: liveP?.email || saved?.email || "",
       online: Boolean(liveP),
       roomId: liveP?.roomId || null,
+      matching: Boolean(liveP?.queueGame),
     });
   }
   out.sort((a, b) => {
@@ -655,6 +771,12 @@ export async function heartbeat(user, href = "", light = false) {
 export async function touchPresence(user, href = "") {
   const id = String(user.id);
   const seat = await getSeat(id);
+  const qGame = await kvGet(`axiom:quser:${id}`);
+  if (qGame) {
+    await kvSet(`axiom:quser:${id}`, qGame, QUEUE_TTL);
+    const ticket = await kvGet(`axiom:qt:${id}`);
+    if (ticket) await kvSet(`axiom:qt:${id}`, ticket, QUEUE_TTL);
+  }
   const rec = {
     id,
     name: playerName(user),
@@ -664,15 +786,17 @@ export async function touchPresence(user, href = "") {
     seenAt: Date.now(),
     href,
     roomId: seat,
+    queueGame: qGame || "",
   };
   await kvSet(`axiom:p:${id}`, rec, ONLINE_SEC);
   await sadd("axiom:online", id, ONLINE_SEC + 5);
 }
 
-export async function watchLobby(user, seq = 0, inviteCount = -1, href = "", timeoutMs = 8000) {
+export async function watchLobby(user, seq = 0, inviteCount = -1, href = "", timeoutMs = 8000, queueCount = -1) {
   const id = String(user.id);
   const wantSeq = Number(seq) || 0;
   const wantInv = Number(inviteCount);
+  const wantQueue = Number(queueCount);
   void touchPresence(user, href);
   ensureSub();
   const started = Date.now();
@@ -694,6 +818,7 @@ export async function watchLobby(user, seq = 0, inviteCount = -1, href = "", tim
     const roomSeq = snap.room?.seq || 0;
     if (roomSeq !== wantSeq) return snap;
     if (wantInv >= 0 && snap.invites.length !== wantInv) return snap;
+    if (wantQueue >= 0 && (snap.queue?.waiting ?? 0) !== wantQueue) return snap;
     const left = timeoutMs - (Date.now() - started);
     const slice = soonest > 0 ? Math.min(left, soonest) : left;
     if (slice < 20) break;
@@ -737,6 +862,7 @@ export async function snapshot(userId, light = false) {
     store: lobbyStoreKind(),
     light: Boolean(light),
     settlement: pending?.game ? pending : null,
+    queue: await queueSnap(userId),
   };
 }
 
@@ -807,6 +933,7 @@ export async function createInvite(from, toId, game, meta = {}) {
   await sadd(`axiom:uinv:${fromId}`, id, INVITE_SEC);
   await sadd(`axiom:uinv:${toId}`, id, INVITE_SEC);
   await kvSet(`axiom:invcd:${fromId}`, String(Date.now()), 15);
+  await leaveQueue(fromId);
   await wakeUsers([toId, fromId]);
   return invite;
 }
@@ -820,6 +947,8 @@ export async function respondInvite(user, inviteId, accept, mods) {
   await srem(`axiom:uinv:${invite.toId}`, inviteId);
   await wakeUsers([invite.fromId, invite.toId]);
   if (!accept) return { ok: true, declined: true };
+  await leaveQueue(user.id);
+  await leaveQueue(invite.fromId);
   if (OPEN_TABLES.has(invite.game)) {
     return joinOpenTable(user, invite, mods);
   }
@@ -1457,6 +1586,7 @@ async function forfeitIfAbsent(rec, exceptId) {
 }
 
 export async function leaveRoom(userId) {
+  await leaveQueue(userId);
   const rid = await getSeat(userId);
   if (!rid) return snapshot(userId);
   const rec = await attachMods(await getRoomRecord(rid));
@@ -1607,6 +1737,7 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
 
   // Open table / start fresh: leave any stuck finished/other-game seat first.
   if (open) {
+    await leaveQueue(userId);
     if (inLobbyHere && rec.seats[0] === userId) {
       return { ok: true, room: publicRoom(rec, userId) };
     }
@@ -1674,4 +1805,203 @@ export async function adjustCpu(user, game, mode, mods, meta = {}) {
   rec.seq = (rec.seq || 0) + 1;
   await saveRoom(rec);
   return { ok: true, room: publicRoom(rec, userId) };
+}
+
+function qKey(game) {
+  return `axiom:q:${game}`;
+}
+
+function matchNeed(game) {
+  if (game === "werewolf") return 4;
+  return 2;
+}
+
+function parseTicket(raw) {
+  if (!raw) return null;
+  try {
+    const t = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!t?.userId) return null;
+    return t;
+  } catch {
+    return null;
+  }
+}
+
+async function queueSnap(userId) {
+  const game = await kvGet(`axiom:quser:${userId}`);
+  if (!game) return null;
+  const waiting = await llen(qKey(game));
+  if (waiting < 1) {
+    await kvDel(`axiom:quser:${userId}`);
+    await kvDel(`axiom:qt:${userId}`);
+    return null;
+  }
+  return { game: String(game), waiting };
+}
+
+async function wakeQueue(game) {
+  const raws = await lrangeAll(qKey(game));
+  const ids = [];
+  for (const raw of raws) {
+    const t = parseTicket(raw);
+    if (t?.userId) ids.push(t.userId);
+  }
+  await wakeUsers(ids);
+}
+
+export async function leaveQueue(userId) {
+  const id = String(userId || "");
+  if (!id) return;
+  const game = await kvGet(`axiom:quser:${id}`);
+  const ticket = await kvGet(`axiom:qt:${id}`);
+  if (game && ticket) await lremValue(qKey(game), ticket);
+  await kvDel(`axiom:quser:${id}`);
+  await kvDel(`axiom:qt:${id}`);
+  if (game) await wakeQueue(game);
+}
+
+async function pushAndMaybePair(game, ticket, prevTicket, need) {
+  const key = qKey(game);
+  const r = client();
+  if (r) {
+    try {
+      const pair = await r.eval(PAIR_LUA, 1, key, ticket, prevTicket || "", String(need));
+      if (Array.isArray(pair) && pair.length >= need) {
+        return pair.map(parseTicket).filter(Boolean);
+      }
+      if (pair) return null;
+    } catch {
+      /* memory */
+    }
+  }
+  if (prevTicket) await lremValue(key, prevTicket);
+  await lpush(key, ticket, 120);
+  if ((await llen(key)) < need) return null;
+  const taken = [];
+  while (taken.length < need) {
+    const raw = await rpop(key);
+    if (!raw) break;
+    const t = parseTicket(raw);
+    if (t) taken.push(t);
+  }
+  if (taken.length < need) {
+    for (const t of taken.reverse()) await rpush(key, JSON.stringify(t), 120);
+    return null;
+  }
+  return taken;
+}
+
+function autoStartMatched(room, mods) {
+  const hostId = String(room.seats[0]);
+  const before = room.state;
+  const start = { type: "start" };
+  if (room.game === "coda") {
+    let state = room.state;
+    for (const p of state.players || []) {
+      state = mods.coda.applyAction(state, p.id, { type: "ready" });
+    }
+    room.state = state;
+    if (state.phase === "arrange" && before.phase !== "arrange") {
+      room.endsAt = Date.now() + (mods.coda.ARRANGE_MS || 5000);
+    }
+    return;
+  }
+  if (room.game === "flip7") room.state = mods.flip.applyFlipAction(room.state, hostId, start);
+  else if (room.game === "bj") room.state = mods.bj.applyBjDuelAction(room.state, hostId, start);
+  else if (room.game === "m24") room.state = mods.m24.applyM24Action(room.state, hostId, start);
+  else if (room.game === "uno") room.state = mods.uno.applyUnoAction(room.state, hostId, start);
+  else if (room.game === "halli") room.state = mods.halli.applyHalliAction(room.state, hostId, start);
+  else if (room.game === "holdem") room.state = mods.holdem.applyHoldemAction(room.state, hostId, start);
+  else if (room.game === "ecard") room.state = mods.ecard.applyEcardAction(room.state, hostId, start);
+  else if (room.game === "gomoku") room.state = mods.gomoku.applyGomokuAction(room.state, hostId, start);
+  else if (room.game === "werewolf") room.state = mods.werewolf.applyWerewolfAction(room.state, hostId, start);
+  else if (room.game === "ludo") room.state = mods.ludo.applyLudoAction(room.state, hostId, start);
+  if (room.game === "ecard" && room.state.rpsReveal && !before.rpsReveal) {
+    room.endsAt = Date.now() + (mods.ecard.RPS_REVEAL_MS || 2800);
+  }
+  if (room.game === "gomoku" && room.state.rpsReveal && !before.rpsReveal) {
+    room.endsAt = Date.now() + (mods.gomoku.RPS_REVEAL_MS || 2800);
+  }
+}
+
+async function createMatchedRoom(tickets, game, mods) {
+  const people = tickets.map((t) => ({
+    id: String(t.userId),
+    name: t.name || "PLAYER",
+    human: true,
+  }));
+  for (const t of tickets) {
+    await touchPresence({
+      id: t.userId,
+      name: t.name,
+      login: t.login,
+      avatar: t.avatar,
+    });
+  }
+  const meta = tickets[0]?.meta || {};
+  const seats = people.map((p) => p.id);
+  const room = {
+    id: uid("room"),
+    game,
+    seats,
+    faces: await seatFaces(seats),
+    state: newLobbyState(game, people, mods, meta),
+    endsAt: null,
+    seq: 1,
+    mods,
+  };
+  autoStartMatched(room, mods);
+  await saveRoom(room);
+  return room;
+}
+
+export async function enqueueMatch(user, game, meta = {}) {
+  game = String(game || "");
+  if (!OPEN_TABLES.has(game)) throw new Error("This game has no matchmaking");
+  const userId = String(user.id);
+  await touchPresence(user);
+  const seated = await getSeat(userId);
+  if (seated) {
+    const rec = await attachMods(await getRoomRecord(seated));
+    if (rec && isLiveMatchState(rec.game, rec.state)) throw new Error("You are already in a game");
+    if (rec) await vacateSeat(userId, rec);
+  }
+  const prevTicket = (await kvGet(`axiom:qt:${userId}`)) || "";
+  const prevGame = await kvGet(`axiom:quser:${userId}`);
+  if (prevGame && prevGame !== game && prevTicket) await lremValue(qKey(prevGame), prevTicket);
+  const ticket = JSON.stringify({
+    userId,
+    name: playerName(user),
+    login: user.login || "",
+    avatar: user.avatar || "",
+    meta: meta && typeof meta === "object" ? meta : {},
+    at: Date.now(),
+  });
+  await kvSet(`axiom:qt:${userId}`, ticket, QUEUE_TTL);
+  await kvSet(`axiom:quser:${userId}`, game, QUEUE_TTL);
+  const need = matchNeed(game);
+  const pair = await pushAndMaybePair(game, ticket, prevGame === game ? prevTicket : "", need);
+  if (pair && pair.length >= need) {
+    const ready = [];
+    for (const t of pair) {
+      const still = await kvGet(`axiom:quser:${t.userId}`);
+      if (!still || still !== game || (await getSeat(t.userId))) continue;
+      ready.push(t);
+    }
+    if (ready.length >= need) {
+      const seated = ready.slice(0, need);
+      for (const t of seated) {
+        await kvDel(`axiom:quser:${t.userId}`);
+        await kvDel(`axiom:qt:${t.userId}`);
+      }
+      const mods = await getMods();
+      await createMatchedRoom(seated, game, mods);
+    } else {
+      for (const t of ready) await rpush(qKey(game), JSON.stringify(t), 120);
+      await wakeQueue(game);
+    }
+  } else {
+    await wakeQueue(game);
+  }
+  return snapshot(userId);
 }

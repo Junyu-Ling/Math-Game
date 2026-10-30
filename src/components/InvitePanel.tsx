@@ -69,8 +69,9 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
         online.map((p) => {
           const live = p.online !== false;
           const inGame = live && Boolean(p.roomId);
-          const status = !live ? "Offline" : inGame ? "In game" : "Online";
-          const statusClass = !live ? "off" : inGame ? "busy" : "on";
+          const matching = live && Boolean(p.matching);
+          const status = !live ? "Offline" : inGame ? "In game" : matching ? "Matching" : "Online";
+          const statusClass = !live ? "off" : inGame || matching ? "busy" : "on";
           return (
           <div key={p.id} className="person-row">
             <Avatar src={p.avatar} name={p.name} />
@@ -81,10 +82,10 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
             <button
               className="btn"
               type="button"
-              disabled={!canInviteMore || !live || inGame || seated.has(p.id)}
+              disabled={!canInviteMore || !live || inGame || matching || seated.has(p.id)}
               onClick={() => void invite(p.id, game, meta).catch((ex) => alert(ex.message))}
             >
-              {!live ? "Offline" : inGame ? "In game" : cooling ? `Invite (${waitSec})` : "Invite"}
+              {!live ? "Offline" : inGame ? "In game" : matching ? "Matching" : cooling ? `Invite (${waitSec})` : "Invite"}
             </button>
           </div>
           );

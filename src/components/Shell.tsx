@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { GAME_LABEL, GAME_PATH, matchNeed } from "../lib/lobby";
+import { useLobby } from "../context/LobbyContext";
 import { usePlayMeta } from "../lib/playMeta";
 import { Avatar } from "./Avatar";
 import { InvitePanel } from "./InvitePanel";
@@ -66,6 +68,31 @@ function NavInvite() {
   );
 }
 
+function MatchBanner() {
+  const { queue, cancelMatch } = useLobby();
+  if (!queue) return null;
+  const need = matchNeed(queue.game);
+  const label = GAME_LABEL[queue.game] || queue.game;
+  const path = GAME_PATH[queue.game];
+  return (
+    <div className="match-banner" role="status">
+      <p>
+        {path ? (
+          <NavLink to={path}>{label}</NavLink>
+        ) : (
+          <strong>{label}</strong>
+        )}
+        {need > 2
+          ? ` · searching ${queue.waiting}/${need}`
+          : ` · searching · ${queue.waiting} in queue`}
+      </p>
+      <button className="btn btn-ghost" type="button" onClick={() => void cancelMatch()}>
+        Cancel
+      </button>
+    </div>
+  );
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   return (
@@ -94,6 +121,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </nav>
       </header>
       <InviteToasts />
+      <MatchBanner />
       <RotateGate />
       <main>{children}</main>
     </div>

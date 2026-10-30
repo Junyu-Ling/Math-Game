@@ -25,7 +25,9 @@ import {
   adjustCpu,
   applyRoomAction,
   createInvite,
+  enqueueMatch,
   heartbeat,
+  leaveQueue,
   leaveRoom,
   lobbyStoreKind,
   findAccountByEmail,
@@ -248,7 +250,7 @@ app.get("/api/health", async (_req, res) => {
     smtp: mailConfigured(),
     github: githubReady(),
     google: googleReady(),
-    match: false,
+    match: true,
     lobby: true,
     lobbyStore: lobbyStoreKind(),
     ws: "",
@@ -587,7 +589,14 @@ app.get("/api/lobby", auth, async (req, res) => {
   const href = String(req.query.href || "");
   if (String(req.query.watch || "") === "1") {
     return res.json(
-      await watchLobby(req.user, Number(req.query.seq || 0), Number(req.query.invites ?? -1), href),
+      await watchLobby(
+        req.user,
+        Number(req.query.seq || 0),
+        Number(req.query.invites ?? -1),
+        href,
+        8000,
+        Number(req.query.queue || -1),
+      ),
     );
   }
   res.json(await heartbeat(req.user, href, String(req.query.light || "") === "1"));
@@ -616,6 +625,13 @@ app.post("/api/lobby", auth, async (req, res) => {
     }
     if (op === "leave") {
       return res.json(await leaveRoom(req.user.id));
+    }
+    if (op === "queue") {
+      return res.json(await enqueueMatch(req.user, String(req.body.game || ""), req.body.meta || {}));
+    }
+    if (op === "unqueue") {
+      await leaveQueue(req.user.id);
+      return res.json(await snapshot(req.user.id));
     }
     res.status(400).json({ error: "未知操作" });
   } catch (err) {

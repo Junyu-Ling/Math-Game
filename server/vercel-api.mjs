@@ -16,9 +16,11 @@ import {
   adjustCpu,
   applyRoomAction,
   createInvite,
+  enqueueMatch,
   findAccountByEmail,
   findAccountById,
   heartbeat,
+  leaveQueue,
   leaveRoom,
   lobbyStoreKind,
   rememberPlayer,
@@ -161,7 +163,7 @@ export async function handle(req, res, path) {
       github: githubReady(),
       google: googleReady(),
       githubSecretIsUrl: githubSecretLooksLikeUrl(),
-      match: false,
+      match: true,
       lobby: true,
       lobbyStore: lobbyStoreKind(),
       vercel: true,
@@ -266,7 +268,14 @@ export async function handle(req, res, path) {
           send(
             res,
             200,
-            await watchLobby(user, Number(query(req, "seq") || 0), Number(query(req, "invites") || -1), query(req, "href")),
+            await watchLobby(
+              user,
+              Number(query(req, "seq") || 0),
+              Number(query(req, "invites") || -1),
+              query(req, "href"),
+              8000,
+              Number(query(req, "queue") || -1),
+            ),
           );
           return;
         }
@@ -299,6 +308,15 @@ export async function handle(req, res, path) {
       }
       if (op === "leave") {
         send(res, 200, await leaveRoom(user.id));
+        return;
+      }
+      if (op === "queue") {
+        send(res, 200, await enqueueMatch(user, String(body.game || ""), body.meta || {}));
+        return;
+      }
+      if (op === "unqueue") {
+        await leaveQueue(user.id);
+        send(res, 200, await heartbeat(user));
         return;
       }
       send(res, 400, { error: "Unknown operation" });

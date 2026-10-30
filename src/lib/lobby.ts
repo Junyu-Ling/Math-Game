@@ -8,6 +8,12 @@ export type OnlinePlayer = {
   email?: string;
   online?: boolean;
   roomId?: string | null;
+  matching?: boolean;
+};
+
+export type QueueSnap = {
+  game: string;
+  waiting: number;
 };
 
 export type Invite = {
@@ -40,6 +46,7 @@ export type LobbySnap = {
   store?: "redis" | "memory";
   light?: boolean;
   settlement?: Settlement | null;
+  queue?: QueueSnap | null;
 };
 
 async function call(token: string, path: string, init: RequestInit = {}): Promise<LobbySnap & Record<string, unknown>> {
@@ -91,6 +98,12 @@ export function minStart(game?: string) {
   return 2;
 }
 
+/** Players pulled from the match queue before the table starts. */
+export function matchNeed(game?: string) {
+  if (game === "werewolf") return 4;
+  return 2;
+}
+
 export function isCpuId(id: string) {
   return /^(cpu|bot|ai)/i.test(id);
 }
@@ -100,8 +113,8 @@ export const lobbyApi = {
     const q = `href=${encodeURIComponent(href)}${light ? "&light=1" : ""}`;
     return call(token, `/api/lobby?${q}`);
   },
-  watch(token: string, seq: number, invites: number, href = "", signal?: AbortSignal) {
-    const q = `watch=1&seq=${encodeURIComponent(String(seq))}&invites=${encodeURIComponent(String(invites))}&href=${encodeURIComponent(href)}`;
+  watch(token: string, seq: number, invites: number, href = "", queue = 0, signal?: AbortSignal) {
+    const q = `watch=1&seq=${encodeURIComponent(String(seq))}&invites=${encodeURIComponent(String(invites))}&href=${encodeURIComponent(href)}&queue=${encodeURIComponent(String(queue))}`;
     return call(token, `/api/lobby?${q}`, { signal });
   },
   invite(token: string, toId: string, game: string, meta: Record<string, unknown> = {}) {
@@ -116,6 +129,12 @@ export const lobbyApi = {
   cpu(token: string, game: string, mode: "add" | "remove" | "fill" | "open", meta: Record<string, unknown> = {}) {
     return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "cpu", game, mode, meta }) });
   },
+  queue(token: string, game: string, meta: Record<string, unknown> = {}) {
+    return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "queue", game, meta }) });
+  },
+  unqueue(token: string) {
+    return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "unqueue" }) });
+  },
   leave(token: string) {
     return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "leave" }) });
   },
@@ -129,6 +148,18 @@ export const lobbyApi = {
       method: "POST",
       headers,
       body: JSON.stringify({ op: "leave" }),
+      keepalive: true,
+    });
+  },
+  unqueueKeepalive(token: string) {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+    void fetch(`${apiBase}/api/lobby`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ op: "unqueue" }),
       keepalive: true,
     });
   },

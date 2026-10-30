@@ -106,6 +106,28 @@ button:disabled {
   z-index: 20;
 }
 
+.match-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px max(var(--gutter), var(--sar)) 10px max(var(--gutter), var(--sal));
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+
+.match-banner p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.match-banner a,
+.match-banner strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .invite-toasts {
   position: fixed;
   top: calc(68px + var(--sat));
