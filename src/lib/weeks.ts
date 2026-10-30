@@ -82,15 +82,16 @@ export const CATALOG: CatalogGame[] = [
     preview: "gomoku",
     week: "steam",
   },
-  {
-    to: "/play/werewolf",
-    idx: "06",
-    code: "WOLF",
-    name: "Werewolf",
-    blurb: "Night and day in a small village. Wolves hunt, the Seer checks, the Witch may save or poison.",
-    preview: "wolf",
-    week: "steam",
-  },
+  // Deferred — Werewolf
+  // {
+  //   to: "/play/werewolf",
+  //   idx: "06",
+  //   code: "WOLF",
+  //   name: "Werewolf",
+  //   blurb: "Night and day in a small village. Wolves hunt, the Seer checks, the Witch may save or poison.",
+  //   preview: "wolf",
+  //   week: "steam",
+  // },
   {
     to: "/play/flip7",
     idx: "07",

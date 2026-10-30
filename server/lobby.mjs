@@ -1470,7 +1470,8 @@ const OPEN_TABLES = new Set([
   "bj",
   "m24",
   "holdem",
-  "werewolf",
+  // Deferred — Werewolf
+  // "werewolf",
   // Deferred — Flying Chess
   // "ludo",
 ]);

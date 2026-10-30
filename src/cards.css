@@ -851,6 +851,149 @@
   margin: 0 0 16px;
 }
 
+.match-duel {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 28px 20px 24px;
+  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 92%, #fff);
+  text-align: center;
+}
+
+.match-duel-close {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.match-duel-title .kicker {
+  margin-bottom: 6px;
+}
+
+.match-duel-title h2 {
+  margin: 0;
+  font-size: clamp(22px, 3vw, 28px);
+  letter-spacing: -0.04em;
+}
+
+.match-duel-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(14px, 4vw, 36px);
+  width: min(520px, 100%);
+}
+
+.match-duel-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.match-duel-face {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  box-shadow: 0 0 0 6px #fff, 0 0 0 7px var(--line);
+}
+
+.match-duel-face .avatar {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50%;
+}
+
+.match-duel-face.is-wait {
+  border-style: dashed;
+  border-color: var(--faint);
+  color: var(--faint);
+  font-size: 34px;
+  font-weight: 600;
+  animation: match-wait 1.6s ease-in-out infinite;
+}
+
+.match-duel-name {
+  display: inline-block;
+  max-width: 140px;
+  margin-top: 12px;
+  padding: 4px 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.match-duel-name.is-wait {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.match-duel-vs {
+  flex: 0 0 auto;
+  font-family: "Barlow Condensed", var(--sans);
+  font-size: clamp(36px, 6vw, 56px);
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.match-duel-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@keyframes match-wait {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (max-height: 520px), (max-width: 700px) {
+  .match-duel {
+    gap: 12px;
+    padding: 18px 12px 16px;
+  }
+  .match-duel-face {
+    width: 72px;
+    height: 72px;
+    box-shadow: 0 0 0 4px #fff, 0 0 0 5px var(--line);
+  }
+  .match-duel-vs {
+    font-size: 36px;
+  }
+  .match-duel-name {
+    margin-top: 8px;
+  }
+}
+
 .cpu-bar p {
   margin: 0 0 10px;
   font-size: 0.88rem;

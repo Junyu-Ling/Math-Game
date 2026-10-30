@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { GAME_LABEL, GAME_PATH, matchNeed } from "../lib/lobby";
+import { GAME_LABEL, GAME_PATH } from "../lib/lobby";
 import { useLobby } from "../context/LobbyContext";
 import { usePlayMeta } from "../lib/playMeta";
 import { Avatar } from "./Avatar";
@@ -21,7 +21,8 @@ const GAME_BY_PATH: Record<string, string> = {
   // Deferred — Flying Chess
   // "/play/ludo": "ludo",
   "/play/24": "m24",
-  "/play/werewolf": "werewolf",
+  // Deferred — Werewolf
+  // "/play/werewolf": "werewolf",
   "/play/animal": "animal",
   "/play/army": "army",
 };
@@ -68,28 +69,16 @@ function NavInvite() {
   );
 }
 
-function MatchBanner() {
-  const { queue, cancelMatch } = useLobby();
+function NavMatch() {
+  const { queue } = useLobby();
   if (!queue) return null;
-  const need = matchNeed(queue.game);
   const label = GAME_LABEL[queue.game] || queue.game;
   const path = GAME_PATH[queue.game];
+  if (!path) return <span>Matching</span>;
   return (
-    <div className="match-banner" role="status">
-      <p>
-        {path ? (
-          <NavLink to={path}>{label}</NavLink>
-        ) : (
-          <strong>{label}</strong>
-        )}
-        {need > 2
-          ? ` · searching ${queue.waiting}/${need}`
-          : ` · searching · ${queue.waiting} in queue`}
-      </p>
-      <button className="btn btn-ghost" type="button" onClick={() => void cancelMatch()}>
-        Cancel
-      </button>
-    </div>
+    <NavLink to={path} title={`Matching ${label}`}>
+      Matching
+    </NavLink>
   );
 }
 
@@ -104,6 +93,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </NavLink>
         <nav className="nav">
           <NavInvite />
+          <NavMatch />
           {user ? (
             <>
               <span className="chip-pill">{user.chips}</span>
@@ -121,7 +111,6 @@ export function Shell({ children }: { children: ReactNode }) {
         </nav>
       </header>
       <InviteToasts />
-      <MatchBanner />
       <RotateGate />
       <main>{children}</main>
     </div>

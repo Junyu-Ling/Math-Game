@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLobby } from "../context/LobbyContext";
 import { GAME_LABEL, isCpuId, matchNeed, minStart, tableMax } from "../lib/lobby";
+import { Avatar } from "./Avatar";
 
 export function MixedCpuBar({
   game,
@@ -126,14 +128,19 @@ export function MixedCpuBar({
     );
   }
 
+  if (searching) {
+    return (
+      <>
+        <MatchDuel game={game} busy={busy} onCancel={() => void stopSearch()} />
+        {error ? <p className="msg err">{error}</p> : null}
+      </>
+    );
+  }
+
   return (
     <div className="cpu-bar">
       <p>
-        {searching
-          ? need > 2
-            ? `Searching for ${GAME_LABEL[game] || game}. ${queue?.waiting ?? 1} of ${need} in queue.`
-            : `Searching for a player. ${queue?.waiting ?? 1} in queue.`
-          : seatedHere && !host
+        {seatedHere && !host
             ? "You're at the table. Ready up when you're set."
             : !atTable
               ? showPractice
@@ -161,18 +168,13 @@ export function MixedCpuBar({
             className="btn btn-ghost"
             type="button"
             onClick={() => {
-              if (searching) void cancelMatch();
               onPractice?.(cpus);
             }}
           >
             {practiceLabel()}
           </button>
         ) : null}
-        {searching ? (
-          <button className="btn" type="button" disabled={busy} onClick={() => void stopSearch()}>
-            {busy ? "Canceling…" : "Cancel search"}
-          </button>
-        ) : seatedHere && !host ? null : !atTable ? (
+        {seatedHere && !host ? null : !atTable ? (
           <>
             <button className="btn" type="button" disabled={!canMatch} onClick={() => void search()}>
               {busy ? "Searching…" : need > 2 ? `Find match · ${need}P` : "Find match"}
@@ -199,6 +201,69 @@ export function MixedCpuBar({
       </div>
       {error ? <p className="msg err">{error}</p> : null}
     </div>
+  );
+}
+
+function MatchDuel({
+  game,
+  busy,
+  onCancel,
+}: {
+  game: string;
+  busy: boolean;
+  onCancel: () => void;
+}) {
+  const { user } = useAuth();
+  const { queue } = useLobby();
+  const mark = useRef<HTMLSpanElement>(null);
+  const [host, setHost] = useState<Element | null>(null);
+
+  useLayoutEffect(() => {
+    setHost(mark.current?.closest(".table") ?? null);
+  }, []);
+
+  if (!queue || queue.game !== game) return null;
+
+  const name = user?.login || user?.name || user?.email?.split("@")[0] || "You";
+  const need = matchNeed(game);
+  const ui = (
+    <div className="match-duel" role="status" aria-live="polite">
+      <button className="match-duel-close" type="button" aria-label="Cancel search" disabled={busy} onClick={onCancel}>
+        ×
+      </button>
+      <div className="match-duel-title">
+        <p className="kicker">Find match</p>
+        <h2>{GAME_LABEL[game] || game}</h2>
+      </div>
+      <div className="match-duel-row">
+        <div className="match-duel-slot">
+          <div className="match-duel-face">
+            <Avatar src={user?.avatar} name={name} size={96} />
+          </div>
+          <span className="match-duel-name">{name}</span>
+        </div>
+        <span className="match-duel-vs" aria-hidden>
+          VS
+        </span>
+        <div className="match-duel-slot">
+          <div className="match-duel-face is-wait">?</div>
+          <span className="match-duel-name is-wait">Waiting</span>
+        </div>
+      </div>
+      <p className="match-duel-status">
+        {need > 2 ? `${queue.waiting} of ${need} in queue` : "Looking for a player"}
+      </p>
+      <button className="btn btn-ghost" type="button" disabled={busy} onClick={onCancel}>
+        {busy ? "Canceling…" : "Cancel"}
+      </button>
+    </div>
+  );
+
+  return (
+    <>
+      <span ref={mark} hidden />
+      {host ? createPortal(ui, host) : ui}
+    </>
   );
 }
 
