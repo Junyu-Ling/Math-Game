@@ -44,7 +44,7 @@ const CPU_NAMES = ["CPU", "CPU 2", "CPU 3", "CPU 4", "CPU 5", "CPU 6", "CPU 7", 
 function tableMax(game) {
   if (game === "flip7") return 16;
   if (game === "werewolf") return 8;
-  if (game === "gomoku" || game === "ecard" || game === "bj" || game === "m24" || game === "holdem")
+  if (game === "gomoku" || game === "ecard" || game === "bj" || game === "m24" || game === "holdem" || game === "ttt" || game === "c4")
     return 2;
   return 4;
 }
@@ -902,6 +902,28 @@ async function expireArrange(room, force = false) {
     room.state = room.mods.ecard.finishEcardRps(room.state);
   } else if (room.game === "gomoku" && room.state.rpsReveal && room.mods.gomoku.finishGomokuRps) {
     room.state = room.mods.gomoku.finishGomokuRps(room.state);
+  } else if (room.game === "snake") {
+    if (room.state.phase === "countdown" && room.mods.snake.finishCountdown) {
+      room.state = room.mods.snake.finishCountdown(room.state);
+      if (room.state.phase === "play") {
+        room.endsAt = Date.now() + (room.mods.snake.TICK_MS || 160);
+        armCpuThink(room);
+        room.seq = (room.seq || 0) + 1;
+        await saveRoom(room);
+        return;
+      }
+    } else if (room.state.phase === "play" && room.mods.snake.stepSnake) {
+      room.state = room.mods.snake.stepSnake(room.state);
+      if (room.state.phase === "play") {
+        room.endsAt = Date.now() + (room.mods.snake.TICK_MS || 160);
+        armCpuThink(room);
+        room.seq = (room.seq || 0) + 1;
+        await saveRoom(room);
+        return;
+      }
+    } else {
+      return;
+    }
   } else {
     return;
   }
@@ -1003,6 +1025,12 @@ function startRoom(invite, from, to, mods) {
     state = mods.ecard.startEcardDuel(a, b);
   } else if (invite.game === "gomoku") {
     state = mods.gomoku.startGomokuDuel(a, b);
+  } else if (invite.game === "ttt") {
+    state = mods.ttt.startTttDuel(a, b);
+  } else if (invite.game === "c4") {
+    state = mods.c4.startC4Duel(a, b);
+  } else if (invite.game === "snake") {
+    state = mods.snake.startSnakeDuel(a, b);
   } else if (invite.game === "werewolf") {
     state = mods.werewolf.startWerewolfLobby([a, b]);
   } else if (invite.game === "ludo") {
@@ -1072,6 +1100,9 @@ function newLobbyState(game, people, mods, meta) {
   if (game === "flip7") return mods.flip.startFlip7Lobby(people);
   if (game === "halli") return mods.halli.startHalliLobby(people);
   if (game === "gomoku") return mods.gomoku.startGomokuLobby(people);
+  if (game === "ttt") return mods.ttt.startTttLobby(people);
+  if (game === "c4") return mods.c4.startC4Lobby(people);
+  if (game === "snake") return mods.snake.startSnakeLobby(people);
   if (game === "ecard") return mods.ecard.startEcardLobby(people);
   if (game === "bj") return mods.bj.startBjLobby(people);
   if (game === "m24") return mods.m24.startM24Lobby(people);
@@ -1087,6 +1118,9 @@ function rebuildLobby(rec, joiner, mods) {
   if (rec.game === "flip7") return mods.flip.startFlip7Lobby(people);
   if (rec.game === "halli") return mods.halli.startHalliLobby(people);
   if (rec.game === "gomoku") return mods.gomoku.startGomokuLobby(people);
+  if (rec.game === "ttt") return mods.ttt.startTttLobby(people);
+  if (rec.game === "c4") return mods.c4.startC4Lobby(people);
+  if (rec.game === "snake") return mods.snake.startSnakeLobby(people);
   if (rec.game === "ecard") return mods.ecard.startEcardLobby(people);
   if (rec.game === "bj") return mods.bj.startBjLobby(people);
   if (rec.game === "m24") return mods.m24.startM24Lobby(people);
@@ -1169,6 +1203,15 @@ function cpuIsToAct(room) {
     const cur = s.players[s.turn];
     return Boolean(isCpuPlayer(cur));
   }
+  if (room.game === "ttt" || room.game === "c4") {
+    if (s.phase !== "play") return false;
+    const cur = s.players[s.turn];
+    return Boolean(isCpuPlayer(cur));
+  }
+  if (room.game === "snake") {
+    if (s.phase !== "play" && s.phase !== "countdown") return false;
+    return s.players.some((p) => isCpuPlayer(p) && p.alive);
+  }
   if (room.game === "ecard") {
     if (s.rpsReveal) return false;
     if (s.phase === "rps") {
@@ -1233,7 +1276,7 @@ function armCpuThink(room) {
   // RAPFI already spends wall-clock time thinking; don't add a full extra second.
   // Make 24 races humans �?give the CPU a few seconds like local practice.
   const delay =
-    room.game === "gomoku" && rapfiAvailable() ? 180 : room.game === "m24" ? 8000 : CPU_THINK_MS;
+    room.game === "gomoku" && rapfiAvailable() ? 180 : room.game === "m24" ? 8000 : room.game === "snake" ? 80 : CPU_THINK_MS;
   room.cpuReadyAt = Date.now() + delay;
 }
 
@@ -1365,6 +1408,31 @@ async function playOneCpuTurn(room) {
     return true;
   }
 
+  if (room.game === "ttt") {
+    const cur = s.players[s.turn];
+    if (!isCpuPlayer(cur)) return false;
+    room.state = mods.ttt.applyTttAction(s, cur.id, mods.ttt.aiTtt(s));
+    return true;
+  }
+
+  if (room.game === "c4") {
+    const cur = s.players[s.turn];
+    if (!isCpuPlayer(cur)) return false;
+    room.state = mods.c4.applyC4Action(s, cur.id, mods.c4.aiC4(s));
+    return true;
+  }
+
+  if (room.game === "snake") {
+    let next = s;
+    for (const p of s.players) {
+      if (!isCpuPlayer(p) || !p.alive) continue;
+      next = mods.snake.applySnakeAction(next, p.id, mods.snake.aiSnake(next, p.id));
+    }
+    if (next === s) return false;
+    room.state = next;
+    return true;
+  }
+
   if (room.game === "ecard") {
     if (s.phase === "reveal") {
       const cpu = s.players.find((p) => isCpuPlayer(p));
@@ -1468,6 +1536,9 @@ const OPEN_TABLES = new Set([
   "flip7",
   "halli",
   "gomoku",
+  "ttt",
+  "c4",
+  "snake",
   "ecard",
   "bj",
   "m24",
@@ -1540,6 +1611,15 @@ export async function applyRoomAction(user, roomId, action, mods) {
     room.state = mods.gomoku.applyGomokuAction(room.state, user.id, action);
     if (room.state.rpsReveal && !before.rpsReveal) {
       room.endsAt = Date.now() + (mods.gomoku.RPS_REVEAL_MS || 2800);
+    }
+  } else if (room.game === "ttt") {
+    room.state = mods.ttt.applyTttAction(room.state, user.id, action);
+  } else if (room.game === "c4") {
+    room.state = mods.c4.applyC4Action(room.state, user.id, action);
+  } else if (room.game === "snake") {
+    room.state = mods.snake.applySnakeAction(room.state, user.id, action);
+    if (room.state.phase === "countdown" && before.phase !== "countdown") {
+      room.endsAt = Date.now() + (mods.snake.COUNTDOWN_MS || 3000);
     }
   } else if (room.game === "werewolf") {
     room.state = mods.werewolf.applyWerewolfAction(room.state, user.id, action);
@@ -1707,7 +1787,10 @@ function publicRoom(room, viewerId) {
       else if (room.game === "gomoku") {
         const st = typeof mods.gomoku.normalizeGomoku === "function" ? mods.gomoku.normalizeGomoku(room.state) : room.state;
         view = mods.gomoku.viewGomoku(st, viewerId);
-      } else if (room.game === "werewolf") view = mods.werewolf.viewWerewolf(room.state, viewerId);
+      } else if (room.game === "ttt") view = mods.ttt.viewTtt(room.state, viewerId);
+      else if (room.game === "c4") view = mods.c4.viewC4(room.state, viewerId);
+      else if (room.game === "snake") view = mods.snake.viewSnake(room.state, viewerId);
+      else if (room.game === "werewolf") view = mods.werewolf.viewWerewolf(room.state, viewerId);
       else if (room.game === "ludo") view = mods.ludo.viewLudo(room.state, viewerId);
       else if (room.game === "animal") view = mods.animal.viewAnimal(room.state, viewerId);
       else if (room.game === "army") view = mods.army.viewArmy(room.state, viewerId);
@@ -1989,6 +2072,9 @@ function autoStartMatched(room, mods) {
   else if (room.game === "holdem") room.state = mods.holdem.applyHoldemAction(room.state, hostId, start);
   else if (room.game === "ecard") room.state = mods.ecard.applyEcardAction(room.state, hostId, start);
   else if (room.game === "gomoku") room.state = mods.gomoku.applyGomokuAction(room.state, hostId, start);
+  else if (room.game === "ttt") room.state = mods.ttt.applyTttAction(room.state, hostId, start);
+  else if (room.game === "c4") room.state = mods.c4.applyC4Action(room.state, hostId, start);
+  else if (room.game === "snake") room.state = mods.snake.applySnakeAction(room.state, hostId, start);
   else if (room.game === "werewolf") room.state = mods.werewolf.applyWerewolfAction(room.state, hostId, start);
   else if (room.game === "ludo") room.state = mods.ludo.applyLudoAction(room.state, hostId, start);
   if (room.game === "ecard" && room.state.rpsReveal && !before.rpsReveal) {
@@ -1996,6 +2082,9 @@ function autoStartMatched(room, mods) {
   }
   if (room.game === "gomoku" && room.state.rpsReveal && !before.rpsReveal) {
     room.endsAt = Date.now() + (mods.gomoku.RPS_REVEAL_MS || 2800);
+  }
+  if (room.game === "snake" && room.state.phase === "countdown" && before.phase !== "countdown") {
+    room.endsAt = Date.now() + (mods.snake.COUNTDOWN_MS || 3000);
   }
 }
 

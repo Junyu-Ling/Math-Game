@@ -104,6 +104,31 @@ function Preview({ kind }: { kind: CatalogPreview }) {
       </div>
     );
   }
+  if (kind === "ttt") {
+    return (
+      <div className="preview-row ttt-preview">
+        <span>X</span>
+        <span>O</span>
+        <span>X</span>
+      </div>
+    );
+  }
+  if (kind === "c4") {
+    return (
+      <div className="preview-row c4-preview">
+        <span className="c4-bead a" />
+        <span className="c4-bead b" />
+        <span className="c4-bead a" />
+      </div>
+    );
+  }
+  if (kind === "snake") {
+    return (
+      <div className="preview-row snake-preview">
+        <i /><i /><i /><b />
+      </div>
+    );
+  }
   if (kind === "wolf") {
     return (
       <div className="preview-row">

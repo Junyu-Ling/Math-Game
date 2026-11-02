@@ -9,6 +9,9 @@ export type CatalogPreview =
   | "bj"
   | "hold"
   | "gomoku"
+  | "ttt"
+  | "c4"
+  | "snake"
   | "wolf"
   | "roulette"
   | "slots";
@@ -80,6 +83,33 @@ export const CATALOG: CatalogGame[] = [
     name: "Gomoku",
     blurb: "15×15. Place stones. First five in a row wins.",
     preview: "gomoku",
+    week: "steam",
+  },
+  {
+    to: "/play/ttt",
+    idx: "06",
+    code: "TTT",
+    name: "Tic-tac-toe",
+    blurb: "3×3. Place X and O. Three in a row wins.",
+    preview: "ttt",
+    week: "steam",
+  },
+  {
+    to: "/play/c4",
+    idx: "12",
+    code: "C4",
+    name: "3D Connect Four",
+    blurb: "4×4×4 cube. Drop a bead; gravity fills from the floor. Four in any line wins.",
+    preview: "c4",
+    week: "steam",
+  },
+  {
+    to: "/play/snake",
+    idx: "13",
+    code: "SNAKE",
+    name: "Snake",
+    blurb: "Share one grid. Steer, eat apples, don’t crash. Last snake alive — or first to 8 — wins.",
+    preview: "snake",
     week: "steam",
   },
   // Deferred — Werewolf

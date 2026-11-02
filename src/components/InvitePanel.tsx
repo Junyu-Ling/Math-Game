@@ -10,7 +10,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
   const view = room?.view as { phase?: string; street?: string } | undefined;
   const tableWait = Boolean(
     room &&
-      ["coda", "uno", "flip7", "halli", "gomoku", "ecard", "bj", "m24", "holdem"].includes(
+      ["coda", "uno", "flip7", "halli", "gomoku", "ecard", "bj", "m24", "holdem", "ttt", "c4", "snake"].includes(
         room.game,
       ) &&
       (view?.phase === "lobby" || view?.street === "lobby"),
@@ -49,6 +49,15 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
       ) : null}
       {game === "gomoku" ? (
         <p>Gomoku is heads-up. Open a table, add a CPU or invite one friend, then start. RPS winner plays black.</p>
+      ) : null}
+      {game === "ttt" ? (
+        <p>Tic-tac-toe is heads-up. Open a table, add a CPU or invite one friend, then start. First player places X.</p>
+      ) : null}
+      {game === "c4" ? (
+        <p>3D Connect Four is heads-up. Open a table, add a CPU or invite one friend, then start. Drop into a column; four in any line wins.</p>
+      ) : null}
+      {game === "snake" ? (
+        <p>Snake is 2–4. Open a table, add CPUs or invite, then start. Arrows or WASD. Last snake alive — or first to 8 apples — wins.</p>
       ) : null}
       {/* Deferred — Werewolf */}
       {game === "bj" ? (

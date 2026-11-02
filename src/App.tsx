@@ -18,6 +18,9 @@ import { UnoPage } from "./games/uno/UnoPage";
 import { HalliGalliPage } from "./games/halligalli/HalliGalliPage";
 import { EcardPage } from "./games/ecard/EcardPage";
 import { GomokuPage } from "./games/gomoku/GomokuPage";
+import { TttPage } from "./games/ttt/TttPage";
+import { C4Page } from "./games/c4/C4Page";
+import { SnakePage } from "./games/snake/SnakePage";
 import { RoulettePage } from "./games/roulette/RoulettePage";
 import { SlotsPage } from "./games/slots/SlotsPage";
 // Deferred — Flying Chess
@@ -53,6 +56,9 @@ export function App() {
             <Route path="/play/halli" element={<WeekGate path="/play/halli"><HalliGalliPage /></WeekGate>} />
             <Route path="/play/ecard" element={<WeekGate path="/play/ecard"><EcardPage /></WeekGate>} />
             <Route path="/play/gomoku" element={<WeekGate path="/play/gomoku"><GomokuPage /></WeekGate>} />
+            <Route path="/play/ttt" element={<WeekGate path="/play/ttt"><TttPage /></WeekGate>} />
+            <Route path="/play/c4" element={<WeekGate path="/play/c4"><C4Page /></WeekGate>} />
+            <Route path="/play/snake" element={<WeekGate path="/play/snake"><SnakePage /></WeekGate>} />
             <Route path="/play/werewolf" element={<Navigate to="/" replace />} />
             <Route path="/play/roulette" element={<WeekGate path="/play/roulette"><RoulettePage /></WeekGate>} />
             <Route path="/play/slots" element={<WeekGate path="/play/slots"><SlotsPage /></WeekGate>} />

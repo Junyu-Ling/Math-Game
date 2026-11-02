@@ -84,7 +84,14 @@ function canPlay(state, card) {
     if (state.stackKind === "wild4") return card.kind === "wild4";
     return card.kind === "draw2" || card.kind === "wild4";
   }
-  if (card.kind === "wild" || card.kind === "wild4") return true;
+  if (card.kind === "wild") return true;
+  if (card.kind === "wild4") {
+    const color = state.color;
+    if (!color) return true;
+    const me = currentUno(state);
+    const hasColor = me.hand.some((c) => c.id !== card.id && c.color === color);
+    return !hasColor;
+  }
   const top = topCard(state);
   if (!top) return true;
   if (card.color === state.color) return true;

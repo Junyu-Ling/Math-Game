@@ -726,7 +726,7 @@ export function continueGuess(state: CodaState): CodaState {
 }
 
 export function stay(state: CodaState): CodaState {
-  if (state.phase !== "continue" && state.phase !== "guess") return state;
+  if (state.phase !== "continue") return state;
   const me = currentPlayer(state);
   if (!state.drawn) return nextTurn({ ...state, phase: "draw" });
   const hidden = { ...state.drawn, revealed: false };

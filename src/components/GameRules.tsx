@@ -56,6 +56,18 @@ const RULES: Record<string, string[]> = {
     "15×15. Open a table, add a CPU or invite, then start. Rock-paper-scissors: winner plays black. First exact five in a row wins.",
     "Black fouls: double live three (two live threes), double live four (two live fours with both ends open), or overline (six+). A blocked line is not live — sleeping threes and rush fours do not count. Exact five wins. White has no fouls.",
   ],
+  ttt: [
+    "Heads-up 3×3. Open a table, add a CPU or invite, then start. First player places X, second places O.",
+    "Tap an empty cell. Three in a row — across, down, or diagonal — wins. A full board with no three is a draw.",
+  ],
+  c4: [
+    "Heads-up 4×4×4 cube. Open a table, add a CPU or invite, then start. Tap a column; the bead drops to the lowest empty floor.",
+    "Four of yours in a straight line — through a floor, a pillar, or any 3D diagonal — wins. A full cube with no four is a draw.",
+  ],
+  snake: [
+    "2–4 players on one grid. Open a table, add CPUs or invite, then start. Steer with arrows or WASD (or the on-screen pads).",
+    "Eat apples to grow and score. Hitting a wall, yourself, or another snake kills you. Last snake alive — or first to 8 apples — wins.",
+  ],
   ludo: [
     "2–4 players. Each color has four planes. Practice is you (blue) plus 1–3 CPUs.",
     "Roll a die. A 6 takes one plane from the hangar onto your ready square, or moves a plane 6 steps. A 6 gives another roll, up to three sixes; the third six still moves, then the turn passes.",
@@ -711,6 +723,72 @@ export function GameRules({ game }: { game: string }) {
           "Ring too early and you pay cards into the deck.",
           "Last player with cards, or first to the score goal, wins.",
         ]}
+      />
+    );
+  }
+  if (game === "ttt") {
+    return (
+      <RuleSheet
+        lead="3×3. First player places X. Three in a row wins."
+        rows={[
+          {
+            name: "Place",
+            tip: "Take turns on empty cells. X starts.",
+            demo: (
+              <>
+                <span className="rule-call">X</span>
+                <span className="rule-call">O</span>
+                <span className="rule-call">X</span>
+              </>
+            ),
+          },
+          {
+            name: "Three",
+            tip: "Row, column, or diagonal. Full board with no three is a draw.",
+            demo: <span className="rule-call">WIN</span>,
+          },
+        ]}
+        notes={RULES.ttt}
+      />
+    );
+  }
+  if (game === "c4") {
+    return (
+      <RuleSheet
+        lead="4×4×4 cube. Drop into a column. Four in any straight line through the cube wins."
+        rows={[
+          {
+            name: "Gravity",
+            tip: "Tap a column. The bead falls to the lowest empty floor in that shaft.",
+            demo: <span className="rule-call">DROP</span>,
+          },
+          {
+            name: "Four through space",
+            tip: "Rows on a floor, pillars, or 3D diagonals all count.",
+            demo: <span className="rule-call">4</span>,
+          },
+        ]}
+        notes={RULES.c4}
+      />
+    );
+  }
+  if (game === "snake") {
+    return (
+      <RuleSheet
+        lead="Share one grid. Steer, eat apples, don’t crash."
+        rows={[
+          {
+            name: "Steer",
+            tip: "Arrows or WASD. You cannot reverse into yourself.",
+            demo: <span className="rule-call">WASD</span>,
+          },
+          {
+            name: "Win",
+            tip: "Last snake alive, or first to 8 apples. Hitting a wall, yourself, or another snake kills you.",
+            demo: <span className="rule-call">×8</span>,
+          },
+        ]}
+        notes={RULES.snake}
       />
     );
   }

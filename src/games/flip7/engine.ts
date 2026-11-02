@@ -250,7 +250,10 @@ function openRecordRound(state: FlipState): FlipState {
 }
 
 export function viewFlip7(state: FlipState, _viewerId: string): FlipState {
-  return state;
+  return {
+    ...state,
+    deck: state.deck.map((_, i) => ({ id: `hidden-flip-${i}`, kind: "number" as const, value: 0 })),
+  };
 }
 
 export function currentFlip(state: FlipState): FlipPlayer {

@@ -173,7 +173,10 @@ function openRecordRound(state) {
   return { ...state, record: { rounds: [...rounds, { round: state.round, draws: [] }] } };
 }
 function viewFlip7(state, _viewerId) {
-  return state;
+  return {
+    ...state,
+    deck: state.deck.map((_, i) => ({ id: `hidden-flip-${i}`, kind: "number", value: 0 }))
+  };
 }
 function currentFlip(state) {
   return state.players[state.turn] ?? state.players[0];

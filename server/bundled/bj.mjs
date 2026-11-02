@@ -338,7 +338,9 @@ function viewBjDuel(state, viewerId) {
       if (p.id === viewerId || showAll || p.stood) return p;
       return {
         ...p,
-        cards: p.cards.map((c, i) => i === 0 ? c : { ...c, hidden: true })
+        cards: p.cards.map(
+          (c, i) => i === 0 ? c : { id: c.id, rank: "A", suit: "S", hidden: true }
+        )
       };
     })
   };

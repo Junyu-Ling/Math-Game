@@ -74,6 +74,9 @@ export const GAME_LABEL: Record<string, string> = {
   halli: "Halli Galli",
   ecard: "E-Card",
   gomoku: "Gomoku",
+  ttt: "Tic-tac-toe",
+  c4: "3D Connect Four",
+  snake: "Snake",
   // Deferred — Werewolf
   // werewolf: "Werewolf",
   roulette: "European Roulette",
@@ -89,7 +92,7 @@ export const GAME_LABEL: Record<string, string> = {
 export function tableMax(game: string) {
   if (game === "flip7") return 16;
   if (game === "werewolf") return 8;
-  if (game === "gomoku" || game === "ecard" || game === "bj" || game === "m24" || game === "holdem")
+  if (game === "gomoku" || game === "ecard" || game === "bj" || game === "m24" || game === "holdem" || game === "ttt" || game === "c4")
     return 2;
   return 4;
 }
@@ -177,6 +180,9 @@ export const GAME_PATH: Record<string, string> = {
   halli: "/play/halli",
   ecard: "/play/ecard",
   gomoku: "/play/gomoku",
+  ttt: "/play/ttt",
+  c4: "/play/c4",
+  snake: "/play/snake",
   // Deferred — Werewolf
   // werewolf: "/play/werewolf",
   roulette: "/play/roulette",

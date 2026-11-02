@@ -159,6 +159,7 @@ function finishIfNeeded(state) {
 }
 function flipHalli(state, actorId) {
   if (state.phase !== "play") return state;
+  if (ringingFruit(state)) return state;
   const me = currentHalli(state);
   if (me.id !== actorId || me.out) return state;
   if (me.deck.length === 0) {
@@ -260,15 +261,13 @@ function aiHalli(state) {
   if (ringingFruit(state)) return { type: "ring" };
   return { type: "flip" };
 }
-function viewHalli(state, viewerId) {
+function viewHalli(state, _viewerId) {
   return {
     ...state,
-    players: state.players.map(
-      (p) => p.id === viewerId ? p : {
-        ...p,
-        deck: p.deck.map((_, i) => ({ id: `${p.id}-d${i}`, fruit: "cherry", count: 0 }))
-      }
-    )
+    players: state.players.map((p) => ({
+      ...p,
+      deck: p.deck.map((_, i) => ({ id: `${p.id}-d${i}`, fruit: "cherry", count: 0 }))
+    }))
   };
 }
 export {

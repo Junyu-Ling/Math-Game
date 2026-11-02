@@ -395,8 +395,11 @@ export function applyHoldemAction(s: HoldemState, playerId: string, action: Hold
 export function viewHoldem(s: HoldemState, viewerId: string): HoldemState {
   const v = structuredClone(s);
   const show = v.street === "showdown" || v.street === "over";
+  v.deck = [];
   for (const p of v.players) {
-    if (p.id !== viewerId && !show) p.hole = p.hole.map((c) => ({ ...c, hidden: true }));
+    if (p.id !== viewerId && !show) {
+      p.hole = p.hole.map((c) => ({ id: c.id, rank: "A" as const, suit: "S" as const, hidden: true }));
+    }
   }
   return v;
 }

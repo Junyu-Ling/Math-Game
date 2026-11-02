@@ -1,0 +1,257 @@
+// src/lib/shuffle.ts
+function uid(prefix = "id") {
+  return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// src/games/snake/engine.ts
+var COLS = 24;
+var ROWS = 16;
+var TICK_MS = 160;
+var COUNTDOWN_MS = 3e3;
+var START_LEN = 3;
+var GOAL = 8;
+var DIRS = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 }
+];
+function same(a, b) {
+  return a.x === b.x && a.y === b.y;
+}
+function opposite(a, b) {
+  return a.x + b.x === 0 && a.y + b.y === 0 && (a.x !== 0 || a.y !== 0);
+}
+function legalDir(dir) {
+  return DIRS.some((d) => d.x === dir.x && d.y === dir.y);
+}
+var STARTS = [
+  { body: [{ x: 3, y: 4 }, { x: 2, y: 4 }, { x: 1, y: 4 }], dir: { x: 1, y: 0 } },
+  { body: [{ x: COLS - 4, y: ROWS - 5 }, { x: COLS - 3, y: ROWS - 5 }, { x: COLS - 2, y: ROWS - 5 }], dir: { x: -1, y: 0 } },
+  { body: [{ x: COLS - 4, y: 4 }, { x: COLS - 3, y: 4 }, { x: COLS - 2, y: 4 }], dir: { x: -1, y: 0 } },
+  { body: [{ x: 3, y: ROWS - 5 }, { x: 2, y: ROWS - 5 }, { x: 1, y: ROWS - 5 }], dir: { x: 1, y: 0 } }
+];
+var HUES = [150, 12, 210, 48];
+function occupied(players, skipId) {
+  const set = /* @__PURE__ */ new Set();
+  for (const p of players) {
+    if (!p.alive || p.id === skipId) continue;
+    for (const cell of p.body) set.add(`${cell.x},${cell.y}`);
+  }
+  return set;
+}
+function spawnFood(players, avoid) {
+  const taken = occupied(players);
+  if (avoid) taken.add(`${avoid.x},${avoid.y}`);
+  const free = [];
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (!taken.has(`${x},${y}`)) free.push({ x, y });
+    }
+  }
+  return free[Math.floor(Math.random() * Math.max(1, free.length))] ?? { x: 12, y: 8 };
+}
+function seatPlayers(people) {
+  return people.slice(0, 4).map((p, i) => {
+    const start = STARTS[i] ?? STARTS[0];
+    const body = start.body.slice(0, START_LEN).map((c) => ({ ...c }));
+    return {
+      id: p.id,
+      name: p.name,
+      human: p.human !== false,
+      body,
+      dir: { ...start.dir },
+      pending: { ...start.dir },
+      alive: true,
+      score: 0,
+      hue: HUES[i] ?? 150
+    };
+  });
+}
+function lobbyOf(people) {
+  const players = seatPlayers(people);
+  return {
+    players,
+    food: { x: 12, y: 8 },
+    phase: "lobby",
+    winnerId: null,
+    tick: 0,
+    log: [
+      {
+        id: uid("l"),
+        text: `Table ${players.length}/4. Open a table, add CPUs or invite, then start. Last snake alive \u2014 or first to ${GOAL} apples \u2014 wins.`
+      }
+    ]
+  };
+}
+function beginMatch(people) {
+  const players = seatPlayers(people);
+  return {
+    players,
+    food: spawnFood(players),
+    phase: "countdown",
+    winnerId: null,
+    tick: 0,
+    log: [{ id: uid("l"), text: "Ready. Move with arrows or WASD. Do not hit a wall, yourself, or another snake." }]
+  };
+}
+function startSnakeLobby(people) {
+  return lobbyOf(people);
+}
+function startSnakeDuel(a, b) {
+  return beginMatch([a, b]);
+}
+function startSnakePractice(seats = 2) {
+  const n = Math.max(2, Math.min(4, Math.floor(seats) || 2));
+  const names = ["YOU", "CPU", "CPU 2", "CPU 3"];
+  const people = Array.from({ length: n }, (_, i) => ({
+    id: i === 0 ? "you" : i === 1 ? "cpu" : `cpu-${i}`,
+    name: names[i],
+    human: i === 0
+  }));
+  return beginMatch(people);
+}
+function finishCountdown(state) {
+  if (state.phase !== "countdown") return state;
+  return { ...state, phase: "play", log: [...state.log, { id: uid("l"), text: "Go." }] };
+}
+function setDir(player, dir) {
+  if (!legalDir(dir)) return player;
+  if (opposite(dir, player.dir)) return player;
+  return { ...player, pending: dir };
+}
+function applySnakeAction(state, actorId, action) {
+  if (state.phase === "over") return state;
+  if (state.phase === "lobby") {
+    if (action.type === "start" && state.players[0]?.id === actorId && state.players.length >= 2) {
+      return beginMatch(state.players);
+    }
+    return state;
+  }
+  if (action.type !== "dir") return state;
+  const dir = { x: action.x, y: action.y };
+  if (!legalDir(dir)) return state;
+  return {
+    ...state,
+    players: state.players.map((p) => p.id === actorId && p.alive ? setDir(p, dir) : p)
+  };
+}
+function nextHead(p) {
+  const head = p.body[0] ?? { x: 0, y: 0 };
+  return { x: head.x + p.dir.x, y: head.y + p.dir.y };
+}
+function inBounds(pt) {
+  return pt.x >= 0 && pt.x < COLS && pt.y >= 0 && pt.y < ROWS;
+}
+function stepSnake(state) {
+  if (state.phase !== "play") return state;
+  const steered = state.players.map((p) => {
+    if (!p.alive) return p;
+    const dir = opposite(p.pending, p.dir) ? p.dir : p.pending;
+    return { ...p, dir, pending: dir };
+  });
+  const heads = steered.map((p) => p.alive ? nextHead(p) : null);
+  const headHits = /* @__PURE__ */ new Map();
+  for (const h of heads) {
+    if (!h) continue;
+    const key = `${h.x},${h.y}`;
+    headHits.set(key, (headHits.get(key) ?? 0) + 1);
+  }
+  let food = state.food;
+  let ate = false;
+  const nextPlayers = steered.map((p, i) => {
+    if (!p.alive) return p;
+    const head = heads[i];
+    if (!inBounds(head) || (headHits.get(`${head.x},${head.y}`) ?? 0) > 1) {
+      return { ...p, alive: false };
+    }
+    for (let j = 0; j < steered.length; j++) {
+      const other = steered[j];
+      if (!other.alive) continue;
+      const body2 = j === i ? other.body.slice(0, -1) : other.body;
+      if (body2.some((c) => same(c, head))) return { ...p, alive: false };
+    }
+    const grow = same(head, food);
+    if (grow) ate = true;
+    const body = grow ? [head, ...p.body] : [head, ...p.body.slice(0, -1)];
+    return { ...p, body, score: p.score + (grow ? 1 : 0), alive: true };
+  });
+  if (ate) food = spawnFood(nextPlayers);
+  const living = nextPlayers.filter((p) => p.alive);
+  const reached = nextPlayers.find((p) => p.alive && p.score >= GOAL);
+  let phase = state.phase;
+  let winnerId = state.winnerId;
+  const log = [...state.log];
+  if (reached) {
+    phase = "over";
+    winnerId = reached.id;
+    log.push({ id: uid("l"), text: `${reached.name} eats ${GOAL} apples and wins.` });
+  } else if (living.length === 1) {
+    phase = "over";
+    winnerId = living[0].id;
+    log.push({ id: uid("l"), text: `${living[0].name} is the last snake standing.` });
+  } else if (living.length === 0) {
+    phase = "over";
+    winnerId = null;
+    log.push({ id: uid("l"), text: "Draw \u2014 every snake crashed." });
+  }
+  return {
+    ...state,
+    players: nextPlayers,
+    food,
+    phase,
+    winnerId,
+    tick: state.tick + 1,
+    log
+  };
+}
+function viewSnake(state, viewerId) {
+  return {
+    ...state,
+    players: state.players.map((p) => p.id === viewerId ? p : { ...p, pending: { ...p.dir } })
+  };
+}
+function danger(state, me, pt) {
+  if (!inBounds(pt)) return true;
+  for (const p of state.players) {
+    if (!p.alive) continue;
+    const body = p.id === me.id ? p.body.slice(0, -1) : p.body;
+    if (body.some((c) => same(c, pt))) return true;
+  }
+  return false;
+}
+function aiSnake(state, cpuId) {
+  const me = state.players.find((p) => p.id === cpuId);
+  if (!me || !me.alive) return { type: "dir", x: 1, y: 0 };
+  const head = me.body[0] ?? { x: 0, y: 0 };
+  const food = state.food;
+  const ranked = DIRS.slice().sort((a, b) => {
+    const ha = { x: head.x + a.x, y: head.y + a.y };
+    const hb = { x: head.x + b.x, y: head.y + b.y };
+    const da = danger(state, me, ha) ? 1e3 : Math.abs(ha.x - food.x) + Math.abs(ha.y - food.y);
+    const db = danger(state, me, hb) ? 1e3 : Math.abs(hb.x - food.x) + Math.abs(hb.y - food.y);
+    return da - db;
+  });
+  for (const dir of ranked) {
+    if (opposite(dir, me.dir)) continue;
+    const nxt = { x: head.x + dir.x, y: head.y + dir.y };
+    if (!danger(state, me, nxt)) return { type: "dir", x: dir.x, y: dir.y };
+  }
+  return { type: "dir", x: me.dir.x, y: me.dir.y };
+}
+export {
+  COLS,
+  COUNTDOWN_MS,
+  GOAL,
+  ROWS,
+  START_LEN,
+  TICK_MS,
+  aiSnake,
+  applySnakeAction,
+  finishCountdown,
+  startSnakeDuel,
+  startSnakeLobby,
+  startSnakePractice,
+  stepSnake,
+  viewSnake
+};

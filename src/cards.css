@@ -1696,7 +1696,10 @@
 .table-uno,
 .table-hg,
 .table-ecard,
-.table-gomoku {
+.table-gomoku,
+.table-ttt,
+.table-c4,
+.table-snake {
   background: rgba(255, 255, 255, 0.45);
   box-shadow: none;
   border: 1px solid #e5e7eb;
@@ -1794,7 +1797,10 @@
 .table-hg:has(> .coda-deal),
 .table-m24:has(> .coda-deal),
 .table-ecard:has(> .coda-deal),
-.table-gomoku:has(> .coda-deal) {
+.table-gomoku:has(> .coda-deal),
+.table-ttt:has(> .coda-deal),
+.table-c4:has(> .coda-deal),
+.table-snake:has(> .coda-deal) {
   display: flex;
   align-items: center;
   justify-content: center;

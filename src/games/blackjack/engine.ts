@@ -374,7 +374,9 @@ export function viewBjDuel(state: BjDuelState, viewerId: string): BjDuelState {
       if (p.id === viewerId || showAll || p.stood) return p;
       return {
         ...p,
-        cards: p.cards.map((c, i) => (i === 0 ? c : { ...c, hidden: true })),
+        cards: p.cards.map((c, i) =>
+          i === 0 ? c : { id: c.id, rank: "A" as const, suit: "S" as const, hidden: true },
+        ),
       };
     }),
   };

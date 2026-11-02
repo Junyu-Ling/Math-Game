@@ -186,6 +186,7 @@ function finishIfNeeded(state: HalliState): HalliState {
 
 export function flipHalli(state: HalliState, actorId: string): HalliState {
   if (state.phase !== "play") return state;
+  if (ringingFruit(state)) return state;
   const me = currentHalli(state);
   if (me.id !== actorId || me.out) return state;
   if (me.deck.length === 0) {
@@ -298,16 +299,12 @@ export function aiHalli(state: HalliState): HalliAction {
   return { type: "flip" };
 }
 
-export function viewHalli(state: HalliState, viewerId: string): HalliState {
+export function viewHalli(state: HalliState, _viewerId: string): HalliState {
   return {
     ...state,
-    players: state.players.map((p) =>
-      p.id === viewerId
-        ? p
-        : {
-            ...p,
-            deck: p.deck.map((_, i) => ({ id: `${p.id}-d${i}`, fruit: "cherry" as HalliFruit, count: 0 })),
-          },
-    ),
+    players: state.players.map((p) => ({
+      ...p,
+      deck: p.deck.map((_, i) => ({ id: `${p.id}-d${i}`, fruit: "cherry" as HalliFruit, count: 0 })),
+    })),
   };
 }
