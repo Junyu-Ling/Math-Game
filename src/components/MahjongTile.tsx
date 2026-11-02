@@ -1,4 +1,4 @@
-import type { CodaTile } from "../games/davinci/engine";
+import type { CodaTile, CodaValue } from "../games/davinci/engine";
 
 type Props = {
   tile: Pick<CodaTile, "color" | "value" | "revealed">;
@@ -10,12 +10,18 @@ type Props = {
   dim?: boolean;
   mini?: boolean;
   fresh?: boolean;
+  tried?: CodaValue[];
   onClick?: () => void;
 };
 
-export function MahjongTile({ tile, hide, selected, aimed, flash, down, dim, mini, fresh, onClick }: Props) {
+function triedLabel(value: CodaValue): string {
+  return value === "joker" ? "—" : String(value);
+}
+
+export function MahjongTile({ tile, hide, selected, aimed, flash, down, dim, mini, fresh, tried, onClick }: Props) {
   const show = tile.revealed || !hide;
   const num = tile.value === "joker" ? "-" : String(tile.value);
+  const marks = !tile.revealed && tried && tried.length > 0 ? tried : [];
   const className = [
     "mj",
     tile.color,
@@ -48,6 +54,13 @@ export function MahjongTile({ tile, hide, selected, aimed, flash, down, dim, min
         <span className="coda-side coda-top" />
         <span className="coda-side coda-right" />
       </span>
+      {marks.length > 0 ? (
+        <span className="mj-tried" aria-label={`Tried ${marks.map(triedLabel).join(" ")}`}>
+          {marks.map((value) => (
+            <i key={String(value)}>{triedLabel(value)}</i>
+          ))}
+        </span>
+      ) : null}
     </>
   );
 

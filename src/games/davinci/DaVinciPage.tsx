@@ -112,6 +112,7 @@ function Row({
   vertical,
   lockSize: _lockSize,
   markHidden,
+  guesses,
 }: {
   tiles: CodaTile[];
   hide: boolean;
@@ -128,6 +129,7 @@ function Row({
   vertical?: boolean;
   lockSize?: boolean;
   markHidden?: boolean;
+  guesses?: CodaValue[][];
 }) {
   const gapSet = new Set(gaps ?? []);
   const cells: { key: string; node: ReactNode }[] = [];
@@ -163,6 +165,7 @@ function Row({
           flash={fx}
           down={Boolean(downRevealed && tile.revealed)}
           fresh={Boolean(fresh?.[tile.id])}
+          tried={tile.revealed ? [] : (guesses?.[i] ?? [])}
           onClick={onTile ? () => onTile(i) : undefined}
         />
       );
@@ -200,6 +203,7 @@ function OppSeat({
   selectedIndex,
   onTile,
   lockSize,
+  guesses,
 }: {
   player: { id: string; name: string; out: boolean };
   className: string;
@@ -211,6 +215,7 @@ function OppSeat({
   selectedIndex?: number;
   onTile: (i: number) => void;
   lockSize?: boolean;
+  guesses?: CodaValue[][];
 }) {
   return (
     <div className={`seat ${className} ${opening ? "veiled" : ""}`}>
@@ -236,11 +241,16 @@ function OppSeat({
           fresh={fresh}
           vertical={className === "seat-left" || className === "seat-right"}
           lockSize={lockSize}
+          guesses={guesses}
           onTile={onTile}
         />
       </div>
     </div>
   );
+}
+
+function guessesOnRow(state: CodaState, _playerId: string, tiles: CodaTile[]): CodaValue[][] {
+  return tiles.map((tile) => (tile.revealed ? [] : (state.tried?.[tile.id] ?? [])));
 }
 
 function applyGuess(state: CodaState, value: CodaValue, _youId: string): { next: CodaState; flash: Flash | null } {
@@ -467,7 +477,8 @@ export function DaVinciPage() {
   useEffect(() => {
     if (!arranging) return;
     const roomEnds = online ? codaRoom?.endsAt ?? endsAtRef.current : null;
-    const deadline = roomEnds && roomEnds > Date.now() ? roomEnds : Date.now() + ARRANGE_MS;
+    // Never start a fresh 5s if the server deadline is missing or already past.
+    const deadline = online ? (roomEnds ?? Date.now()) : Date.now() + ARRANGE_MS;
     let id = 0;
     let flushed = false;
     const tick = () => {
@@ -475,11 +486,10 @@ export function DaVinciPage() {
       setRemain(left / 1000);
       if (left <= 0) {
         window.clearInterval(id);
-        if (!online) setState((s) => (s ? finishArrange(s) : s));
-        else if (!flushed) {
-          flushed = true;
-          void lobby.sendAction({ type: "tick" });
-        }
+        if (flushed) return;
+        flushed = true;
+        setState((s) => (s && s.phase === "arrange" ? finishArrange(s) : s));
+        if (online) void lobby.sendAction({ type: "tick" });
       }
     };
     tick();
@@ -620,6 +630,13 @@ export function DaVinciPage() {
     const view = codaRoom.view as CodaState;
     setYouId(user?.id ?? null);
     setState((prev) => {
+      if (
+        prev &&
+        (prev.arrangeId > view.arrangeId ||
+          (view.phase === "arrange" && prev.phase !== "arrange" && prev.arrangeId >= view.arrangeId))
+      ) {
+        return prev;
+      }
       if (prev && view.log.length > prev.log.length) {
         const added = view.log.slice(prev.log.length);
         const sel = view.selected ?? prev.selected;
@@ -788,6 +805,7 @@ export function DaVinciPage() {
               flash={flash}
               fresh={state.fresh}
               selectedIndex={state.selected?.playerId === seated.partner.id ? state.selected.index : undefined}
+              guesses={guessesOnRow(state, seated.partner.id, seated.partner.tiles)}
               onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: seated.partner!.id, index: i })}
             />
           ) : null}
@@ -802,6 +820,7 @@ export function DaVinciPage() {
               flash={flash}
               fresh={state.fresh}
               selectedIndex={aimedRival}
+              guesses={guessesOnRow(state, seated.rival.id, rivalRow)}
               onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: seated.rival!.id, index: i })}
             />
           ) : null}
@@ -816,6 +835,7 @@ export function DaVinciPage() {
               flash={flash}
               fresh={state.fresh}
               selectedIndex={state.selected?.playerId === seated.left.id ? state.selected.index : undefined}
+              guesses={guessesOnRow(state, seated.left.id, seated.left.tiles)}
               onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: seated.left!.id, index: i })}
             />
           ) : null}
@@ -885,6 +905,7 @@ export function DaVinciPage() {
               flash={flash}
               fresh={state.fresh}
               selectedIndex={state.selected?.playerId === seated.right.id ? state.selected.index : undefined}
+              guesses={guessesOnRow(state, seated.right.id, seated.right.tiles)}
               onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: seated.right!.id, index: i })}
             />
           ) : null}
@@ -910,6 +931,7 @@ export function DaVinciPage() {
                 ghostAt={myInsert ? autoSlot : null}
                 lockSize={Boolean(seated.left)}
                 markHidden={Boolean(myTurn && state.phase === "penalty")}
+                guesses={guessesOnRow(state, you.id, humanRow)}
                 onTile={(i) => {
                   if (!myTurn || state.phase !== "penalty") return;
                   const tile = you.tiles[i];

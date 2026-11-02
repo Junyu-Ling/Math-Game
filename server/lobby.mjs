@@ -825,7 +825,7 @@ export async function watchLobby(user, seq = 0, inviteCount = -1, href = "", tim
         else soonest = rec.cpuReadyAt - Date.now();
       }
       if (rec?.endsAt) {
-        const until = rec.endsAt - Date.now() + 25;
+        const until = rec.endsAt - Date.now();
         if (until > 0) soonest = soonest > 0 ? Math.min(soonest, until) : until;
       }
     }
@@ -881,8 +881,10 @@ export async function snapshot(userId, light = false) {
   };
 }
 
-async function expireArrange(room) {
-  if (!room.endsAt || Date.now() < room.endsAt) return;
+async function expireArrange(room, force = false) {
+  const arranging = room.game === "coda" && room.state?.phase === "arrange";
+  const due = force && arranging ? true : Boolean(room.endsAt && Date.now() >= room.endsAt);
+  if (!due) return;
   if (room.game === "coda") {
     if (room.state.phase === "arrange") {
       const before = room.state.arrangeId;
@@ -1482,7 +1484,10 @@ export async function applyRoomAction(user, roomId, action, mods) {
   if (!rec || !rec.seats.includes(user.id)) throw new Error("Game not found");
   const room = { ...rec, mods };
   await expireArrange(room);
-  if (action && action.type === "tick") return publicRoom(room, user.id);
+  if (action && action.type === "tick") {
+    await expireArrange(room, true);
+    return publicRoom(room, user.id);
+  }
   if (
     action &&
     (action.type === "ready" || action.type === "start") &&

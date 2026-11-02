@@ -978,7 +978,8 @@ function viewFor(state, viewerId) {
     })),
     drawn: !state.drawn ? null : showDrawn ? state.drawn : openingArrange ? null : maskTile(state.drawn),
     pending: !state.pending ? null : showPending ? state.pending : openingArrange ? null : maskTile(state.pending),
-    fresh: state.fresh ?? {}
+    fresh: state.fresh ?? {},
+    tried: state.tried ?? {}
   };
 }
 export {

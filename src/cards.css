@@ -190,6 +190,35 @@
   display: none;
 }
 
+.mj-tried {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 6px;
+  z-index: 8;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.mj-tried i {
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  min-width: 12px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: rgba(12, 12, 12, 0.82);
+  color: #f5f5f4;
+  line-height: 1.2;
+}
+
+.mj.white .mj-tried i {
+  background: rgba(24, 24, 24, 0.78);
+}
+
 .mj.white .mark {
   border: 2px solid rgba(140, 108, 48, 0.55);
   background: radial-gradient(circle at 40% 35%, #fff, #e2c98a);
