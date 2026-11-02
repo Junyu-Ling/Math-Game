@@ -162,48 +162,41 @@ function playUntil(start, step, cap, name) {
   ok("ttt random X cannot beat perfect O", cpuLoss === 0);
 }
 
-/* ---------- 3D connect four ---------- */
+/* ---------- connect four ---------- */
 
 {
   let s = c4.startC4Practice();
-  for (let n = 0; n < 4; n++) {
-    s = c4.applyC4Action(s, n % 2 === 0 ? "you" : "cpu", { type: "drop", x: n % 2 === 0 ? 0 : 1, y: 0 });
+  for (let n = 0; n < 3; n++) {
+    s = c4.applyC4Action(s, "you", { type: "drop", col: 0 });
+    s = c4.applyC4Action(s, "cpu", { type: "drop", col: 1 });
   }
-  s = c4.applyC4Action(s, "you", { type: "drop", x: 0, y: 0 });
-  s = c4.applyC4Action(s, "cpu", { type: "drop", x: 1, y: 0 });
-  s = c4.applyC4Action(s, "you", { type: "drop", x: 0, y: 0 });
-  ok("c4 four stacked in a pillar wins", s.phase === "over" && s.winnerId === "you");
+  s = c4.applyC4Action(s, "you", { type: "drop", col: 0 });
+  ok("c4 four stacked in a column wins", s.phase === "over" && s.winnerId === "you");
 
   let line = c4.startC4Practice();
   const seq = [
-    ["you", 0, 0],
-    ["cpu", 0, 3],
-    ["you", 1, 0],
-    ["cpu", 1, 3],
-    ["you", 2, 0],
-    ["cpu", 2, 3],
-    ["you", 3, 0],
+    ["you", 0],
+    ["cpu", 6],
+    ["you", 1],
+    ["cpu", 5],
+    ["you", 2],
+    ["cpu", 4],
+    ["you", 3],
   ];
-  for (const [id, x, y] of seq) line = c4.applyC4Action(line, id, { type: "drop", x, y });
-  ok("c4 four along the floor wins", line.phase === "over" && line.winnerId === "you");
+  for (const [id, col] of seq) line = c4.applyC4Action(line, id, { type: "drop", col });
+  ok("c4 four along the bottom wins", line.phase === "over" && line.winnerId === "you");
 
-  const full = c4.startC4Practice();
-  let packed = full;
-  for (let x = 0; x < 4; x++) {
-    for (let y = 0; y < 4; y++) {
-      for (let z = 0; z < 4; z++) {
-        if (packed.phase === "over") break;
-        const actor = packed.players[packed.turn].id;
-        packed = c4.applyC4Action(packed, actor, { type: "drop", x, y });
-      }
-    }
+  let packed = c4.startC4Practice();
+  for (let n = 0; n < 6; n++) {
+    const actor = packed.players[packed.turn].id;
+    packed = c4.applyC4Action(packed, actor, { type: "drop", col: 0 });
   }
-  const extra = c4.applyC4Action(packed, packed.players[packed.turn]?.id ?? "you", { type: "drop", x: 0, y: 0 });
-  ok("c4 full column / over rejects extra drops", extra === packed || extra.phase === "over");
+  const extra = c4.applyC4Action(packed, packed.players[packed.turn]?.id ?? "you", { type: "drop", col: 0 });
+  ok("c4 full column rejects extra drops", extra === packed);
 
   const mid = c4.startC4Practice();
-  const air = c4.applyC4Action(mid, "you", { type: "drop", x: 9, y: 9 });
-  ok("c4 cannot drop outside the cube", air.board[0][0][0] === 0);
+  const air = c4.applyC4Action(mid, "you", { type: "drop", col: 9 });
+  ok("c4 cannot drop outside the grid", air.board[0][0] === 0);
 
   let games = 0;
   let finished = 0;
@@ -211,7 +204,7 @@ function playUntil(start, step, cap, name) {
     games += 1;
     let st = c4.startC4Duel({ id: "a", name: "A" }, { id: "b", name: "B" });
     let guard = 0;
-    while (st.phase !== "over" && guard++ < 80) {
+    while (st.phase !== "over" && guard++ < 50) {
       const actor = st.players[st.turn];
       st = c4.applyC4Action(st, actor.id, c4.aiC4(st));
     }

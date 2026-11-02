@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { aiC4, applyC4Action, dropZ, SIZE, startC4Practice, type C4Action, type C4State } from "./engine";
+import { aiC4, applyC4Action, COLS, dropRow, ROWS, startC4Practice, type C4Action, type C4State } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
@@ -58,7 +58,7 @@ export function C4Page() {
       <div className="game-head">
         <div>
           <p className="kicker">12 / C4 · Duel</p>
-          <h1>3D Connect Four</h1>
+          <h1>Connect Four</h1>
         </div>
         <div className="row-actions">
           <RulesButton game="c4" />
@@ -86,12 +86,12 @@ export function C4Page() {
         <div className="table table-c4">
           {!state || !me || waiting ? (
             <div className="coda-deal">
-              <p className="kicker">{waiting ? "TABLE" : "3D CONNECT FOUR"}</p>
-              <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Four through the cube"}</h2>
+              <p className="kicker">{waiting ? "TABLE" : "CONNECT FOUR"}</p>
+              <h2>{waiting ? `Table ${state?.players.length ?? 0}/2` : "Drop four in a row"}</h2>
               <p>
                 {waiting
-                  ? "Add a CPU or invite one friend, then everyone Ready. Drop into a column — gravity fills from the floor up."
-                  : "4×4×4. Tap a column to drop. Four in any straight line through the cube wins."}
+                  ? "Add a CPU or invite one friend, then everyone Ready. Drop a disc into a column — it falls to the lowest empty slot."
+                  : "7×6 standing grid. Tap a column to drop. Four in a row — across, down, or diagonal — wins."}
               </p>
               {waiting && state ? (
                 <ul className="lobby-roster">
@@ -126,47 +126,44 @@ export function C4Page() {
                 {state.phase === "over"
                   ? forfeitText(state) ||
                     (state.winnerId
-                      ? `${state.players.find((p) => p.id === state.winnerId)?.name} connects four through the cube.`
-                      : "Draw — the cube filled.")
+                      ? `${state.players.find((p) => p.id === state.winnerId)?.name} connects four.`
+                      : "Draw — the grid filled.")
                   : myTurn
-                    ? `Your turn. Tap a column — the bead drops to the lowest empty floor.`
+                    ? "Your turn. Tap a column — the disc drops to the lowest empty slot."
                     : `Wait — ${state.players[state.turn]?.name} drops.`}
               </p>
-              <div className="c4-layers">
-                {Array.from({ length: SIZE }, (_, zi) => {
-                  const z = SIZE - 1 - zi;
-                  return (
-                    <div key={z} className="c4-layer">
-                      <span className="c4-floor">Floor {z + 1}</span>
-                      <div className="c4-grid" role="grid" aria-label={`Floor ${z + 1}`}>
-                        {Array.from({ length: SIZE }, (_, y) =>
-                          Array.from({ length: SIZE }, (_, x) => {
-                            const v = state.board[x]![y]![z]!;
-                            const top = dropZ(state.board, x, y);
-                            const canDrop = myTurn && state.phase === "play" && top >= 0;
-                            const onWin = Boolean(state.winLine?.some((p) => p.x === x && p.y === y && p.z === z));
-                            const last =
-                              state.last?.x === x && state.last?.y === y && state.last?.z === z;
-                            return (
-                              <button
-                                key={`${x}-${y}-${z}`}
-                                type="button"
-                                className={`c4-cell${v ? " filled" : ""}${onWin ? " win" : ""}${last ? " last" : ""}${top === z ? " land" : ""}`}
-                                disabled={!canDrop}
-                                onClick={() => {
-                                  if (!canDrop) return;
-                                  act({ type: "drop", x, y });
-                                }}
-                              >
-                                {v ? <span className={`c4-bead ${v === 1 ? "a" : "b"}`} /> : null}
-                              </button>
-                            );
-                          }),
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="c4-stand">
+                <div className="c4-frame" role="grid" aria-label="Connect Four 7 by 6">
+                  {Array.from({ length: ROWS }, (_, ri) => {
+                    const row = ROWS - 1 - ri;
+                    return Array.from({ length: COLS }, (_, col) => {
+                      const v = state.board[col]![row]!;
+                      const land = dropRow(state.board, col);
+                      const canDrop = myTurn && state.phase === "play" && land >= 0;
+                      const onWin = Boolean(state.winLine?.some((p) => p.col === col && p.row === row));
+                      const last = state.last?.col === col && state.last?.row === row;
+                      return (
+                        <button
+                          key={`${col}-${row}`}
+                          type="button"
+                          className={`c4-cell${v ? " filled" : ""}${onWin ? " win" : ""}${last ? " last" : ""}`}
+                          disabled={!canDrop}
+                          aria-label={`Column ${col + 1}`}
+                          onClick={() => {
+                            if (!canDrop) return;
+                            act({ type: "drop", col });
+                          }}
+                        >
+                          {v ? <span className={`c4-bead ${v === 1 ? "a" : "b"}`} /> : null}
+                        </button>
+                      );
+                    });
+                  })}
+                </div>
+                <div className="c4-feet" aria-hidden="true">
+                  <i />
+                  <i />
+                </div>
               </div>
             </div>
           )}

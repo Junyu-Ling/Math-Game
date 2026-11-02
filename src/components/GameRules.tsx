@@ -61,8 +61,8 @@ const RULES: Record<string, string[]> = {
     "Tap an empty cell. Three in a row — across, down, or diagonal — wins. A full board with no three is a draw.",
   ],
   c4: [
-    "Heads-up 4×4×4 cube. Open a table, add a CPU or invite, then start. Tap a column; the bead drops to the lowest empty floor.",
-    "Four of yours in a straight line — through a floor, a pillar, or any 3D diagonal — wins. A full cube with no four is a draw.",
+    "Heads-up 7×6 grid. Open a table, add a CPU or invite, then start. Tap a column; the disc drops to the lowest empty slot.",
+    "Four of yours in a row — across, down, or diagonal — wins. A full grid with no four is a draw.",
   ],
   snake: [
     "2–4 players on one grid. Open a table, add CPUs or invite, then start. Steer with arrows or WASD (or the on-screen pads).",
@@ -755,16 +755,16 @@ export function GameRules({ game }: { game: string }) {
   if (game === "c4") {
     return (
       <RuleSheet
-        lead="4×4×4 cube. Drop into a column. Four in any straight line through the cube wins."
+        lead="7×6 standing grid. Drop into a column. Four in a row wins."
         rows={[
           {
             name: "Gravity",
-            tip: "Tap a column. The bead falls to the lowest empty floor in that shaft.",
+            tip: "Tap a column. The disc falls to the lowest empty slot.",
             demo: <span className="rule-call">DROP</span>,
           },
           {
-            name: "Four through space",
-            tip: "Rows on a floor, pillars, or 3D diagonals all count.",
+            name: "Four in a row",
+            tip: "Horizontal, vertical, or either diagonal all count.",
             demo: <span className="rule-call">4</span>,
           },
         ]}

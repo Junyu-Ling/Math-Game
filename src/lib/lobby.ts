@@ -75,7 +75,7 @@ export const GAME_LABEL: Record<string, string> = {
   ecard: "E-Card",
   gomoku: "Gomoku",
   ttt: "Tic-tac-toe",
-  c4: "3D Connect Four",
+  c4: "Connect Four",
   snake: "Snake",
   // Deferred — Werewolf
   // werewolf: "Werewolf",
