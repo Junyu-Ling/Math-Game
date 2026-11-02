@@ -933,6 +933,10 @@
   animation: match-wait 1.6s ease-in-out infinite;
 }
 
+.match-duel-face.is-in {
+  animation: match-pop 0.4s ease-out;
+}
+
 .match-duel-name {
   display: inline-block;
   max-width: 140px;
@@ -970,9 +974,37 @@
   font-size: 13px;
 }
 
+.match-duel-status.is-found {
+  color: var(--ink);
+  font-weight: 600;
+  animation: match-status-in 0.35s ease 0.12s both;
+}
+
 @keyframes match-wait {
   50% {
     opacity: 0.4;
+  }
+}
+
+@keyframes match-pop {
+  from {
+    transform: scale(0.62);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes match-status-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

@@ -1,10 +1,34 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLobby } from "../context/LobbyContext";
 import { GAME_LABEL, isCpuId, matchNeed, minStart, tableMax } from "../lib/lobby";
 import { Avatar } from "./Avatar";
+import { useSeatFace } from "./TableTalk";
+
+const MATCH_REVEAL_MS = 3000;
+
+function matchRevealKey(id: string) {
+  return `axiom.matchReveal:${id}`;
+}
+
+function readRevealEnd(id: string) {
+  try {
+    const n = Number(sessionStorage.getItem(matchRevealKey(id)) || 0);
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeRevealEnd(id: string, at: number) {
+  try {
+    sessionStorage.setItem(matchRevealKey(id), String(at));
+  } catch {
+    /* private mode */
+  }
+}
 
 export function MixedCpuBar({
   game,
@@ -50,6 +74,49 @@ export function MixedCpuBar({
   const searching = Boolean(queue && queue.game === game);
   const need = matchNeed(game);
   const canMatch = Boolean(user && !busy && !seatedHere);
+  const hunting = useRef(false);
+  const [found, setFound] = useState(false);
+  const [remain, setRemain] = useState(3);
+  const rivalId = user && room ? room.seats.find((id) => id !== user.id && !isCpuId(id)) : undefined;
+
+  useEffect(() => {
+    if (searching) hunting.current = true;
+  }, [searching]);
+
+  useLayoutEffect(() => {
+    if (!here || !matched || !room) {
+      setFound(false);
+      return;
+    }
+    const now = Date.now();
+    let end = readRevealEnd(room.id);
+    if (end && end <= now) {
+      setFound(false);
+      return;
+    }
+    if (!end) {
+      if (!hunting.current) {
+        setFound(false);
+        return;
+      }
+      end = now + MATCH_REVEAL_MS;
+      writeRevealEnd(room.id, end);
+    }
+    hunting.current = false;
+    setFound(true);
+    setRemain(Math.max(1, Math.ceil((end - now) / 1000)));
+    const iv = window.setInterval(() => {
+      const left = Math.ceil((end - Date.now()) / 1000);
+      if (left <= 0) {
+        setFound(false);
+        setRemain(0);
+        window.clearInterval(iv);
+        return;
+      }
+      setRemain(left);
+    }, 200);
+    return () => window.clearInterval(iv);
+  }, [here, matched, room?.id]);
 
   function setCpus(next: number) {
     const n = Math.max(cpuMin, Math.min(cpuMax, next));
@@ -76,10 +143,12 @@ export function MixedCpuBar({
 
   async function search() {
     if (busy) return;
+    hunting.current = true;
     setBusy(true);
     try {
       await findMatch(game, meta);
     } catch (ex) {
+      hunting.current = false;
       alert(ex instanceof Error ? ex.message : "Failed");
     } finally {
       setBusy(false);
@@ -88,6 +157,7 @@ export function MixedCpuBar({
 
   async function stopSearch() {
     if (busy) return;
+    hunting.current = false;
     setBusy(true);
     try {
       await cancelMatch();
@@ -128,10 +198,17 @@ export function MixedCpuBar({
     );
   }
 
-  if (searching) {
+  if (searching || found) {
     return (
       <>
-        <MatchDuel game={game} busy={busy} onCancel={() => void stopSearch()} />
+        <MatchDuel
+          game={game}
+          busy={busy}
+          found={found}
+          remain={remain}
+          rivalId={rivalId}
+          onCancel={() => void stopSearch()}
+        />
         {error ? <p className="msg err">{error}</p> : null}
       </>
     );
@@ -207,14 +284,21 @@ export function MixedCpuBar({
 function MatchDuel({
   game,
   busy,
+  found,
+  remain,
+  rivalId,
   onCancel,
 }: {
   game: string;
   busy: boolean;
+  found: boolean;
+  remain: number;
+  rivalId?: string;
   onCancel: () => void;
 }) {
   const { user } = useAuth();
   const { queue } = useLobby();
+  const rival = useSeatFace(rivalId || "", "Player");
   const mark = useRef<HTMLSpanElement>(null);
   const [host, setHost] = useState<Element | null>(null);
 
@@ -222,17 +306,19 @@ function MatchDuel({
     setHost(mark.current?.closest(".table") ?? null);
   }, []);
 
-  if (!queue || queue.game !== game) return null;
+  if (!found && (!queue || queue.game !== game)) return null;
 
   const name = user?.login || user?.name || user?.email?.split("@")[0] || "You";
   const need = matchNeed(game);
   const ui = (
-    <div className="match-duel" role="status" aria-live="polite">
-      <button className="match-duel-close" type="button" aria-label="Cancel search" disabled={busy} onClick={onCancel}>
-        ×
-      </button>
+    <div className={`match-duel${found ? " is-found" : ""}`} role="status" aria-live="polite">
+      {found ? null : (
+        <button className="match-duel-close" type="button" aria-label="Cancel search" disabled={busy} onClick={onCancel}>
+          ×
+        </button>
+      )}
       <div className="match-duel-title">
-        <p className="kicker">Find match</p>
+        <p className="kicker">{found ? "Match found" : "Find match"}</p>
         <h2>{GAME_LABEL[game] || game}</h2>
       </div>
       <div className="match-duel-row">
@@ -246,16 +332,33 @@ function MatchDuel({
           VS
         </span>
         <div className="match-duel-slot">
-          <div className="match-duel-face is-wait">?</div>
-          <span className="match-duel-name is-wait">Waiting</span>
+          {found ? (
+            <>
+              <div className="match-duel-face is-in">
+                <Avatar src={rival.avatar} name={rival.label} size={96} />
+              </div>
+              <span className="match-duel-name">{rival.label}</span>
+            </>
+          ) : (
+            <>
+              <div className="match-duel-face is-wait">?</div>
+              <span className="match-duel-name is-wait">Waiting</span>
+            </>
+          )}
         </div>
       </div>
-      <p className="match-duel-status">
-        {need > 2 ? `${queue.waiting} of ${need} in queue` : "Looking for a player"}
+      <p className={`match-duel-status${found ? " is-found" : ""}`}>
+        {found
+          ? `Match found. Entering table in ${remain}`
+          : need > 2
+            ? `${queue?.waiting ?? 1} of ${need} in queue`
+            : "Looking for a player"}
       </p>
-      <button className="btn btn-ghost" type="button" disabled={busy} onClick={onCancel}>
-        {busy ? "Canceling…" : "Cancel"}
-      </button>
+      {found ? null : (
+        <button className="btn btn-ghost" type="button" disabled={busy} onClick={onCancel}>
+          {busy ? "Canceling…" : "Cancel"}
+        </button>
+      )}
     </div>
   );
 
