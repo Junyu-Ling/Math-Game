@@ -952,6 +952,7 @@ export async function createInvite(from, toId, game, meta = {}) {
   const fromId = String(from.id);
   toId = String(toId);
   if (String(game) === "snake") throw new Error("Snake is a shared world — open /play/snake to join everyone online");
+  if (String(game) === "halli") throw new Error("Halli Galli is temporarily unavailable");
   if (fromId === toId) throw new Error("You cannot invite yourself");
   // Per-friend cooldown: same target needs 5s; other friends are independent.
   const cdKey = `axiom:invcd:${fromId}:${toId}`;
@@ -1552,7 +1553,8 @@ const OPEN_TABLES = new Set([
   "coda",
   "uno",
   "flip7",
-  "halli",
+  // Deferred — Halli Galli
+  // "halli",
   "gomoku",
   "ttt",
   "c4",

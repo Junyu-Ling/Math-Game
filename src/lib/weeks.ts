@@ -58,15 +58,16 @@ export const CATALOG: CatalogGame[] = [
     preview: "uno",
     week: "steam",
   },
-  {
-    to: "/play/halli",
-    idx: "03",
-    code: "HALLI",
-    name: "Halli Galli",
-    blurb: "Flip fruit cards. When five of one fruit show, ring the bell first.",
-    preview: "halli",
-    week: "steam",
-  },
+  // Deferred — Halli Galli
+  // {
+  //   to: "/play/halli",
+  //   idx: "03",
+  //   code: "HALLI",
+  //   name: "Halli Galli",
+  //   blurb: "Flip fruit cards. When five of one fruit show, ring the bell first.",
+  //   preview: "halli",
+  //   week: "steam",
+  // },
   {
     to: "/play/ecard",
     idx: "04",

@@ -15,7 +15,6 @@ import { BlackjackPage } from "./games/blackjack/BlackjackPage";
 // import { Math24Page } from "./games/math24/Math24Page";
 import { HoldemPage } from "./games/holdem/HoldemPage";
 import { UnoPage } from "./games/uno/UnoPage";
-import { HalliGalliPage } from "./games/halligalli/HalliGalliPage";
 import { EcardPage } from "./games/ecard/EcardPage";
 import { GomokuPage } from "./games/gomoku/GomokuPage";
 import { TttPage } from "./games/ttt/TttPage";
@@ -53,7 +52,7 @@ export function App() {
             {/* Deferred — Make 24: /play/24 */}
             <Route path="/play/holdem" element={<WeekGate path="/play/holdem"><HoldemPage /></WeekGate>} />
             <Route path="/play/uno" element={<WeekGate path="/play/uno"><UnoPage /></WeekGate>} />
-            <Route path="/play/halli" element={<WeekGate path="/play/halli"><HalliGalliPage /></WeekGate>} />
+            <Route path="/play/halli" element={<Navigate to="/" replace />} />
             <Route path="/play/ecard" element={<WeekGate path="/play/ecard"><EcardPage /></WeekGate>} />
             <Route path="/play/gomoku" element={<WeekGate path="/play/gomoku"><GomokuPage /></WeekGate>} />
             <Route path="/play/ttt" element={<WeekGate path="/play/ttt"><TttPage /></WeekGate>} />
