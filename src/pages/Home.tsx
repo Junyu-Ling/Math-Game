@@ -98,34 +98,149 @@ function Preview({ kind }: { kind: CatalogPreview }) {
   }
   if (kind === "gomoku") {
     return (
-      <div className="preview-row">
-        <span className="gomoku-stone black" style={{ position: "relative", width: 28, height: 28, display: "inline-block" }} />
-        <span className="gomoku-stone white" style={{ position: "relative", width: 28, height: 28, display: "inline-block" }} />
+      <div className="preview-row preview-scene-row">
+        <div className="home-preview home-preview-gomoku" aria-hidden>
+          <svg viewBox="0 0 120 78" className="home-preview-svg">
+            <defs>
+              <linearGradient id="gomo-wood" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#e8c89a" />
+                <stop offset="100%" stopColor="#c49a5c" />
+              </linearGradient>
+              <radialGradient id="gomo-b" cx="35%" cy="30%" r="65%">
+                <stop offset="0%" stopColor="#555" />
+                <stop offset="55%" stopColor="#1a1a1a" />
+                <stop offset="100%" stopColor="#050505" />
+              </radialGradient>
+              <radialGradient id="gomo-w" cx="35%" cy="30%" r="65%">
+                <stop offset="0%" stopColor="#fff" />
+                <stop offset="70%" stopColor="#ece6dc" />
+                <stop offset="100%" stopColor="#cfc6b8" />
+              </radialGradient>
+            </defs>
+            <rect x="6" y="6" width="108" height="66" rx="8" fill="url(#gomo-wood)" stroke="#a67c45" strokeWidth="1.2" />
+            {[18, 30, 42, 54, 66, 78, 90, 102].map((x) => (
+              <line key={`vx${x}`} x1={x} y1="14" x2={x} y2="64" stroke="#8b6914" strokeOpacity="0.35" strokeWidth="0.8" />
+            ))}
+            {[18, 30, 42, 54].map((y) => (
+              <line key={`hy${y}`} x1="18" y1={y} x2="102" y2={y} stroke="#8b6914" strokeOpacity="0.35" strokeWidth="0.8" />
+            ))}
+            {[
+              [42, 30],
+              [54, 30],
+              [66, 30],
+              [78, 30],
+              [90, 30],
+            ].map(([cx, cy], i) => (
+              <circle key={`b${i}`} cx={cx} cy={cy} r="7.2" fill="url(#gomo-b)" />
+            ))}
+            <circle cx="66" cy="42" r="7.2" fill="url(#gomo-w)" stroke="#b8aea0" strokeWidth="0.6" />
+            <circle cx="54" cy="54" r="7.2" fill="url(#gomo-w)" stroke="#b8aea0" strokeWidth="0.6" />
+          </svg>
+        </div>
       </div>
     );
   }
   if (kind === "ttt") {
     return (
-      <div className="preview-row ttt-preview">
-        <span>X</span>
-        <span>O</span>
-        <span>X</span>
+      <div className="preview-row preview-scene-row">
+        <div className="home-preview home-preview-ttt" aria-hidden>
+          <svg viewBox="0 0 120 78" className="home-preview-svg">
+            <defs>
+              <linearGradient id="ttt-panel" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#f8fafc" />
+                <stop offset="100%" stopColor="#e2e8f0" />
+              </linearGradient>
+            </defs>
+            <rect x="18" y="4" width="84" height="70" rx="10" fill="url(#ttt-panel)" stroke="#cbd5e1" strokeWidth="1.4" />
+            <line x1="46" y1="12" x2="46" y2="66" stroke="#94a3b8" strokeWidth="2.4" strokeLinecap="round" />
+            <line x1="74" y1="12" x2="74" y2="66" stroke="#94a3b8" strokeWidth="2.4" strokeLinecap="round" />
+            <line x1="26" y1="30" x2="94" y2="30" stroke="#94a3b8" strokeWidth="2.4" strokeLinecap="round" />
+            <line x1="26" y1="48" x2="94" y2="48" stroke="#94a3b8" strokeWidth="2.4" strokeLinecap="round" />
+            <g stroke="#0f172a" strokeWidth="3.2" strokeLinecap="round">
+              <line x1="28" y1="14" x2="42" y2="26" />
+              <line x1="42" y1="14" x2="28" y2="26" />
+            </g>
+            <circle cx="60" cy="39" r="7.5" fill="none" stroke="#dc2626" strokeWidth="3" />
+            <g stroke="#0f172a" strokeWidth="3.2" strokeLinecap="round">
+              <line x1="80" y1="52" x2="94" y2="64" />
+              <line x1="94" y1="52" x2="80" y2="64" />
+            </g>
+            <circle cx="32" cy="57" r="7.5" fill="none" stroke="#dc2626" strokeWidth="3" />
+          </svg>
+        </div>
       </div>
     );
   }
   if (kind === "c4") {
     return (
-      <div className="preview-row c4-preview">
-        <span className="c4-bead a" />
-        <span className="c4-bead b" />
-        <span className="c4-bead a" />
+      <div className="preview-row preview-scene-row">
+        <div className="home-preview home-preview-c4" aria-hidden>
+          <svg viewBox="0 0 120 78" className="home-preview-svg">
+            <defs>
+              <linearGradient id="c4-frame" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#60a5fa" />
+                <stop offset="55%" stopColor="#2563eb" />
+                <stop offset="100%" stopColor="#1e3a8a" />
+              </linearGradient>
+              <radialGradient id="c4-red" cx="32%" cy="28%" r="70%">
+                <stop offset="0%" stopColor="#fca5a5" />
+                <stop offset="55%" stopColor="#dc2626" />
+                <stop offset="100%" stopColor="#7f1d1d" />
+              </radialGradient>
+              <radialGradient id="c4-yel" cx="32%" cy="28%" r="70%">
+                <stop offset="0%" stopColor="#fde68a" />
+                <stop offset="55%" stopColor="#eab308" />
+                <stop offset="100%" stopColor="#854d0e" />
+              </radialGradient>
+            </defs>
+            <rect x="14" y="8" width="92" height="58" rx="8" fill="url(#c4-frame)" />
+            {[0, 1, 2, 3, 4].flatMap((col) =>
+              [0, 1, 2, 3].map((row) => {
+                const cx = 28 + col * 16;
+                const cy = 18 + row * 13;
+                const filled = (col === 1 && row >= 2) || (col === 2 && row >= 1) || (col === 3 && row >= 2);
+                const red = (col === 1 && row === 3) || (col === 2 && row !== 2) || (col === 3 && row === 3);
+                return (
+                  <g key={`${col}-${row}`}>
+                    <circle cx={cx} cy={cy} r="5.4" fill="#f1f5f9" opacity="0.95" />
+                    {filled ? <circle cx={cx} cy={cy} r="4.6" fill={red ? "url(#c4-red)" : "url(#c4-yel)"} /> : null}
+                  </g>
+                );
+              }),
+            )}
+            <rect x="18" y="66" width="10" height="8" rx="2" fill="#1e3a8a" />
+            <rect x="92" y="66" width="10" height="8" rx="2" fill="#1e3a8a" />
+          </svg>
+        </div>
       </div>
     );
   }
   if (kind === "snake") {
     return (
-      <div className="preview-row snake-preview">
-        <i /><i /><i /><b />
+      <div className="preview-row preview-scene-row">
+        <div className="home-preview home-preview-snake" aria-hidden>
+          <svg viewBox="0 0 120 78" className="home-preview-svg">
+            <defs>
+              <radialGradient id="snake-sky" cx="50%" cy="35%" r="70%">
+                <stop offset="0%" stopColor="#1a4a52" />
+                <stop offset="100%" stopColor="#07151d" />
+              </radialGradient>
+              <linearGradient id="snake-body" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#0f766e" />
+                <stop offset="55%" stopColor="#14b8a6" />
+                <stop offset="100%" stopColor="#5eead4" />
+              </linearGradient>
+            </defs>
+            <rect x="4" y="4" width="112" height="70" rx="12" fill="url(#snake-sky)" stroke="#134e4a" strokeWidth="1.2" />
+            <path d="M18 52 C28 52 32 28 48 28 S72 52 86 40" fill="none" stroke="url(#snake-body)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="86" cy="40" r="7" fill="#2dd4bf" />
+            <circle cx="88.5" cy="38" r="1.6" fill="#0f172a" />
+            <circle cx="102" cy="28" r="4.2" fill="#fbbf24" />
+            <circle cx="100.8" cy="26.8" r="1.3" fill="#fff7d6" opacity="0.85" />
+            <circle cx="34" cy="58" r="2.2" fill="#f59e0b" opacity="0.7" />
+            <circle cx="58" cy="62" r="1.8" fill="#fbbf24" opacity="0.55" />
+          </svg>
+        </div>
       </div>
     );
   }
