@@ -108,7 +108,7 @@ export const CATALOG: CatalogGame[] = [
     idx: "13",
     code: "SNAKE",
     name: "Snake",
-    blurb: "Shared twisting arena. Everyone on /play/snake is on one map. Bend, eat, respawn.",
+    blurb: "Shared twisting arena. Bend, eat, boost, respawn — one map for everyone online.",
     preview: "snake",
     week: "steam",
   },

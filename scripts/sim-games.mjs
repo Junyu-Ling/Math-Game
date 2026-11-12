@@ -347,6 +347,20 @@ function playUntil(start, step, cap, name) {
 
   const view = snake.viewSnake(bots, "you");
   ok("snake view keeps the viewer snake", Boolean(view.players.find((p) => p.id === "you")));
+
+  let fat = snake.startSnakePractice(0);
+  fat = {
+    ...fat,
+    players: fat.players.map((p) =>
+      p.id === "you" ? { ...p, score: 8, path: Array.from({ length: 40 }, (_, i) => ({ x: 40 - i * 0.5, y: 40 })) } : p,
+    ),
+  };
+  fat = snake.applySnakeAction(fat, "you", { type: "boost", on: true });
+  const beforeBoost = fat.players.find((p) => p.id === "you");
+  ok("snake boost arms when held", beforeBoost.boosting === true);
+  for (let i = 0; i < 12; i++) fat = snake.stepSnake(fat);
+  const afterBoost = fat.players.find((p) => p.id === "you");
+  ok("snake boost drains score", afterBoost.score < beforeBoost.score);
 }
 
 /* ---------- other live tables: AI vs AI, no crash ---------- */

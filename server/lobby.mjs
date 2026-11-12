@@ -924,7 +924,7 @@ async function expireArrange(room, force = false) {
           }
         }
       }
-      room.endsAt = Date.now() + (room.mods.snake.TICK_MS || 60);
+      room.endsAt = Date.now() + (room.mods.snake.TICK_MS || 40);
       room.seats = (room.state.players || []).filter((p) => p.human !== false).map((p) => String(p.id));
       armCpuThink(room);
       room.seq = (room.seq || 0) + 1;
@@ -1629,8 +1629,14 @@ export async function applyRoomAction(user, roomId, action, mods) {
     room.state = mods.c4.applyC4Action(room.state, user.id, action);
   } else if (room.game === "snake") {
     room.state = mods.snake.applySnakeAction(room.state, user.id, action);
+    const tickMs = mods.snake.TICK_MS || 40;
+    let guard = 0;
+    while (room.endsAt && Date.now() + 2 >= room.endsAt && guard++ < 10) {
+      room.state = mods.snake.stepSnake(room.state, Date.now());
+      room.endsAt = Date.now() + tickMs;
+    }
     if (!room.endsAt || room.endsAt < Date.now()) {
-      room.endsAt = Date.now() + (mods.snake.TICK_MS || 60);
+      room.endsAt = Date.now() + tickMs;
     }
     await syncSnakeSeats(room);
   } else if (room.game === "werewolf") {
@@ -1763,7 +1769,7 @@ export async function joinSnakeWorld(user) {
   });
   await syncSnakeSeats(rec);
   if (!rec.endsAt || rec.endsAt < Date.now()) {
-    rec.endsAt = Date.now() + (mods.snake.TICK_MS || 60);
+    rec.endsAt = Date.now() + (mods.snake.TICK_MS || 40);
   }
   rec.seq = (rec.seq || 0) + 1;
   await saveRoom(rec);

@@ -2,16 +2,19 @@ import { uid } from "../../lib/shuffle";
 
 /** Continuous world size (units). */
 export const WORLD = 200;
-export const TICK_MS = 60;
+export const TICK_MS = 40;
 export const VIEW_RADIUS = 42;
 export const START_LEN = 18;
 export const FOOD_COUNT = 80;
-export const SPEED = 0.55;
-export const TURN_RATE = 0.14;
+export const SPEED = 0.58;
+export const BOOST_MULT = 1.85;
+export const BOOST_DRAIN_EVERY = 5;
+export const MIN_BOOST_SCORE = 1;
+export const TURN_RATE = 0.16;
 export const HEAD_R = 1.35;
 export const FOOD_R = 0.85;
 export const PATH_STEP = 0.55;
-export const RESPAWN_MS = 900;
+export const RESPAWN_MS = 700;
 export const SNAKE_WORLD_ID = "snake-world";
 
 export type Point = { x: number; y: number };
@@ -30,6 +33,7 @@ export type SnakePlayer = {
   score: number;
   hue: number;
   respawnAt: number | null;
+  boosting: boolean;
 };
 
 export type Food = { id: string; x: number; y: number };
@@ -46,6 +50,7 @@ export type SnakeState = {
 export type SnakeAction =
   | { type: "aim"; angle: number }
   | { type: "dir"; x: number; y: number }
+  | { type: "boost"; on: boolean }
   | { type: "join" }
   | { type: "leave" };
 
@@ -100,6 +105,10 @@ function buildPath(x: number, y: number, angle: number, len: number): Point[] {
   return path;
 }
 
+export function canBoost(p: Pick<SnakePlayer, "alive" | "score" | "path">): boolean {
+  return Boolean(p.alive && p.score >= MIN_BOOST_SCORE && p.path.length > START_LEN);
+}
+
 function spawnPlayer(
   person: { id: string; name: string; human?: boolean },
   index: number,
@@ -119,6 +128,7 @@ function spawnPlayer(
     score: 0,
     hue: hueFor(person.id, index),
     respawnAt: null,
+    boosting: false,
   };
 }
 
@@ -136,7 +146,7 @@ function emptyWorld(mode: SnakeState["mode"] = "world"): SnakeState {
     foods: seedFoods(),
     phase: "play",
     tick: 0,
-    log: [{ id: uid("l"), text: "Global snake arena. Steer to twist. Crash and respawn." }],
+    log: [{ id: uid("l"), text: "Global snake arena. Steer to twist. Hold Space to boost." }],
   };
 }
 
@@ -218,6 +228,16 @@ export function applySnakeAction(state: SnakeState, actorId: string, action: Sna
   if (action.type === "leave") return leaveSnake(state, actorId);
   const me = state.players.find((p) => p.id === actorId);
   if (!me || (!me.alive && !me.respawnAt)) return state;
+
+  if (action.type === "boost") {
+    return {
+      ...state,
+      players: state.players.map((p) =>
+        p.id === actorId ? { ...p, boosting: Boolean(action.on) && p.alive } : p,
+      ),
+    };
+  }
+
   let angle: number | null = null;
   if (action.type === "aim" && Number.isFinite(action.angle)) angle = action.angle;
   else if (action.type === "dir") angle = aimFromDir(action.x, action.y);
@@ -247,7 +267,7 @@ function segmentHit(head: Point, path: Point[], skip: number, radius: number): b
 
 function respawnNow(p: SnakePlayer, index: number): SnakePlayer {
   const fresh = spawnPlayer({ id: p.id, name: p.name, human: p.human }, index);
-  return { ...fresh, score: 0, hue: p.hue };
+  return { ...fresh, score: 0, hue: p.hue, boosting: false };
 }
 
 export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
@@ -255,31 +275,38 @@ export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
     state = { ...state, phase: "play" };
   }
   let foods = state.foods.slice();
+  const tick = state.tick + 1;
   const players = state.players.map((p, index) => {
     if (!p.alive) {
       if (p.respawnAt && now >= p.respawnAt) return respawnNow(p, index);
-      return p;
+      return { ...p, boosting: false };
     }
-    const angle = turnToward(p.angle, p.aim, TURN_RATE);
-    const x = p.x + Math.cos(angle) * SPEED;
-    const y = p.y + Math.sin(angle) * SPEED;
+    const boosting = Boolean(p.boosting) && canBoost(p);
+    const spd = boosting ? SPEED * BOOST_MULT : SPEED;
+    const angle = turnToward(p.angle, p.aim, TURN_RATE * (boosting ? 0.85 : 1));
+    const x = p.x + Math.cos(angle) * spd;
+    const y = p.y + Math.sin(angle) * spd;
     let path = [{ x, y }, ...p.path];
-    const maxPts = START_LEN + Math.floor(p.score * 2.2);
+    let score = p.score;
+    if (boosting && tick % BOOST_DRAIN_EVERY === 0) {
+      score = Math.max(0, score - 1);
+    }
+    const maxPts = START_LEN + Math.floor(score * 2.2);
     if (path.length > maxPts) path = path.slice(0, maxPts);
-    return { ...p, x, y, angle, path };
+    return { ...p, x, y, angle, path, score, boosting };
   });
 
   const next: SnakePlayer[] = players.map((p, i) => {
     if (!p.alive) return p;
     if (p.x < HEAD_R || p.y < HEAD_R || p.x > WORLD - HEAD_R || p.y > WORLD - HEAD_R) {
-      return { ...p, alive: false, respawnAt: now + RESPAWN_MS, path: p.path.slice(0, 4) };
+      return { ...p, alive: false, boosting: false, respawnAt: now + RESPAWN_MS, path: p.path.slice(0, 4) };
     }
     for (let j = 0; j < players.length; j++) {
       const other = players[j]!;
       if (!other.alive) continue;
       const skip = j === i ? 8 : 0;
       if (segmentHit({ x: p.x, y: p.y }, other.path, skip, HEAD_R * 0.95)) {
-        return { ...p, alive: false, respawnAt: now + RESPAWN_MS, path: p.path.slice(0, 4) };
+        return { ...p, alive: false, boosting: false, respawnAt: now + RESPAWN_MS, path: p.path.slice(0, 4) };
       }
     }
     let score = p.score;
@@ -293,7 +320,7 @@ export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
       } else kept.push(f);
     }
     foods = kept;
-    return { ...p, score, path };
+    return { ...p, score, path, boosting: p.boosting && canBoost({ ...p, score, path }) };
   });
 
   while (foods.length < FOOD_COUNT) {
@@ -306,12 +333,51 @@ export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
     players: next,
     foods,
     phase: "play",
-    tick: state.tick + 1,
+    tick,
   };
 }
 
 /** Alias used by lobby tick. */
 export const stepSnakeWorld = stepSnake;
+
+/** Prefer server snapshot; keep unsent local aim/boost on yourself. */
+export function reconcileSnake(server: SnakeState, local: SnakeState | null, youId?: string): SnakeState {
+  if (!local || !youId) return server;
+  const mine = local.players.find((p) => p.id === youId);
+  if (!mine) return server;
+  return {
+    ...server,
+    players: server.players.map((p) =>
+      p.id === youId ? { ...p, aim: mine.aim, boosting: mine.boosting && p.alive } : p,
+    ),
+  };
+}
+
+/** Visual-only short prediction of your own snake between server ticks. */
+export function predictSelf(state: SnakeState, youId: string, ticks: number): SnakeState {
+  const n = Math.max(0, Math.min(4, Math.floor(ticks)));
+  if (!n || !youId) return state;
+  return {
+    ...state,
+    players: state.players.map((p) => {
+      if (p.id !== youId || !p.alive) return p;
+      let { x, y, angle, path, score } = p;
+      let boosting = Boolean(p.boosting);
+      for (let i = 0; i < n; i++) {
+        boosting = boosting && canBoost({ alive: true, score, path });
+        const spd = boosting ? SPEED * BOOST_MULT : SPEED;
+        angle = turnToward(angle, p.aim, TURN_RATE * (boosting ? 0.85 : 1));
+        x += Math.cos(angle) * spd;
+        y += Math.sin(angle) * spd;
+        path = [{ x, y }, ...path];
+        if (boosting && (state.tick + i + 1) % BOOST_DRAIN_EVERY === 0) score = Math.max(0, score - 1);
+        const maxPts = START_LEN + Math.floor(score * 2.2);
+        if (path.length > maxPts) path = path.slice(0, maxPts);
+      }
+      return { ...p, x, y, angle, path, score, boosting };
+    }),
+  };
+}
 
 export function viewSnake(state: SnakeState, viewerId: string): SnakeState {
   const me = state.players.find((p) => p.id === viewerId);
@@ -344,7 +410,6 @@ export function aiSnake(state: SnakeState, cpuId: string): SnakeAction {
   }
   if (!best) return { type: "aim", angle: me.angle };
   const angle = Math.atan2(best.y - me.y, best.x - me.x);
-  // Nudge away from nearby foreign heads
   for (const p of state.players) {
     if (p.id === me.id || !p.alive) continue;
     const d = Math.sqrt(dist2({ x: me.x, y: me.y }, { x: p.x, y: p.y }));

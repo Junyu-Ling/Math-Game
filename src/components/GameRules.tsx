@@ -66,7 +66,7 @@ const RULES: Record<string, string[]> = {
   ],
   snake: [
     "Shared world: sign in and open Snake — every online player on this page is on the same continuous map. The camera follows your head.",
-    "Aim with arrows or WASD. Your body bends as you turn. Eat pellets to grow. Hit a wall or another snake and you respawn. Practice vs CPU works offline.",
+    "Aim with the mouse, arrows, or WASD. Your body bends as you turn. Eat pellets to grow. Hold Space or Shift to boost (burns score for speed). Hit a wall or another snake and you respawn. Practice vs CPU works offline.",
   ],
   ludo: [
     "2–4 players. Each color has four planes. Practice is you (blue) plus 1–3 CPUs.",
@@ -775,12 +775,17 @@ export function GameRules({ game }: { game: string }) {
   if (game === "snake") {
     return (
       <RuleSheet
-        lead="One shared twisting map. Aim, bend, eat, respawn."
+        lead="One shared twisting map. Aim, bend, boost, respawn."
         rows={[
           {
             name: "Steer",
-            tip: "Arrows or WASD set your aim. The body curves as you turn.",
-            demo: <span className="rule-call">WASD</span>,
+            tip: "Mouse, arrows, or WASD set your aim. The body curves as you turn.",
+            demo: <span className="rule-call">MOUSE</span>,
+          },
+          {
+            name: "Boost",
+            tip: "Hold Space or Shift to sprint. Boost burns score and shortens you.",
+            demo: <span className="rule-call">SPACE</span>,
           },
           {
             name: "Survive",
