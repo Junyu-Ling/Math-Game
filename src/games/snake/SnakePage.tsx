@@ -9,6 +9,7 @@ import {
   reconcileSnake,
   SNAKE_WORLD_ID,
   startSnakePractice,
+  stepSelfPredict,
   stepSnake,
   TICK_MS,
   VIEW_RADIUS,
@@ -316,7 +317,12 @@ export function SnakePage() {
     else netSend(action);
   }
 
-  function pushHud(cur: SnakeState) {
+  const hudAtRef = useRef(0);
+
+  function pushHud(cur: SnakeState, force = false) {
+    const now = performance.now();
+    if (!force && now - hudAtRef.current < 80) return;
+    hudAtRef.current = now;
     const me = youId ? cur.players.find((p) => p.id === youId) : undefined;
     setHud({
       score: me?.score ?? 0,
@@ -330,13 +336,14 @@ export function SnakePage() {
 
   useEffect(() => {
     if (!serverView || practice) return;
-    if (serverView.tick < lastServerTickRef.current && liveRef.current) return;
+    // Same tick / duplicate watch payloads must not re-merge — that flickers foods & peers.
+    if (serverView.tick <= lastServerTickRef.current && liveRef.current) return;
     lastServerTickRef.current = serverView.tick;
     liveRef.current = reconcileSnake(serverView, liveRef.current, youId);
-    pushHud(liveRef.current);
+    pushHud(liveRef.current, true);
   }, [serverView, practice, youId, serverView?.tick]);
 
-  // Local simulation for practice AND online — online feels instant; server only corrects peers/events.
+  // Practice: full local sim. Online: predict only yourself; peers/food come from server.
   useEffect(() => {
     if (!practice && !world) return;
     const id = window.setInterval(() => {
@@ -358,7 +365,7 @@ export function SnakePage() {
           if (world) netSend({ type: "boost", on: boostRef.current });
         }
       }
-      cur = stepSnake(cur);
+      cur = practice ? stepSnake(cur) : youId ? stepSelfPredict(cur, youId) : cur;
       liveRef.current = cur;
       if (practice) setLocal(cur);
       pushHud(cur);

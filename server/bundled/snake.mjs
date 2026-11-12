@@ -387,20 +387,110 @@ function reconcileSnake(server, local, youId) {
     };
   }
   const prevById = new Map(local.players.map((p) => [p.id, p]));
+  const serverIds = new Set(server.players.map((p) => p.id));
+  const players = server.players.map((p) => {
+    if (p.id === youId) return self;
+    const prev = prevById.get(p.id);
+    if (!prev || !prev.alive || !p.alive) return p;
+    if (!p.path.length && prev.path.length) {
+      return { ...prev, name: p.name, hue: p.hue, score: p.score, alive: p.alive };
+    }
+    const t = 0.22;
+    const x = prev.x + (p.x - prev.x) * t;
+    const y = prev.y + (p.y - prev.y) * t;
+    const angle = lerpAngle(prev.angle, p.angle, t);
+    const path = p.path.length ? [{ x, y }, ...p.path.slice(1)] : prev.path;
+    return { ...p, x, y, angle, path };
+  });
+  const foods = server.foods.length ? server.foods : local.foods;
   return {
     ...server,
+    foods,
     tick: Math.max(server.tick, local.tick),
-    players: server.players.map((p) => {
-      if (p.id === youId) return self;
-      const prev = prevById.get(p.id);
-      if (!prev || !prev.alive || !p.alive) return p;
-      const t = 0.28;
-      const x = prev.x + (p.x - prev.x) * t;
-      const y = prev.y + (p.y - prev.y) * t;
-      const angle = lerpAngle(prev.angle, p.angle, t);
-      const path = p.path.length ? [{ x, y }, ...p.path.slice(1)] : [{ x, y }];
-      return { ...p, x, y, angle, path };
-    })
+    players: players.filter((p) => p.id === youId || serverIds.has(p.id))
+  };
+}
+function stepSelfPredict(state, youId, now = Date.now()) {
+  const tick = state.tick + 1;
+  const me = state.players.find((p) => p.id === youId);
+  if (!me) return { ...state, tick };
+  if (!me.alive) {
+    if (me.respawnAt && now >= me.respawnAt) {
+      const idx = state.players.findIndex((p) => p.id === youId);
+      const fresh = respawnNow(me, Math.max(0, idx), now);
+      return {
+        ...state,
+        tick,
+        players: state.players.map((p) => p.id === youId ? fresh : p)
+      };
+    }
+    return { ...state, tick, players: state.players.map((p) => p.id === youId ? { ...p, boosting: false } : p) };
+  }
+  let energy = me.energy;
+  const boosting = Boolean(me.boosting) && canBoost(me);
+  const spd = boosting ? SPEED * BOOST_MULT : SPEED;
+  const angle = turnToward(me.angle, me.aim, turnRateFor({ ...me, boosting }));
+  let x = me.x + Math.cos(angle) * spd;
+  let y = me.y + Math.sin(angle) * spd;
+  let path = [{ x, y }, ...me.path];
+  let score = me.score;
+  if (boosting && tick % BOOST_DRAIN_EVERY === 0) energy = Math.max(0, energy - BOOST_DRAIN);
+  const maxPts = START_LEN + Math.floor(score * 2.2);
+  if (path.length > maxPts) path = path.slice(0, maxPts);
+  const shielded = isShielded({ ...me, shieldUntil: me.shieldUntil }, now);
+  if (x < HEAD_R || y < HEAD_R || x > WORLD - HEAD_R || y > WORLD - HEAD_R) {
+    if (shielded) {
+      x = clamp(x, HEAD_R, WORLD - HEAD_R);
+      y = clamp(y, HEAD_R, WORLD - HEAD_R);
+    } else {
+      const killed = killSnake({ ...me, x, y, angle, path, energy, score, boosting: false }, now);
+      return {
+        ...state,
+        tick,
+        foods: state.foods.concat(killed.drops),
+        players: state.players.map((p) => p.id === youId ? killed.player : p)
+      };
+    }
+  }
+  for (const other of state.players) {
+    if (other.id === youId || !other.alive || !other.path.length) continue;
+    if (shielded || isShielded(other, now)) continue;
+    if (segmentHit({ x, y }, other.path, 0, HEAD_R * 0.95)) {
+      const killed = killSnake({ ...me, x, y, angle, path, energy, score, boosting: false }, now);
+      return {
+        ...state,
+        tick,
+        foods: state.foods.concat(killed.drops),
+        players: state.players.map((p) => p.id === youId ? killed.player : p)
+      };
+    }
+  }
+  let foods = state.foods;
+  const kept = [];
+  for (const f of foods) {
+    if (dist2({ x, y }, f) <= (HEAD_R + FOOD_R) * (HEAD_R + FOOD_R)) {
+      score += 1;
+      energy = Math.min(ENERGY_MAX, energy + ENERGY_PER_FOOD);
+      const tip = path[path.length - 1] ?? { x, y };
+      path = [...path, { x: tip.x, y: tip.y }];
+    } else kept.push(f);
+  }
+  foods = kept;
+  const nextMe = {
+    ...me,
+    x,
+    y,
+    angle,
+    path,
+    score,
+    energy,
+    boosting: boosting && energy > 0
+  };
+  return {
+    ...state,
+    tick,
+    foods,
+    players: state.players.map((p) => p.id === youId ? nextMe : p)
   };
 }
 function viewSnake(state, viewerId) {
@@ -574,6 +664,7 @@ export {
   startSnakeDuel,
   startSnakeLobby,
   startSnakePractice,
+  stepSelfPredict,
   stepSnake,
   stepSnakeWorld,
   turnRateFor,

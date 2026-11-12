@@ -534,6 +534,18 @@ function playUntil(start, step, cap, name) {
   const merged = snake.reconcileSnake(serverSnap, localPred, "you");
   const mergedYou = merged.players.find((p) => p.id === "you");
   ok("snake reconcile keeps local aim while soft-merging", Math.abs(mergedYou.aim - 1.2) < 1e-6);
+
+  let pred = snake.startSnakePractice(1);
+  const foodCount = pred.foods.length;
+  const peer = pred.players.find((p) => p.id === "cpu");
+  const peerX = peer.x;
+  pred = snake.applySnakeAction(pred, "you", { type: "aim", angle: 0 });
+  pred = snake.stepSelfPredict(pred, "you");
+  const afterPred = pred.players.find((p) => p.id === "cpu");
+  ok(
+    "snake self predict leaves peers and food spawn alone",
+    afterPred.x === peerX && pred.foods.length <= foodCount,
+  );
 }
 
 /* ---------- other live tables: AI vs AI, no crash ---------- */
