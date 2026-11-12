@@ -65,7 +65,7 @@ const RULES: Record<string, string[]> = {
     "Four of yours in a row — across, down, or diagonal — wins. A full grid with no four is a draw.",
   ],
   snake: [
-    "2–4 players on one grid. Open a table, add CPUs or invite, then start. Steer with arrows or WASD (or the on-screen pads).",
+    "2–4 players on a 48×32 arena. The on-screen window follows your head. Open a table, add CPUs or invite, then start. Steer with arrows or WASD (or the on-screen pads).",
     "Eat apples to grow and score. Hitting a wall, yourself, or another snake kills you. Last snake alive — or first to 8 apples — wins.",
   ],
   ludo: [
@@ -775,11 +775,11 @@ export function GameRules({ game }: { game: string }) {
   if (game === "snake") {
     return (
       <RuleSheet
-        lead="Share one grid. Steer, eat apples, don’t crash."
+        lead="Large 48×32 map. The camera follows your head. Steer, eat apples, don’t crash."
         rows={[
           {
             name: "Steer",
-            tip: "Arrows or WASD. You cannot reverse into yourself.",
+            tip: "Arrows or WASD. You cannot reverse into yourself. The view pans as you move.",
             demo: <span className="rule-call">WASD</span>,
           },
           {

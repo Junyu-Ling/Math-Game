@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   aiSnake,
   applySnakeAction,
+  cameraOrigin,
   COLS,
   COUNTDOWN_MS,
   finishCountdown,
@@ -9,6 +10,8 @@ import {
   startSnakePractice,
   stepSnake,
   TICK_MS,
+  VIEW_COLS,
+  VIEW_ROWS,
   type SnakeAction,
   type SnakeState,
 } from "./engine";
@@ -100,6 +103,9 @@ export function SnakePage() {
       });
     }
   }
+  const focus = me?.alive && me.body[0] ? me.body[0] : state?.food ?? { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) };
+  const { ox, oy } = cameraOrigin(focus);
+  const atEdge = ox <= 0 || oy <= 0 || ox >= COLS - VIEW_COLS || oy >= ROWS - VIEW_ROWS;
 
   return (
     <div className="page-wide">
@@ -139,7 +145,7 @@ export function SnakePage() {
               <p>
                 {waiting
                   ? "Add CPUs or invite friends, then everyone Ready. Arrows or WASD. Last snake alive — or first to 8 apples — wins."
-                  : "Share one grid. Steer with arrows or WASD. Walls, yourself, and other snakes kill."}
+                  : "Large scrolling 48×32 map. Steer with arrows or WASD. Walls, yourself, and other snakes kill."}
               </p>
               {waiting && state ? (
                 <ul className="lobby-roster">
@@ -176,28 +182,35 @@ export function SnakePage() {
               </div>
               <p className="status-line">
                 {state.phase === "countdown"
-                  ? "Get ready. Arrows or WASD."
+                  ? `Get ready. Arrows or WASD. Arena ${COLS}×${ROWS} — the view follows your head.`
                   : state.phase === "over"
                     ? forfeitText(state) ||
                       (state.winnerId
                         ? `${state.players.find((p) => p.id === state.winnerId)?.name} wins.`
                         : "Draw — every snake crashed.")
-                    : "Steer with arrows or WASD. Eat apples. Don’t hit a wall, yourself, or another snake."}
+                    : `Steer with arrows or WASD. Map ${COLS}×${ROWS}; camera pans with you. Eat apples — don’t hit a wall, yourself, or another snake.`}
               </p>
               <div
-                className="snake-grid"
-                style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)`, gridTemplateRows: `repeat(${ROWS}, 1fr)` }}
+                className={`snake-grid${atEdge ? " at-edge" : ""}`}
+                style={{
+                  gridTemplateColumns: `repeat(${VIEW_COLS}, 1fr)`,
+                  gridTemplateRows: `repeat(${VIEW_ROWS}, 1fr)`,
+                }}
                 role="img"
-                aria-label="Snake arena"
+                aria-label={`Snake arena view ${ox},${oy} of ${COLS} by ${ROWS}`}
               >
-                {Array.from({ length: ROWS * COLS }, (_, i) => {
-                  const x = i % COLS;
-                  const y = Math.floor(i / COLS);
+                {Array.from({ length: VIEW_ROWS * VIEW_COLS }, (_, i) => {
+                  const x = ox + (i % VIEW_COLS);
+                  const y = oy + Math.floor(i / VIEW_COLS);
                   const cell = cells.get(`${x},${y}`);
+                  const wall =
+                    x <= 0 || y <= 0 || x >= COLS - 1 || y >= ROWS - 1
+                      ? " near-wall"
+                      : "";
                   return (
                     <span
-                      key={i}
-                      className={`snake-cell${cell ? ` is-${cell.kind}` : ""}${cell?.dead ? " dead" : ""}`}
+                      key={`${x}-${y}`}
+                      className={`snake-cell${cell ? ` is-${cell.kind}` : ""}${cell?.dead ? " dead" : ""}${wall}`}
                       style={cell?.hue != null ? { ["--hue" as string]: cell.hue } : undefined}
                     />
                   );

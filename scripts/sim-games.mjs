@@ -300,6 +300,9 @@ function playUntil(start, step, cap, name) {
 {
   let s = snake.startSnakePractice();
   ok("snake starts on countdown", s.phase === "countdown");
+  ok("snake arena is larger than the camera window", snake.COLS > snake.VIEW_COLS && snake.ROWS > snake.VIEW_ROWS);
+  const cam = snake.cameraOrigin({ x: 2, y: 2 });
+  ok("snake camera clamps near the corner", cam.ox === 0 && cam.oy === 0);
   const you = s.players.find((p) => p.id === "you");
   const reverse = snake.applySnakeAction(s, "you", { type: "dir", x: -you.dir.x, y: -you.dir.y });
   const after = reverse.players.find((p) => p.id === "you");

@@ -4,8 +4,10 @@ function uid(prefix = "id") {
 }
 
 // src/games/snake/engine.ts
-var COLS = 24;
-var ROWS = 16;
+var COLS = 48;
+var ROWS = 32;
+var VIEW_COLS = 24;
+var VIEW_ROWS = 16;
 var TICK_MS = 160;
 var COUNTDOWN_MS = 3e3;
 var START_LEN = 3;
@@ -43,13 +45,23 @@ function occupied(players, skipId) {
 function spawnFood(players, avoid) {
   const taken = occupied(players);
   if (avoid) taken.add(`${avoid.x},${avoid.y}`);
+  for (let n = 0; n < 240; n++) {
+    const x = Math.floor(Math.random() * COLS);
+    const y = Math.floor(Math.random() * ROWS);
+    if (!taken.has(`${x},${y}`)) return { x, y };
+  }
   const free = [];
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
       if (!taken.has(`${x},${y}`)) free.push({ x, y });
     }
   }
-  return free[Math.floor(Math.random() * Math.max(1, free.length))] ?? { x: 12, y: 8 };
+  return free[Math.floor(Math.random() * Math.max(1, free.length))] ?? { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) };
+}
+function cameraOrigin(focus) {
+  const ox = Math.max(0, Math.min(COLS - VIEW_COLS, focus.x - Math.floor(VIEW_COLS / 2)));
+  const oy = Math.max(0, Math.min(ROWS - VIEW_ROWS, focus.y - Math.floor(VIEW_ROWS / 2)));
+  return { ox, oy };
 }
 function seatPlayers(people) {
   return people.slice(0, 4).map((p, i) => {
@@ -72,14 +84,14 @@ function lobbyOf(people) {
   const players = seatPlayers(people);
   return {
     players,
-    food: { x: 12, y: 8 },
+    food: { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) },
     phase: "lobby",
     winnerId: null,
     tick: 0,
     log: [
       {
         id: uid("l"),
-        text: `Table ${players.length}/4. Open a table, add CPUs or invite, then start. Last snake alive \u2014 or first to ${GOAL} apples \u2014 wins.`
+        text: `Table ${players.length}/4. Open a table, add CPUs or invite, then start. Large ${COLS}\xD7${ROWS} map \u2014 camera follows your head. Last snake alive \u2014 or first to ${GOAL} apples \u2014 wins.`
       }
     ]
   };
@@ -246,8 +258,11 @@ export {
   ROWS,
   START_LEN,
   TICK_MS,
+  VIEW_COLS,
+  VIEW_ROWS,
   aiSnake,
   applySnakeAction,
+  cameraOrigin,
   finishCountdown,
   startSnakeDuel,
   startSnakeLobby,

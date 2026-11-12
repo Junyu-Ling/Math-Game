@@ -17,10 +17,8 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
   );
   const host = Boolean(user && room?.seats?.[0] === user.id);
   const seated = new Set(room?.seats || []);
-  const cooling = inviteCooldownMs > 0;
-  const waitSec = Math.ceil(inviteCooldownMs / 1000);
   const max = tableMax(game);
-  const canInviteMore = (!room || (tableWait && host && seated.size < max)) && !cooling;
+  const canInviteMore = !room || (tableWait && host && seated.size < max);
 
   if (!user) {
     return (
@@ -57,7 +55,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
         <p>Connect Four is heads-up. Open a table, add a CPU or invite one friend, then start. Drop into a column; four in a row wins.</p>
       ) : null}
       {game === "snake" ? (
-        <p>Snake is 2–4. Open a table, add CPUs or invite, then start. Arrows or WASD. Last snake alive — or first to 8 apples — wins.</p>
+        <p>Snake is 2–4 on a large scrolling map. Open a table, add CPUs or invite, then start. Arrows or WASD. Last snake alive — or first to 8 apples — wins.</p>
       ) : null}
       {/* Deferred — Werewolf */}
       {game === "bj" ? (
@@ -77,6 +75,9 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
           const live = p.online !== false;
           const inGame = live && Boolean(p.roomId);
           const matching = live && Boolean(p.matching);
+          const coolMs = inviteCooldownMs(p.id);
+          const cooling = coolMs > 0;
+          const waitSec = Math.ceil(coolMs / 1000);
           const status = !live ? "Offline" : inGame ? "In game" : matching ? "Matching" : "Online";
           const statusClass = !live ? "off" : inGame || matching ? "busy" : "on";
           return (
@@ -89,7 +90,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
             <button
               className="btn"
               type="button"
-              disabled={!canInviteMore || !live || inGame || matching || seated.has(p.id)}
+              disabled={!canInviteMore || cooling || !live || inGame || matching || seated.has(p.id)}
               onClick={() => void invite(p.id, game, meta).catch((ex) => alert(ex.message))}
             >
               {!live ? "Offline" : inGame ? "In game" : matching ? "Matching" : cooling ? `Invite (${waitSec})` : "Invite"}

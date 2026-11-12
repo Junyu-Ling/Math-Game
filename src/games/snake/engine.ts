@@ -1,7 +1,11 @@
 import { uid } from "../../lib/shuffle";
 
-export const COLS = 24;
-export const ROWS = 16;
+/** Full arena — larger than the on-screen window; the camera pans with your head. */
+export const COLS = 48;
+export const ROWS = 32;
+/** Visible window size (cells). */
+export const VIEW_COLS = 24;
+export const VIEW_ROWS = 16;
 export const TICK_MS = 160;
 export const COUNTDOWN_MS = 3000;
 export const START_LEN = 3;
@@ -76,13 +80,25 @@ function occupied(players: SnakePlayer[], skipId?: string): Set<string> {
 function spawnFood(players: SnakePlayer[], avoid?: Point): Point {
   const taken = occupied(players);
   if (avoid) taken.add(`${avoid.x},${avoid.y}`);
+  for (let n = 0; n < 240; n++) {
+    const x = Math.floor(Math.random() * COLS);
+    const y = Math.floor(Math.random() * ROWS);
+    if (!taken.has(`${x},${y}`)) return { x, y };
+  }
   const free: Point[] = [];
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
       if (!taken.has(`${x},${y}`)) free.push({ x, y });
     }
   }
-  return free[Math.floor(Math.random() * Math.max(1, free.length))] ?? { x: 12, y: 8 };
+  return free[Math.floor(Math.random() * Math.max(1, free.length))] ?? { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) };
+}
+
+/** Top-left of the camera window, clamped so the view stays inside the arena. */
+export function cameraOrigin(focus: Point): { ox: number; oy: number } {
+  const ox = Math.max(0, Math.min(COLS - VIEW_COLS, focus.x - Math.floor(VIEW_COLS / 2)));
+  const oy = Math.max(0, Math.min(ROWS - VIEW_ROWS, focus.y - Math.floor(VIEW_ROWS / 2)));
+  return { ox, oy };
 }
 
 function seatPlayers(people: Array<{ id: string; name: string; human?: boolean }>): SnakePlayer[] {
@@ -107,14 +123,14 @@ function lobbyOf(people: Array<{ id: string; name: string; human?: boolean }>): 
   const players = seatPlayers(people);
   return {
     players,
-    food: { x: 12, y: 8 },
+    food: { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) },
     phase: "lobby",
     winnerId: null,
     tick: 0,
     log: [
       {
         id: uid("l"),
-        text: `Table ${players.length}/4. Open a table, add CPUs or invite, then start. Last snake alive — or first to ${GOAL} apples — wins.`,
+        text: `Table ${players.length}/4. Open a table, add CPUs or invite, then start. Large ${COLS}×${ROWS} map — camera follows your head. Last snake alive — or first to ${GOAL} apples — wins.`,
       },
     ],
   };
