@@ -13,11 +13,12 @@ export const SPEED = 0.58;
 export const BOOST_MULT = 1.85;
 export const BOOST_DRAIN_EVERY = 5;
 export const MIN_BOOST_SCORE = 1;
-export const TURN_RATE = 0.3;
+export const TURN_RATE = 0.65;
 export const HEAD_R = 1.35;
 export const FOOD_R = 0.85;
 export const PATH_STEP = 0.55;
 export const RESPAWN_MS = 700;
+export const SHIELD_MS = 5000;
 export const SNAKE_WORLD_ID = "snake-world";
 
 export type Point = { x: number; y: number };
@@ -37,6 +38,8 @@ export type SnakePlayer = {
   hue: number;
   respawnAt: number | null;
   boosting: boolean;
+  /** Invulnerable until this timestamp (ms). */
+  shieldUntil: number | null;
 };
 
 export type Food = { id: string; x: number; y: number; hue?: number };
@@ -112,9 +115,14 @@ export function canBoost(p: Pick<SnakePlayer, "alive" | "score" | "path">): bool
   return Boolean(p.alive && p.score >= MIN_BOOST_SCORE && p.path.length > START_LEN);
 }
 
+export function isShielded(p: Pick<SnakePlayer, "alive" | "shieldUntil">, now = Date.now()): boolean {
+  return Boolean(p.alive && p.shieldUntil != null && now < p.shieldUntil);
+}
+
 function spawnPlayer(
   person: { id: string; name: string; human?: boolean },
   index: number,
+  now = Date.now(),
 ): SnakePlayer {
   const pt = randomPoint(12);
   const angle = Math.random() * Math.PI * 2;
@@ -132,6 +140,7 @@ function spawnPlayer(
     hue: hueFor(person.id, index),
     respawnAt: null,
     boosting: false,
+    shieldUntil: now + SHIELD_MS,
   };
 }
 
@@ -268,9 +277,9 @@ function segmentHit(head: Point, path: Point[], skip: number, radius: number): b
   return false;
 }
 
-function respawnNow(p: SnakePlayer, index: number): SnakePlayer {
-  const fresh = spawnPlayer({ id: p.id, name: p.name, human: p.human }, index);
-  return { ...fresh, score: 0, hue: p.hue, boosting: false };
+function respawnNow(p: SnakePlayer, index: number, now: number): SnakePlayer {
+  const fresh = spawnPlayer({ id: p.id, name: p.name, human: p.human }, index, now);
+  return { ...fresh, score: 0, hue: p.hue, boosting: false, shieldUntil: now + SHIELD_MS };
 }
 
 /** Scatter edible remains along the dead snake's body. */
@@ -307,6 +316,7 @@ function killSnake(p: SnakePlayer, now: number): { player: SnakePlayer; drops: F
       score: 0,
       respawnAt: now + RESPAWN_MS,
       path: p.path.slice(0, 3),
+      shieldUntil: null,
     },
   };
 }
@@ -319,12 +329,12 @@ export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
   const tick = state.tick + 1;
   const players = state.players.map((p, index) => {
     if (!p.alive) {
-      if (p.respawnAt && now >= p.respawnAt) return respawnNow(p, index);
+      if (p.respawnAt && now >= p.respawnAt) return respawnNow(p, index, now);
       return { ...p, boosting: false };
     }
     const boosting = Boolean(p.boosting) && canBoost(p);
     const spd = boosting ? SPEED * BOOST_MULT : SPEED;
-    const angle = turnToward(p.angle, p.aim, TURN_RATE * (boosting ? 0.95 : 1));
+    const angle = turnToward(p.angle, p.aim, TURN_RATE);
     const x = p.x + Math.cos(angle) * spd;
     const y = p.y + Math.sin(angle) * spd;
     let path = [{ x, y }, ...p.path];
@@ -339,13 +349,24 @@ export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
 
   const next: SnakePlayer[] = players.map((p, i) => {
     if (!p.alive) return p;
+    const shielded = isShielded(p, now);
     let dead = false;
-    if (p.x < HEAD_R || p.y < HEAD_R || p.x > WORLD - HEAD_R || p.y > WORLD - HEAD_R) dead = true;
+    if (p.x < HEAD_R || p.y < HEAD_R || p.x > WORLD - HEAD_R || p.y > WORLD - HEAD_R) {
+      if (shielded) {
+        return {
+          ...p,
+          x: clamp(p.x, HEAD_R, WORLD - HEAD_R),
+          y: clamp(p.y, HEAD_R, WORLD - HEAD_R),
+        };
+      }
+      dead = true;
+    }
     if (!dead) {
       for (let j = 0; j < players.length; j++) {
         if (j === i) continue; // self-collision does not kill
         const other = players[j]!;
         if (!other.alive) continue;
+        if (isShielded(other, now) || shielded) continue;
         if (segmentHit({ x: p.x, y: p.y }, other.path, 0, HEAD_R * 0.95)) {
           dead = true;
           break;
@@ -415,7 +436,7 @@ export function predictSelf(state: SnakeState, youId: string, ticks: number): Sn
       for (let i = 0; i < n; i++) {
         boosting = boosting && canBoost({ alive: true, score, path });
         const spd = boosting ? SPEED * BOOST_MULT : SPEED;
-        angle = turnToward(angle, p.aim, TURN_RATE * (boosting ? 0.95 : 1));
+        angle = turnToward(angle, p.aim, TURN_RATE);
         x += Math.cos(angle) * spd;
         y += Math.sin(angle) * spd;
         path = [{ x, y }, ...path];

@@ -318,7 +318,17 @@ function playUntil(start, step, cap, name) {
     ...s,
     players: s.players.map((p) =>
       p.id === "you"
-        ? { ...p, x: 0.2, y: 10, angle: Math.PI, aim: Math.PI, path: [{ x: 0.2, y: 10 }], alive: true, respawnAt: null }
+        ? {
+            ...p,
+            x: 0.2,
+            y: 10,
+            angle: Math.PI,
+            aim: Math.PI,
+            path: [{ x: 0.2, y: 10 }],
+            alive: true,
+            respawnAt: null,
+            shieldUntil: null,
+          }
         : p,
     ),
   };
@@ -350,7 +360,17 @@ function playUntil(start, step, cap, name) {
   ok("snake self collision does not kill", selfHit.players.find((p) => p.id === "you").alive === true);
 
   const revived = snake.stepSnake(crashed, dead.respawnAt + 1);
-  ok("snake respawns after delay", revived.players.find((p) => p.id === "you").alive === true);
+  const youFresh = revived.players.find((p) => p.id === "you");
+  ok("snake respawns after delay", youFresh.alive === true);
+  ok("snake respawn grants shield", youFresh.shieldUntil > dead.respawnAt + 1);
+  const shieldedWall = {
+    ...revived,
+    players: revived.players.map((p) =>
+      p.id === "you" ? { ...p, x: 0.2, y: 10, angle: Math.PI, aim: Math.PI, path: [{ x: 0.2, y: 10 }] } : p,
+    ),
+  };
+  const stillSafe = snake.stepSnake(shieldedWall, dead.respawnAt + 1);
+  ok("snake shield blocks wall death", stillSafe.players.find((p) => p.id === "you").alive === true);
 
   let world = snake.createSnakeWorld();
   world = snake.joinSnake(world, { id: "a", name: "A" });

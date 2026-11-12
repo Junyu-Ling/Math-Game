@@ -16,11 +16,12 @@ var SPEED = 0.58;
 var BOOST_MULT = 1.85;
 var BOOST_DRAIN_EVERY = 5;
 var MIN_BOOST_SCORE = 1;
-var TURN_RATE = 0.3;
+var TURN_RATE = 0.65;
 var HEAD_R = 1.35;
 var FOOD_R = 0.85;
 var PATH_STEP = 0.55;
 var RESPAWN_MS = 700;
+var SHIELD_MS = 5e3;
 var SNAKE_WORLD_ID = "snake-world";
 var HUES = [150, 12, 210, 48, 280, 30, 190, 330];
 function clamp(n, a, b) {
@@ -68,7 +69,10 @@ function buildPath(x, y, angle, len) {
 function canBoost(p) {
   return Boolean(p.alive && p.score >= MIN_BOOST_SCORE && p.path.length > START_LEN);
 }
-function spawnPlayer(person, index) {
+function isShielded(p, now = Date.now()) {
+  return Boolean(p.alive && p.shieldUntil != null && now < p.shieldUntil);
+}
+function spawnPlayer(person, index, now = Date.now()) {
   const pt = randomPoint(12);
   const angle = Math.random() * Math.PI * 2;
   return {
@@ -84,7 +88,8 @@ function spawnPlayer(person, index) {
     score: 0,
     hue: hueFor(person.id, index),
     respawnAt: null,
-    boosting: false
+    boosting: false,
+    shieldUntil: now + SHIELD_MS
   };
 }
 function seedFoods(n = FOOD_COUNT) {
@@ -200,9 +205,9 @@ function segmentHit(head, path, skip, radius) {
   }
   return false;
 }
-function respawnNow(p, index) {
-  const fresh = spawnPlayer({ id: p.id, name: p.name, human: p.human }, index);
-  return { ...fresh, score: 0, hue: p.hue, boosting: false };
+function respawnNow(p, index, now) {
+  const fresh = spawnPlayer({ id: p.id, name: p.name, human: p.human }, index, now);
+  return { ...fresh, score: 0, hue: p.hue, boosting: false, shieldUntil: now + SHIELD_MS };
 }
 function scatterCorpse(path, hue) {
   if (!path.length) return [];
@@ -235,7 +240,8 @@ function killSnake(p, now) {
       boosting: false,
       score: 0,
       respawnAt: now + RESPAWN_MS,
-      path: p.path.slice(0, 3)
+      path: p.path.slice(0, 3),
+      shieldUntil: null
     }
   };
 }
@@ -247,12 +253,12 @@ function stepSnake(state, now = Date.now()) {
   const tick = state.tick + 1;
   const players = state.players.map((p, index) => {
     if (!p.alive) {
-      if (p.respawnAt && now >= p.respawnAt) return respawnNow(p, index);
+      if (p.respawnAt && now >= p.respawnAt) return respawnNow(p, index, now);
       return { ...p, boosting: false };
     }
     const boosting = Boolean(p.boosting) && canBoost(p);
     const spd = boosting ? SPEED * BOOST_MULT : SPEED;
-    const angle = turnToward(p.angle, p.aim, TURN_RATE * (boosting ? 0.95 : 1));
+    const angle = turnToward(p.angle, p.aim, TURN_RATE);
     const x = p.x + Math.cos(angle) * spd;
     const y = p.y + Math.sin(angle) * spd;
     let path = [{ x, y }, ...p.path];
@@ -266,13 +272,24 @@ function stepSnake(state, now = Date.now()) {
   });
   const next = players.map((p, i) => {
     if (!p.alive) return p;
+    const shielded = isShielded(p, now);
     let dead = false;
-    if (p.x < HEAD_R || p.y < HEAD_R || p.x > WORLD - HEAD_R || p.y > WORLD - HEAD_R) dead = true;
+    if (p.x < HEAD_R || p.y < HEAD_R || p.x > WORLD - HEAD_R || p.y > WORLD - HEAD_R) {
+      if (shielded) {
+        return {
+          ...p,
+          x: clamp(p.x, HEAD_R, WORLD - HEAD_R),
+          y: clamp(p.y, HEAD_R, WORLD - HEAD_R)
+        };
+      }
+      dead = true;
+    }
     if (!dead) {
       for (let j = 0; j < players.length; j++) {
         if (j === i) continue;
         const other = players[j];
         if (!other.alive) continue;
+        if (isShielded(other, now) || shielded) continue;
         if (segmentHit({ x: p.x, y: p.y }, other.path, 0, HEAD_R * 0.95)) {
           dead = true;
           break;
@@ -334,7 +351,7 @@ function predictSelf(state, youId, ticks) {
       for (let i = 0; i < n; i++) {
         boosting = boosting && canBoost({ alive: true, score, path });
         const spd = boosting ? SPEED * BOOST_MULT : SPEED;
-        angle = turnToward(angle, p.aim, TURN_RATE * (boosting ? 0.95 : 1));
+        angle = turnToward(angle, p.aim, TURN_RATE);
         x += Math.cos(angle) * spd;
         y += Math.sin(angle) * spd;
         path = [{ x, y }, ...path];
@@ -413,6 +430,7 @@ export {
   PATH_STEP,
   RESPAWN_MS,
   ROWS,
+  SHIELD_MS,
   SNAKE_WORLD_ID,
   SPEED,
   START_LEN,
@@ -428,6 +446,7 @@ export {
   canBoost,
   createSnakeWorld,
   finishCountdown,
+  isShielded,
   joinSnake,
   leaveSnake,
   predictSelf,

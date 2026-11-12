@@ -4,6 +4,7 @@ import {
   applySnakeAction,
   canBoost,
   HEAD_R,
+  isShielded,
   predictSelf,
   reconcileSnake,
   SNAKE_WORLD_ID,
@@ -153,6 +154,21 @@ function drawWorld(
 
     const head = toScreen(p.x, p.y);
     const hr = width * 0.58;
+    const shielded = isShielded(p, Date.now());
+    if (shielded) {
+      const pulse = 1 + Math.sin(tMs / 140) * 0.08;
+      ctx.beginPath();
+      ctx.strokeStyle = `hsla(${p.hue} 90% 70% / 0.85)`;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([6, 5]);
+      ctx.arc(head.sx, head.sy, hr * 1.85 * pulse, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.fillStyle = `hsla(${p.hue} 80% 60% / 0.12)`;
+      ctx.arc(head.sx, head.sy, hr * 1.85 * pulse, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.beginPath();
     ctx.fillStyle = `hsl(${p.hue} 82% ${p.alive ? 58 : 34}%)`;
     ctx.arc(head.sx, head.sy, hr, 0, Math.PI * 2);
@@ -204,7 +220,13 @@ export function SnakePage() {
   const room = lobby.room?.game === "snake" ? lobby.room : null;
   const [local, setLocal] = useState<SnakeState | null>(null);
   const [joining, setJoining] = useState(false);
-  const [hud, setHud] = useState<{ score: number; boosting: boolean; players: number; alive: boolean } | null>(null);
+  const [hud, setHud] = useState<{
+    score: number;
+    boosting: boolean;
+    players: number;
+    alive: boolean;
+    shieldLeft: number;
+  } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const aimRef = useRef<number | null>(null);
   const boostRef = useRef(false);
@@ -253,6 +275,7 @@ export function SnakePage() {
       boosting: Boolean(me?.boosting),
       players: liveRef.current.players.length,
       alive: Boolean(me?.alive ?? true),
+      shieldLeft: me?.shieldUntil ? Math.max(0, me.shieldUntil - Date.now()) : 0,
     });
   }, [serverView, practice, youId, serverView?.tick]);
 
@@ -315,6 +338,7 @@ export function SnakePage() {
         boosting: Boolean(me?.boosting),
         players: cur.players.length,
         alive: Boolean(me?.alive),
+        shieldLeft: me?.shieldUntil ? Math.max(0, me.shieldUntil - Date.now()) : 0,
       });
     }, TICK_MS);
     return () => window.clearInterval(id);
@@ -536,6 +560,11 @@ export function SnakePage() {
                   <div className={`snake-boost-pill${(hud?.boosting ?? meLive?.boosting) ? " on" : ""}${(meLive && canBoost(meLive)) || hud?.boosting ? "" : " dim"}`}>
                     {(hud?.boosting ?? meLive?.boosting) ? "BOOST" : "SPACE boost"}
                   </div>
+                  {(hud?.shieldLeft ?? 0) > 0 || (meLive && isShielded(meLive)) ? (
+                    <div className="snake-boost-pill on">
+                      SHIELD {Math.ceil((hud?.shieldLeft ?? Math.max(0, (meLive?.shieldUntil ?? 0) - Date.now())) / 1000)}s
+                    </div>
+                  ) : null}
                 </div>
                 {!hud?.alive && meLive && !meLive.alive ? <div className="snake-respawn">Respawning…</div> : null}
               </div>
