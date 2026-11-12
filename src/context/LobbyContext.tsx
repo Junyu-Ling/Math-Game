@@ -10,7 +10,8 @@ type LobbyCtx = {
   queue: QueueSnap | null;
   error: string;
   store: "redis" | "memory" | "";
-  inviteCooldownMs: number;
+  /** Remaining ms before this friend can be invited again (per-friend). */
+  inviteCooldownMs: (toId: string) => number;
   invite: (toId: string, game: string, meta?: Record<string, unknown>) => Promise<void>;
   findMatch: (game: string, meta?: Record<string, unknown>) => Promise<void>;
   cancelMatch: () => Promise<void>;
@@ -62,7 +63,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   const [snap, setSnap] = useState<LobbySnap>({ online: [], invites: [], room: null, store: "memory", queue: null });
   const [settlement, setSettlement] = useState<Settlement | null>(null);
   const [error, setError] = useState("");
-  const [inviteUntil, setInviteUntil] = useState(0);
+  const [inviteUntilByTo, setInviteUntilByTo] = useState<Record<string, number>>({});
   const [now, setNow] = useState(() => Date.now());
   const roomGame = useRef<string | null>(null);
   const roomSeq = useRef(0);
@@ -91,10 +92,11 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    if (inviteUntil <= Date.now()) return;
+    const active = Object.values(inviteUntilByTo).some((t) => t > Date.now());
+    if (!active) return;
     const id = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(id);
-  }, [inviteUntil]);
+  }, [inviteUntilByTo]);
 
   useEffect(() => {
     if (!token || !user) {
@@ -305,12 +307,15 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       },
       error,
       store: snap.store || "",
-      inviteCooldownMs: Math.max(0, inviteUntil - now),
+      inviteCooldownMs(toId) {
+        return Math.max(0, (inviteUntilByTo[String(toId)] || 0) - now);
+      },
       async invite(toId, game, meta = {}) {
         if (!token) throw new Error("Sign in first");
-        if (Date.now() < inviteUntil) throw new Error("Wait 5 seconds before inviting again");
+        const until = inviteUntilByTo[String(toId)] || 0;
+        if (Date.now() < until) throw new Error("Wait 5 seconds before inviting this friend again");
         const next = await lobbyApi.invite(token, toId, game, meta);
-        setInviteUntil(Date.now() + COOLDOWN);
+        setInviteUntilByTo((prev) => ({ ...prev, [String(toId)]: Date.now() + COOLDOWN }));
         setSettlement(null);
         acceptRoom(next.room);
         setSnap((prev) => ({
@@ -407,7 +412,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         nav("/");
       },
     }),
-    [snap, settlement, error, token, nav, inviteUntil, now],
+    [snap, settlement, error, token, nav, inviteUntilByTo, now],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -62,18 +62,24 @@ export function MixedCpuBar({
   const cpuN = seats.filter(isCpuId).length;
   const max = tableMax(game);
   const full = seats.length >= max;
-  const view = here ? (room?.view as { phase?: string; street?: string; matched?: boolean } | undefined) : undefined;
+  const view = here
+    ? (room?.view as { phase?: string; street?: string; matched?: boolean; seekingMatch?: boolean } | undefined)
+    : undefined;
   const waiting = Boolean(here && (view?.phase === "lobby" || view?.street === "lobby"));
   const matched = Boolean(view?.matched);
   const duel = max <= 2;
   const seatedHere = Boolean(here && waiting);
   /** Host-only add/remove after a live lobby table exists. */
   const atTable = seatedHere && host;
+  const seekingFill = Boolean(
+    atTable && (room?.seekingMatch || view?.seekingMatch || (queue && queue.game === game)),
+  );
   const canOpen = Boolean(user && !busy && (!here || !waiting || host));
   const showPractice = Boolean(onPractice && !atTable && !waiting);
-  const searching = Boolean(queue && queue.game === game);
+  const searching = Boolean(queue && queue.game === game && !atTable);
   const need = matchNeed(game);
-  const canMatch = Boolean(user && !busy && !seatedHere);
+  const openSeats = Math.max(0, max - seats.length);
+  const canMatch = Boolean(user && !busy && (!seatedHere || (atTable && !full)));
   const hunting = useRef(false);
   const [found, setFound] = useState(false);
   const [remain, setRemain] = useState(3);
@@ -225,13 +231,15 @@ export function MixedCpuBar({
                   ? "Practice, find a match, or open a table to add a CPU / invite."
                   : "Practice vs CPU, find a match, or open a table to invite."
                 : "Find a match, or open a table and invite from the player list."
-              : matched
-                ? "Table is open. Ready up — the game starts when everyone is ready."
-                : duel
-                  ? "Add a CPU or invite one friend from the player list, then everyone Ready."
-                  : max >= 16
-                    ? "Add CPUs or invite humans, then everyone Ready with 2+."
-                    : `Add CPUs or invite humans, then everyone Ready with ${minStart(game)}–${max}.`}
+              : seekingFill
+                ? `Finding ${openSeats} more player${openSeats === 1 ? "" : "s"} for this table…`
+                : matched
+                  ? "Table is open. Ready up — the game starts when everyone is ready."
+                  : duel
+                    ? "Add a CPU, invite a friend, or Find match to fill empty seats, then everyone Ready."
+                    : max >= 16
+                      ? "Add CPUs, invite humans, or Find match to fill seats, then Ready with 2+."
+                      : `Add CPUs, invite humans, or Find match to fill seats (${minStart(game)}–${max}), then Ready.`}
       </p>
       <div className="row-actions" style={{ justifyContent: "center" }}>
         {showPractice && pickCpus ? <CpuCount cpus={cpus} min={cpuMin} max={cpuMax} onChange={setCpus} /> : null}
@@ -262,15 +270,24 @@ export function MixedCpuBar({
           </>
         ) : (
           <>
-            <button className="btn btn-ghost" type="button" disabled={busy || full} onClick={() => void run("add")}>
+            {seekingFill ? (
+              <button className="btn" type="button" disabled={busy} onClick={() => void stopSearch()}>
+                {busy ? "Canceling…" : "Cancel match"}
+              </button>
+            ) : (
+              <button className="btn" type="button" disabled={!canMatch} onClick={() => void search()}>
+                {busy ? "Searching…" : openSeats > 0 ? `Find match · +${openSeats}` : "Find match"}
+              </button>
+            )}
+            <button className="btn btn-ghost" type="button" disabled={busy || full || seekingFill} onClick={() => void run("add")}>
               Add CPU
             </button>
             {!duel ? (
-              <button className="btn btn-ghost" type="button" disabled={busy || full} onClick={() => void run("fill")}>
+              <button className="btn btn-ghost" type="button" disabled={busy || full || seekingFill} onClick={() => void run("fill")}>
                 {max >= 16 ? "Add 3 CPUs" : "Fill with CPU"}
               </button>
             ) : null}
-            <button className="btn btn-ghost" type="button" disabled={busy || cpuN < 1} onClick={() => void run("remove")}>
+            <button className="btn btn-ghost" type="button" disabled={busy || cpuN < 1 || seekingFill} onClick={() => void run("remove")}>
               Remove CPU
             </button>
           </>

@@ -34,6 +34,7 @@ export type RoomSnap = {
   seats: string[];
   endsAt: number | null;
   seq?: number;
+  seekingMatch?: boolean;
   view: unknown;
 };
 

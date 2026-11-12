@@ -733,6 +733,7 @@ async function saveRoom(room, opts = {}) {
     faces,
     readyIds: Array.isArray(room.readyIds) ? room.readyIds.map(String) : [],
     matched: Boolean(room.matched),
+    seekingMatch: Boolean(room.seekingMatch),
   };
   const r = client();
   if (r) {
@@ -938,9 +939,11 @@ export async function createInvite(from, toId, game, meta = {}) {
   const fromId = String(from.id);
   toId = String(toId);
   if (fromId === toId) throw new Error("You cannot invite yourself");
-  const last = Number((await kvGet(`axiom:invcd:${fromId}`)) || 0);
+  // Per-friend cooldown: same target needs 5s; other friends are independent.
+  const cdKey = `axiom:invcd:${fromId}:${toId}`;
+  const last = Number((await kvGet(cdKey)) || 0);
   if (last && Date.now() - last < INVITE_COOLDOWN_MS) {
-    throw new Error("Wait 5 seconds before inviting again");
+    throw new Error("Wait 5 seconds before inviting this friend again");
   }
   const target = await readJson(`axiom:p:${toId}`);
   if (!target) throw new Error("They are not online");
@@ -972,7 +975,7 @@ export async function createInvite(from, toId, game, meta = {}) {
   await kvSet(`axiom:inv:${id}`, invite, INVITE_SEC);
   await sadd(`axiom:uinv:${fromId}`, id, INVITE_SEC);
   await sadd(`axiom:uinv:${toId}`, id, INVITE_SEC);
-  await kvSet(`axiom:invcd:${fromId}`, String(Date.now()), 15);
+  await kvSet(cdKey, String(Date.now()), 15);
   await leaveQueue(fromId);
   await wakeUsers([toId, fromId]);
   return invite;
@@ -1807,6 +1810,7 @@ function publicRoom(room, viewerId) {
       faces: Array.isArray(room.faces) ? room.faces : [],
       readyIds: Array.isArray(room.readyIds) ? room.readyIds.map(String) : [],
       matched: Boolean(room.matched),
+      seekingMatch: Boolean(room.seekingMatch),
     };
   }
   return {
@@ -1815,6 +1819,7 @@ function publicRoom(room, viewerId) {
     seats: room.seats,
     endsAt: room.endsAt,
     seq: room.seq || 0,
+    seekingMatch: Boolean(room.seekingMatch),
     view,
   };
 }
@@ -1845,6 +1850,7 @@ async function vacateSeat(userId, rec) {
   const humansLeft = humanSeatIds(rec.seats).filter((x) => x !== id);
   if (hostLeft || humansLeft.length < 1) {
     for (const hid of humanSeatIds(rec.seats)) await kvDel(`axiom:seat:${hid}`);
+    await unregisterSeekingRoom(rec.game, rec.id);
     await kvDel(`axiom:room:${rec.id}`);
     await wakeUsers(humanSeatIds(rec.seats));
     return;
@@ -1948,9 +1954,161 @@ function qKey(game) {
   return `axiom:q:${game}`;
 }
 
+function seekKey(game) {
+  return `axiom:qseek:${game}`;
+}
+
 function matchNeed(game) {
   if (game === "werewolf") return 4;
   return 2;
+}
+
+function openSlots(rec) {
+  if (!rec) return 0;
+  return Math.max(0, tableMax(rec.game) - (rec.seats?.length || 0));
+}
+
+async function registerSeekingRoom(game, roomId) {
+  await sadd(seekKey(game), String(roomId), QUEUE_TTL + 30);
+}
+
+async function unregisterSeekingRoom(game, roomId) {
+  await srem(seekKey(game), String(roomId));
+}
+
+async function clearRoomSeeking(rec) {
+  if (!rec?.seekingMatch) return rec;
+  rec.seekingMatch = false;
+  await unregisterSeekingRoom(rec.game, rec.id);
+  return rec;
+}
+
+async function seatTicketIntoRoom(rec, ticket, mods) {
+  const joinerId = String(ticket.userId);
+  if (!joinerId || rec.seats.includes(joinerId) || openSlots(rec) <= 0) return false;
+  if (await getSeat(joinerId)) return false;
+  const joiner = {
+    id: joinerId,
+    name: ticket.name || "PLAYER",
+    human: true,
+  };
+  await touchPresence({
+    id: joinerId,
+    name: ticket.name,
+    login: ticket.login,
+    avatar: ticket.avatar,
+  });
+  rec.seats = [...rec.seats, joiner.id];
+  rec.state = rebuildLobby(rec, joiner, mods);
+  rec.readyIds = [];
+  rec.matched = true;
+  rec.seq = (rec.seq || 0) + 1;
+  rec.mods = mods;
+  rec.faces = await seatFaces(rec.seats);
+  await kvDel(`axiom:quser:${joinerId}`);
+  await kvDel(`axiom:qt:${joinerId}`);
+  return true;
+}
+
+async function fillSeekingRoom(rec, mods) {
+  if (!rec || !isLobbyState(rec.state)) return rec;
+  let want = openSlots(rec);
+  if (want <= 0) {
+    await clearRoomSeeking(rec);
+    return rec;
+  }
+  const taken = [];
+  while (taken.length < want) {
+    const raw = await rpop(qKey(rec.game));
+    if (!raw) break;
+    const t = parseTicket(raw);
+    if (!t?.userId) continue;
+    if (t.role === "host" || t.roomId) continue;
+    if (await getSeat(t.userId)) continue;
+    const still = await kvGet(`axiom:quser:${t.userId}`);
+    if (!still || still !== rec.game) continue;
+    taken.push(t);
+  }
+  for (const t of taken) {
+    const ok = await seatTicketIntoRoom(rec, t, mods);
+    if (!ok) await rpush(qKey(rec.game), JSON.stringify(t), 120);
+  }
+  if (openSlots(rec) <= 0) {
+    await clearRoomSeeking(rec);
+    const hostId = String(rec.seats[0] || "");
+    if (hostId) {
+      await kvDel(`axiom:quser:${hostId}`);
+      await kvDel(`axiom:qt:${hostId}`);
+    }
+  } else {
+    rec.seekingMatch = true;
+    await registerSeekingRoom(rec.game, rec.id);
+  }
+  rec.seq = (rec.seq || 0) + 1;
+  await saveRoom(rec);
+  await wakeUsers(humanSeatIds(rec.seats));
+  await wakeQueue(rec.game);
+  return rec;
+}
+
+async function tryJoinSeekingRoom(user, game, mods) {
+  const roomIds = await smembers(seekKey(game));
+  for (const roomId of roomIds) {
+    let rec = await attachMods(await getRoomRecord(roomId));
+    if (!rec || rec.game !== game || !isLobbyState(rec.state) || !rec.seekingMatch || openSlots(rec) <= 0) {
+      await unregisterSeekingRoom(game, roomId);
+      continue;
+    }
+    const ticket = {
+      userId: String(user.id),
+      name: playerName(user),
+      login: user.login || "",
+      avatar: user.avatar || "",
+    };
+    const seated = await seatTicketIntoRoom(rec, ticket, mods);
+    if (!seated) continue;
+    if (openSlots(rec) <= 0) {
+      await clearRoomSeeking(rec);
+      const hostId = String(rec.seats[0] || "");
+      if (hostId) {
+        await kvDel(`axiom:quser:${hostId}`);
+        await kvDel(`axiom:qt:${hostId}`);
+      }
+    } else {
+      rec.seekingMatch = true;
+      await registerSeekingRoom(game, rec.id);
+    }
+    rec.seq = (rec.seq || 0) + 1;
+    await saveRoom(rec);
+    await wakeUsers(humanSeatIds(rec.seats));
+    await wakeQueue(game);
+    return rec;
+  }
+  return null;
+}
+
+async function seekRoomFill(user, rec, mods) {
+  const userId = String(user.id);
+  const game = rec.game;
+  if (String(rec.seats[0]) !== userId) throw new Error("Only the host can find players for this table");
+  if (!isLobbyState(rec.state)) throw new Error("The table already started");
+  const open = openSlots(rec);
+  if (open <= 0) throw new Error("The table is full");
+  rec = { ...rec, mods, seekingMatch: true, matched: true };
+  await registerSeekingRoom(game, rec.id);
+  const ticket = JSON.stringify({
+    userId,
+    name: playerName(user),
+    login: user.login || "",
+    avatar: user.avatar || "",
+    roomId: rec.id,
+    role: "host",
+    at: Date.now(),
+  });
+  await kvSet(`axiom:qt:${userId}`, ticket, QUEUE_TTL);
+  await kvSet(`axiom:quser:${userId}`, game, QUEUE_TTL);
+  rec = await fillSeekingRoom(rec, mods);
+  return snapshot(userId);
 }
 
 function parseTicket(raw) {
@@ -1990,6 +2148,17 @@ export async function leaveQueue(userId) {
   if (game && ticket) await lremValue(qKey(game), ticket);
   await kvDel(`axiom:quser:${id}`);
   await kvDel(`axiom:qt:${id}`);
+  const seat = await getSeat(id);
+  if (seat) {
+    const rec = await getRoomRecord(seat);
+    if (rec?.seekingMatch && String(rec.seats?.[0]) === id) {
+      rec.seekingMatch = false;
+      await unregisterSeekingRoom(rec.game, rec.id);
+      rec.seq = (rec.seq || 0) + 1;
+      await saveRoom(rec);
+      await wakeUsers(humanSeatIds(rec.seats));
+    }
+  }
   if (game) await wakeQueue(game);
 }
 
@@ -2126,12 +2295,21 @@ export async function enqueueMatch(user, game, meta = {}) {
   if (!OPEN_TABLES.has(game)) throw new Error("This game has no matchmaking");
   const userId = String(user.id);
   await touchPresence(user);
+  const mods = await getMods();
   const seated = await getSeat(userId);
   if (seated) {
     const rec = await attachMods(await getRoomRecord(seated));
     if (rec && isLiveMatchState(rec.game, rec.state)) throw new Error("You are already in a game");
+    // Host already opened a lobby: find players to fill empty seats instead of leaving.
+    if (rec && rec.game === game && isLobbyState(rec.state) && String(rec.seats[0]) === userId) {
+      return seekRoomFill(user, rec, mods);
+    }
     if (rec) await vacateSeat(userId, rec);
   }
+  // Prefer joining an open table that is already seeking players.
+  const joined = await tryJoinSeekingRoom(user, game, mods);
+  if (joined) return snapshot(userId);
+
   const prevGame = await kvGet(`axiom:quser:${userId}`);
   if (prevGame && prevGame !== game) await dropUserFromQueue(prevGame, userId);
   const ticket = JSON.stringify({
@@ -2144,28 +2322,39 @@ export async function enqueueMatch(user, game, meta = {}) {
   });
   await kvSet(`axiom:qt:${userId}`, ticket, QUEUE_TTL);
   await kvSet(`axiom:quser:${userId}`, game, QUEUE_TTL);
+
+  // After queueing, try again in case a host started seeking while we were writing the ticket.
+  const lateJoin = await tryJoinSeekingRoom(user, game, mods);
+  if (lateJoin) return snapshot(userId);
+
   const need = matchNeed(game);
   const pair = await pushAndMaybePair(game, ticket, userId, need);
   if (pair && pair.length >= need) {
     const ready = [];
     for (const t of pair) {
+      if (t.role === "host" || t.roomId) continue;
       const still = await kvGet(`axiom:quser:${t.userId}`);
       if (!still || still !== game || (await getSeat(t.userId))) continue;
       ready.push(t);
     }
     if (ready.length >= need) {
-      const seated = ready.slice(0, need);
-      for (const t of seated) {
+      const paired = ready.slice(0, need);
+      for (const t of paired) {
         await kvDel(`axiom:quser:${t.userId}`);
         await kvDel(`axiom:qt:${t.userId}`);
       }
-      const mods = await getMods();
-      await createMatchedRoom(seated, game, mods);
+      await createMatchedRoom(paired, game, mods);
     } else {
       for (const t of ready) await rpush(qKey(game), JSON.stringify(t), 120);
       await wakeQueue(game);
     }
   } else {
+    // Keep filling any seeking rooms from leftover queue.
+    const seeking = await smembers(seekKey(game));
+    for (const roomId of seeking) {
+      const rec = await attachMods(await getRoomRecord(roomId));
+      if (rec?.seekingMatch) await fillSeekingRoom(rec, mods);
+    }
     await wakeQueue(game);
   }
   return snapshot(userId);
