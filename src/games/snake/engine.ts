@@ -6,6 +6,9 @@ export const TICK_MS = 40;
 export const VIEW_RADIUS = 42;
 export const START_LEN = 18;
 export const FOOD_COUNT = 80;
+export const FOOD_SOFT_CAP = FOOD_COUNT + 180;
+export const CORPSE_STRIDE = 2;
+export const CORPSE_MAX = 52;
 export const SPEED = 0.58;
 export const BOOST_MULT = 1.85;
 export const BOOST_DRAIN_EVERY = 5;
@@ -36,7 +39,7 @@ export type SnakePlayer = {
   boosting: boolean;
 };
 
-export type Food = { id: string; x: number; y: number };
+export type Food = { id: string; x: number; y: number; hue?: number };
 
 export type SnakeState = {
   mode: "world" | "practice";
@@ -270,6 +273,44 @@ function respawnNow(p: SnakePlayer, index: number): SnakePlayer {
   return { ...fresh, score: 0, hue: p.hue, boosting: false };
 }
 
+/** Scatter edible remains along the dead snake's body. */
+export function scatterCorpse(path: Point[], hue: number): Food[] {
+  if (!path.length) return [];
+  const stride = path.length > 60 ? 3 : CORPSE_STRIDE;
+  const drops: Food[] = [];
+  for (let i = 0; i < path.length && drops.length < CORPSE_MAX; i += stride) {
+    const pt = path[i]!;
+    const x = clamp(pt.x + (Math.random() - 0.5) * 1.4, FOOD_R, WORLD - FOOD_R);
+    const y = clamp(pt.y + (Math.random() - 0.5) * 1.4, FOOD_R, WORLD - FOOD_R);
+    drops.push({ id: uid("c"), x, y, hue });
+  }
+  if (drops.length < 3) {
+    for (const pt of path.slice(0, 3)) {
+      drops.push({
+        id: uid("c"),
+        x: clamp(pt.x, FOOD_R, WORLD - FOOD_R),
+        y: clamp(pt.y, FOOD_R, WORLD - FOOD_R),
+        hue,
+      });
+    }
+  }
+  return drops.slice(0, CORPSE_MAX);
+}
+
+function killSnake(p: SnakePlayer, now: number): { player: SnakePlayer; drops: Food[] } {
+  return {
+    drops: scatterCorpse(p.path, p.hue),
+    player: {
+      ...p,
+      alive: false,
+      boosting: false,
+      score: 0,
+      respawnAt: now + RESPAWN_MS,
+      path: p.path.slice(0, 3),
+    },
+  };
+}
+
 export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
   if (state.phase === "over" && state.mode === "world") {
     state = { ...state, phase: "play" };
@@ -298,16 +339,23 @@ export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
 
   const next: SnakePlayer[] = players.map((p, i) => {
     if (!p.alive) return p;
-    if (p.x < HEAD_R || p.y < HEAD_R || p.x > WORLD - HEAD_R || p.y > WORLD - HEAD_R) {
-      return { ...p, alive: false, boosting: false, respawnAt: now + RESPAWN_MS, path: p.path.slice(0, 4) };
-    }
-    for (let j = 0; j < players.length; j++) {
-      const other = players[j]!;
-      if (!other.alive) continue;
-      const skip = j === i ? 8 : 0;
-      if (segmentHit({ x: p.x, y: p.y }, other.path, skip, HEAD_R * 0.95)) {
-        return { ...p, alive: false, boosting: false, respawnAt: now + RESPAWN_MS, path: p.path.slice(0, 4) };
+    let dead = false;
+    if (p.x < HEAD_R || p.y < HEAD_R || p.x > WORLD - HEAD_R || p.y > WORLD - HEAD_R) dead = true;
+    if (!dead) {
+      for (let j = 0; j < players.length; j++) {
+        const other = players[j]!;
+        if (!other.alive) continue;
+        const skip = j === i ? 8 : 0;
+        if (segmentHit({ x: p.x, y: p.y }, other.path, skip, HEAD_R * 0.95)) {
+          dead = true;
+          break;
+        }
       }
+    }
+    if (dead) {
+      const killed = killSnake(p, now);
+      foods = foods.concat(killed.drops);
+      return killed.player;
     }
     let score = p.score;
     let path = p.path;
@@ -327,6 +375,7 @@ export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
     const pt = randomPoint(4);
     foods.push({ id: uid("f"), x: pt.x, y: pt.y });
   }
+  if (foods.length > FOOD_SOFT_CAP) foods = foods.slice(foods.length - FOOD_SOFT_CAP);
 
   return {
     ...state,

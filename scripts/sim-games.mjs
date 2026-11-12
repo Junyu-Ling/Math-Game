@@ -322,9 +322,11 @@ function playUntil(start, step, cap, name) {
         : p,
     ),
   };
+  const foodBefore = wall.foods.length;
   const crashed = snake.stepSnake(wall);
   const dead = crashed.players.find((p) => p.id === "you");
   ok("snake dies on a wall", dead.alive === false && dead.respawnAt != null);
+  ok("snake death drops corpse food", crashed.foods.length > foodBefore && crashed.foods.some((f) => Number.isFinite(f.hue)));
 
   const revived = snake.stepSnake(crashed, dead.respawnAt + 1);
   ok("snake respawns after delay", revived.players.find((p) => p.id === "you").alive === true);

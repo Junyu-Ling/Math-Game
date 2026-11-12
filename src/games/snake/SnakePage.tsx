@@ -83,20 +83,22 @@ function drawWorld(
   for (const f of state.foods) {
     const { sx, sy } = toScreen(f.x, f.y);
     const pulse = 1 + Math.sin(tMs / 220 + f.x + f.y) * 0.12;
-    const r = Math.max(2.4, 0.9 * scale) * pulse;
+    const corpse = Number.isFinite(f.hue);
+    const r = Math.max(2.4, (corpse ? 1.05 : 0.9) * scale) * pulse;
+    const hue = corpse ? f.hue! : 42;
     const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 3.2);
-    glow.addColorStop(0, "rgba(251, 191, 36, 0.55)");
-    glow.addColorStop(1, "rgba(251, 191, 36, 0)");
+    glow.addColorStop(0, `hsla(${hue} 85% 58% / 0.55)`);
+    glow.addColorStop(1, `hsla(${hue} 85% 58% / 0)`);
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(sx, sy, r * 3.2, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.fillStyle = "#fbbf24";
+    ctx.fillStyle = corpse ? `hsl(${hue} 78% 56%)` : "#fbbf24";
     ctx.arc(sx, sy, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.fillStyle = "#fff7d6";
+    ctx.fillStyle = corpse ? `hsl(${hue} 90% 78%)` : "#fff7d6";
     ctx.arc(sx - r * 0.25, sy - r * 0.25, r * 0.35, 0, Math.PI * 2);
     ctx.fill();
   }
