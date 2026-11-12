@@ -5,7 +5,7 @@ function uid(prefix = "id") {
 
 // src/games/snake/engine.ts
 var WORLD = 200;
-var TICK_MS = 40;
+var TICK_MS = 33;
 var VIEW_RADIUS = 42;
 var START_LEN = 18;
 var FOOD_COUNT = 80;
@@ -345,39 +345,30 @@ var stepSnakeWorld = stepSnake;
 function reconcileSnake(server, local, youId) {
   if (!local || !youId) return server;
   const mine = local.players.find((p) => p.id === youId);
-  if (!mine) return server;
+  const theirs = server.players.find((p) => p.id === youId);
+  if (!mine || !theirs) return server;
+  const hardEvent = mine.alive !== theirs.alive || Boolean(mine.respawnAt) !== Boolean(theirs.respawnAt) || theirs.alive && !mine.alive || mine.alive && theirs.alive && Math.hypot(mine.x - theirs.x, mine.y - theirs.y) > 14;
+  const self = hardEvent ? {
+    ...theirs,
+    aim: mine.aim,
+    boosting: mine.boosting && theirs.alive
+  } : {
+    ...mine,
+    id: theirs.id,
+    name: theirs.name,
+    human: theirs.human,
+    hue: theirs.hue,
+    score: theirs.score,
+    shieldUntil: theirs.shieldUntil,
+    // Keep local aim/boost/motion; gently pull energy toward server
+    energy: Math.abs(mine.energy - theirs.energy) > 25 ? theirs.energy : mine.energy,
+    aim: mine.aim,
+    boosting: mine.boosting && mine.alive
+  };
   return {
     ...server,
-    players: server.players.map(
-      (p) => p.id === youId ? { ...p, aim: mine.aim, boosting: mine.boosting && p.alive } : p
-    )
-  };
-}
-function predictSelf(state, youId, ticks) {
-  const n = Math.max(0, Math.min(4, Math.floor(ticks)));
-  if (!n || !youId) return state;
-  return {
-    ...state,
-    players: state.players.map((p) => {
-      if (p.id !== youId || !p.alive) return p;
-      let { x, y, angle, path, score, energy } = p;
-      let boosting = Boolean(p.boosting);
-      for (let i = 0; i < n; i++) {
-        boosting = boosting && canBoost({ alive: true, energy });
-        const spd = boosting ? SPEED * BOOST_MULT : SPEED;
-        angle = turnToward(angle, p.aim, TURN_RATE);
-        x += Math.cos(angle) * spd;
-        y += Math.sin(angle) * spd;
-        path = [{ x, y }, ...path];
-        if (boosting && (state.tick + i + 1) % BOOST_DRAIN_EVERY === 0) {
-          energy = Math.max(0, energy - BOOST_DRAIN);
-        }
-        const maxPts = START_LEN + Math.floor(score * 2.2);
-        if (path.length > maxPts) path = path.slice(0, maxPts);
-        boosting = boosting && energy > 0;
-      }
-      return { ...p, x, y, angle, path, score, energy, boosting };
-    })
+    tick: Math.max(server.tick, local.tick),
+    players: server.players.map((p) => p.id === youId ? self : p)
   };
 }
 function viewSnake(state, viewerId) {
@@ -543,7 +534,6 @@ export {
   isShielded,
   joinSnake,
   leaveSnake,
-  predictSelf,
   reconcileSnake,
   scatterCorpse,
   startSnakeDuel,

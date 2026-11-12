@@ -392,6 +392,11 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       async sendAction(action) {
         const roomId = snapRef.current.room?.id;
         if (!token || !roomId) return;
+        // Snake runs on local prediction — never await/clobber the view with a late HTTP body.
+        if (snapRef.current.room?.game === "snake") {
+          void lobbyApi.action(token, roomId, action).catch(() => {});
+          return;
+        }
         const next = await lobbyApi.action(token, roomId, action);
         if (!next.room) return;
         setSnap((prev) => ({

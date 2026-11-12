@@ -444,13 +444,16 @@ function playUntil(start, step, cap, name) {
   let fat = snake.startSnakePractice(0);
   fat = {
     ...fat,
+    foods: [],
     players: fat.players.map((p) =>
       p.id === "you"
         ? {
             ...p,
+            x: 80,
+            y: 80,
             score: 8,
             energy: 80,
-            path: Array.from({ length: 40 }, (_, i) => ({ x: 40 - i * 0.5, y: 40 })),
+            path: Array.from({ length: 40 }, (_, i) => ({ x: 80 - i * 0.5, y: 80 })),
           }
         : p,
     ),
@@ -458,9 +461,12 @@ function playUntil(start, step, cap, name) {
   fat = snake.applySnakeAction(fat, "you", { type: "boost", on: true });
   const beforeBoost = fat.players.find((p) => p.id === "you");
   ok("snake boost arms when held", beforeBoost.boosting === true);
-  for (let i = 0; i < 12; i++) fat = snake.stepSnake(fat);
+  for (let i = 0; i < 16; i++) fat = snake.stepSnake(fat);
   const afterBoost = fat.players.find((p) => p.id === "you");
-  ok("snake boost drains energy not length", afterBoost.energy < beforeBoost.energy && afterBoost.score === beforeBoost.score);
+  ok(
+    "snake boost drains energy not length",
+    afterBoost.energy < beforeBoost.energy - 1 && afterBoost.score === beforeBoost.score,
+  );
 
   let hungry = snake.startSnakePractice(0);
   const you0 = hungry.players.find((p) => p.id === "you");
@@ -481,6 +487,20 @@ function playUntil(start, step, cap, name) {
   empty = snake.applySnakeAction(empty, "you", { type: "boost", on: true });
   empty = snake.stepSnake(empty);
   ok("snake cannot boost without energy", empty.players.find((p) => p.id === "you").boosting === false);
+
+  let localPred = snake.startSnakePractice(0);
+  localPred = snake.applySnakeAction(localPred, "you", { type: "aim", angle: 1.2 });
+  for (let i = 0; i < 5; i++) localPred = snake.stepSnake(localPred);
+  const serverSnap = {
+    ...localPred,
+    tick: localPred.tick - 2,
+    players: localPred.players.map((p) =>
+      p.id === "you" ? { ...p, x: p.x - 1, y: p.y, aim: 0, boosting: false } : p,
+    ),
+  };
+  const merged = snake.reconcileSnake(serverSnap, localPred, "you");
+  const mergedYou = merged.players.find((p) => p.id === "you");
+  ok("snake reconcile keeps local aim while soft-merging", Math.abs(mergedYou.aim - 1.2) < 1e-6);
 }
 
 /* ---------- other live tables: AI vs AI, no crash ---------- */

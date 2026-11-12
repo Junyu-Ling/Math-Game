@@ -2,7 +2,7 @@ import { uid } from "../../lib/shuffle";
 
 /** Continuous world size (units). */
 export const WORLD = 200;
-export const TICK_MS = 40;
+export const TICK_MS = 33;
 export const VIEW_RADIUS = 42;
 export const START_LEN = 18;
 export const FOOD_COUNT = 80;
@@ -426,45 +426,46 @@ export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
 /** Alias used by lobby tick. */
 export const stepSnakeWorld = stepSnake;
 
-/** Prefer server snapshot; keep unsent local aim/boost on yourself. */
+/**
+ * Merge a server snapshot into local prediction without rubber-banding your own snake.
+ * Others / foods / hard events (death, respawn) come from the server.
+ */
 export function reconcileSnake(server: SnakeState, local: SnakeState | null, youId?: string): SnakeState {
   if (!local || !youId) return server;
   const mine = local.players.find((p) => p.id === youId);
-  if (!mine) return server;
+  const theirs = server.players.find((p) => p.id === youId);
+  if (!mine || !theirs) return server;
+
+  const hardEvent =
+    mine.alive !== theirs.alive ||
+    Boolean(mine.respawnAt) !== Boolean(theirs.respawnAt) ||
+    (theirs.alive && !mine.alive) ||
+    (mine.alive && theirs.alive && Math.hypot(mine.x - theirs.x, mine.y - theirs.y) > 14);
+
+  const self = hardEvent
+    ? {
+        ...theirs,
+        aim: mine.aim,
+        boosting: mine.boosting && theirs.alive,
+      }
+    : {
+        ...mine,
+        id: theirs.id,
+        name: theirs.name,
+        human: theirs.human,
+        hue: theirs.hue,
+        score: theirs.score,
+        shieldUntil: theirs.shieldUntil,
+        // Keep local aim/boost/motion; gently pull energy toward server
+        energy: Math.abs(mine.energy - theirs.energy) > 25 ? theirs.energy : mine.energy,
+        aim: mine.aim,
+        boosting: mine.boosting && mine.alive,
+      };
+
   return {
     ...server,
-    players: server.players.map((p) =>
-      p.id === youId ? { ...p, aim: mine.aim, boosting: mine.boosting && p.alive } : p,
-    ),
-  };
-}
-
-/** Visual-only short prediction of your own snake between server ticks. */
-export function predictSelf(state: SnakeState, youId: string, ticks: number): SnakeState {
-  const n = Math.max(0, Math.min(4, Math.floor(ticks)));
-  if (!n || !youId) return state;
-  return {
-    ...state,
-    players: state.players.map((p) => {
-      if (p.id !== youId || !p.alive) return p;
-      let { x, y, angle, path, score, energy } = p;
-      let boosting = Boolean(p.boosting);
-      for (let i = 0; i < n; i++) {
-        boosting = boosting && canBoost({ alive: true, energy });
-        const spd = boosting ? SPEED * BOOST_MULT : SPEED;
-        angle = turnToward(angle, p.aim, TURN_RATE);
-        x += Math.cos(angle) * spd;
-        y += Math.sin(angle) * spd;
-        path = [{ x, y }, ...path];
-        if (boosting && (state.tick + i + 1) % BOOST_DRAIN_EVERY === 0) {
-          energy = Math.max(0, energy - BOOST_DRAIN);
-        }
-        const maxPts = START_LEN + Math.floor(score * 2.2);
-        if (path.length > maxPts) path = path.slice(0, maxPts);
-        boosting = boosting && energy > 0;
-      }
-      return { ...p, x, y, angle, path, score, energy, boosting };
-    }),
+    tick: Math.max(server.tick, local.tick),
+    players: server.players.map((p) => (p.id === youId ? self : p)),
   };
 }
 

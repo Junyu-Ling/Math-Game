@@ -6,7 +6,6 @@ import {
   ENERGY_MAX,
   HEAD_R,
   isShielded,
-  predictSelf,
   reconcileSnake,
   SNAKE_WORLD_ID,
   startSnakePractice,
@@ -239,7 +238,6 @@ export function SnakePage() {
   const lastNetRef = useRef(0);
   const lastAimSent = useRef<number | null>(null);
   const lastBoostSent = useRef(false);
-  const serverAtRef = useRef(performance.now());
   const [stickKnob, setStickKnob] = useState({ x: 0, y: 0 });
   const [stickLive, setStickLive] = useState(false);
 
@@ -274,7 +272,6 @@ export function SnakePage() {
   useEffect(() => {
     if (!serverView || practice) return;
     liveRef.current = reconcileSnake(serverView, liveRef.current, youId);
-    serverAtRef.current = performance.now();
     const me = youId ? liveRef.current.players.find((p) => p.id === youId) : undefined;
     setHud({
       score: me?.score ?? 0,
@@ -295,9 +292,9 @@ export function SnakePage() {
     const now = performance.now();
     if (action.type === "aim") {
       if (
-        now - lastNetRef.current < 16 &&
+        now - lastNetRef.current < 20 &&
         lastAimSent.current != null &&
-        Math.abs(normDiff(lastAimSent.current, action.angle)) < 0.04
+        Math.abs(normDiff(lastAimSent.current, action.angle)) < 0.05
       ) {
         return;
       }
@@ -319,56 +316,47 @@ export function SnakePage() {
     else netSend(action);
   }
 
+  function pushHud(cur: SnakeState) {
+    const me = youId ? cur.players.find((p) => p.id === youId) : undefined;
+    setHud({
+      score: me?.score ?? 0,
+      energy: me?.energy ?? 0,
+      boosting: Boolean(me?.boosting),
+      players: cur.players.length,
+      alive: Boolean(me?.alive),
+      shieldLeft: me?.shieldUntil ? Math.max(0, me.shieldUntil - Date.now()) : 0,
+    });
+  }
+
+  // Local simulation for practice AND online — online feels instant; server only corrects peers/events.
   useEffect(() => {
-    if (!practice) return;
+    if (!practice && !world) return;
     const id = window.setInterval(() => {
       let cur = liveRef.current;
       if (!cur) return;
-      for (const p of cur.players) {
-        if (!p.human && p.alive) cur = applySnakeAction(cur, p.id, aiSnake(cur, p.id));
+      if (practice) {
+        for (const p of cur.players) {
+          if (!p.human && p.alive) cur = applySnakeAction(cur, p.id, aiSnake(cur, p.id));
+        }
       }
       if (youId && aimRef.current != null && cur.players.some((p) => p.id === youId && p.alive)) {
         cur = applySnakeAction(cur, youId, { type: "aim", angle: aimRef.current });
+        if (world) netSend({ type: "aim", angle: aimRef.current });
       }
       if (youId) {
         const me = cur.players.find((p) => p.id === youId);
         if (me && me.boosting !== boostRef.current) {
           cur = applySnakeAction(cur, youId, { type: "boost", on: boostRef.current });
+          if (world) netSend({ type: "boost", on: boostRef.current });
         }
       }
       cur = stepSnake(cur);
       liveRef.current = cur;
-      setLocal(cur);
-      const me = youId ? cur.players.find((p) => p.id === youId) : undefined;
-      setHud({
-        score: me?.score ?? 0,
-        energy: me?.energy ?? 0,
-        boosting: Boolean(me?.boosting),
-        players: cur.players.length,
-        alive: Boolean(me?.alive),
-        shieldLeft: me?.shieldUntil ? Math.max(0, me.shieldUntil - Date.now()) : 0,
-      });
+      if (practice) setLocal(cur);
+      pushHud(cur);
     }, TICK_MS);
     return () => window.clearInterval(id);
-  }, [practice, youId]);
-
-  // Online: keep sending held aim/boost and nudge the server clock without double-simulating.
-  useEffect(() => {
-    if (!world || practice) return;
-    const id = window.setInterval(() => {
-      if (!youId || !liveRef.current) return;
-      if (aimRef.current != null) {
-        liveRef.current = applySnakeAction(liveRef.current, youId, { type: "aim", angle: aimRef.current });
-        netSend({ type: "aim", angle: aimRef.current });
-      }
-      const me = liveRef.current.players.find((p) => p.id === youId);
-      if (me && me.boosting !== boostRef.current) {
-        liveRef.current = applySnakeAction(liveRef.current, youId, { type: "boost", on: boostRef.current });
-        netSend({ type: "boost", on: boostRef.current });
-      }
-    }, TICK_MS);
-    return () => window.clearInterval(id);
-  }, [world, practice, youId]);
+  }, [practice, world, youId]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -407,13 +395,9 @@ export function SnakePage() {
     if (!canvas) return;
     let raf = 0;
     const paint = (t: number) => {
-      let state = liveRef.current;
+      const state = liveRef.current;
       const ctx = canvas.getContext("2d");
       if (ctx && state) {
-        if (world && youId) {
-          const ahead = (performance.now() - serverAtRef.current) / TICK_MS;
-          state = predictSelf(state, youId, ahead);
-        }
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.getBoundingClientRect();
         const bw = Math.floor(rect.width * dpr);
@@ -435,7 +419,7 @@ export function SnakePage() {
     };
     raf = window.requestAnimationFrame(paint);
     return () => window.cancelAnimationFrame(raf);
-  }, [youId, world]);
+  }, [youId]);
 
   function aimFromStick(clientX: number, clientY: number) {
     const el = stickRef.current;

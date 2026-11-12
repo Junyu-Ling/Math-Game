@@ -915,16 +915,23 @@ async function expireArrange(room, force = false) {
       return;
     }
     if (room.mods.snake.stepSnake) {
-      room.state = room.mods.snake.stepSnake(room.state, Date.now());
-      // Practice bots in a private room still get AI aims each tick.
-      if (room.id !== SNAKE_WORLD_ID) {
-        for (const p of room.state.players || []) {
-          if (p.human === false && p.alive) {
-            room.state = room.mods.snake.applySnakeAction(room.state, p.id, room.mods.snake.aiSnake(room.state, p.id));
+      const tickMs = room.mods.snake.TICK_MS || 33;
+      const now = Date.now();
+      let guard = 0;
+      let nextAt = room.endsAt || now;
+      while (nextAt <= now + skewMs && guard++ < 24) {
+        room.state = room.mods.snake.stepSnake(room.state, now);
+        // Practice bots in a private room still get AI aims each tick.
+        if (room.id !== SNAKE_WORLD_ID) {
+          for (const p of room.state.players || []) {
+            if (p.human === false && p.alive) {
+              room.state = room.mods.snake.applySnakeAction(room.state, p.id, room.mods.snake.aiSnake(room.state, p.id));
+            }
           }
         }
+        nextAt += tickMs;
       }
-      room.endsAt = Date.now() + (room.mods.snake.TICK_MS || 40);
+      room.endsAt = Math.max(nextAt, now + tickMs);
       room.seats = (room.state.players || []).filter((p) => p.human !== false).map((p) => String(p.id));
       armCpuThink(room);
       room.seq = (room.seq || 0) + 1;
@@ -1629,15 +1636,15 @@ export async function applyRoomAction(user, roomId, action, mods) {
     room.state = mods.c4.applyC4Action(room.state, user.id, action);
   } else if (room.game === "snake") {
     room.state = mods.snake.applySnakeAction(room.state, user.id, action);
-    const tickMs = mods.snake.TICK_MS || 40;
+    const tickMs = mods.snake.TICK_MS || 33;
+    const now = Date.now();
     let guard = 0;
-    while (room.endsAt && Date.now() + 2 >= room.endsAt && guard++ < 10) {
-      room.state = mods.snake.stepSnake(room.state, Date.now());
-      room.endsAt = Date.now() + tickMs;
+    let nextAt = room.endsAt || now;
+    while (nextAt <= now + 2 && guard++ < 24) {
+      room.state = mods.snake.stepSnake(room.state, now);
+      nextAt += tickMs;
     }
-    if (!room.endsAt || room.endsAt < Date.now()) {
-      room.endsAt = Date.now() + tickMs;
-    }
+    room.endsAt = Math.max(nextAt, now + tickMs);
     await syncSnakeSeats(room);
   } else if (room.game === "werewolf") {
     room.state = mods.werewolf.applyWerewolfAction(room.state, user.id, action);
@@ -1769,7 +1776,7 @@ export async function joinSnakeWorld(user) {
   });
   await syncSnakeSeats(rec);
   if (!rec.endsAt || rec.endsAt < Date.now()) {
-    rec.endsAt = Date.now() + (mods.snake.TICK_MS || 40);
+    rec.endsAt = Date.now() + (mods.snake.TICK_MS || 33);
   }
   rec.seq = (rec.seq || 0) + 1;
   await saveRoom(rec);
