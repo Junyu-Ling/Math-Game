@@ -328,6 +328,27 @@ function playUntil(start, step, cap, name) {
   ok("snake dies on a wall", dead.alive === false && dead.respawnAt != null);
   ok("snake death drops corpse food", crashed.foods.length > foodBefore && crashed.foods.some((f) => Number.isFinite(f.hue)));
 
+  const loopPath = Array.from({ length: 40 }, (_, i) => ({ x: 50 + Math.cos(i * 0.35) * 6, y: 50 + Math.sin(i * 0.35) * 6 }));
+  let selfHit = {
+    ...s,
+    players: s.players.map((p) =>
+      p.id === "you"
+        ? {
+            ...p,
+            x: loopPath[0].x,
+            y: loopPath[0].y,
+            angle: 0,
+            aim: 0,
+            path: loopPath,
+            alive: true,
+            respawnAt: null,
+          }
+        : { ...p, alive: false, path: [], respawnAt: null },
+    ),
+  };
+  for (let i = 0; i < 8; i++) selfHit = snake.stepSnake(selfHit);
+  ok("snake self collision does not kill", selfHit.players.find((p) => p.id === "you").alive === true);
+
   const revived = snake.stepSnake(crashed, dead.respawnAt + 1);
   ok("snake respawns after delay", revived.players.find((p) => p.id === "you").alive === true);
 

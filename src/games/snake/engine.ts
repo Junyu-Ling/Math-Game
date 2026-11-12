@@ -343,10 +343,10 @@ export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
     if (p.x < HEAD_R || p.y < HEAD_R || p.x > WORLD - HEAD_R || p.y > WORLD - HEAD_R) dead = true;
     if (!dead) {
       for (let j = 0; j < players.length; j++) {
+        if (j === i) continue; // self-collision does not kill
         const other = players[j]!;
         if (!other.alive) continue;
-        const skip = j === i ? 8 : 0;
-        if (segmentHit({ x: p.x, y: p.y }, other.path, skip, HEAD_R * 0.95)) {
+        if (segmentHit({ x: p.x, y: p.y }, other.path, 0, HEAD_R * 0.95)) {
           dead = true;
           break;
         }
