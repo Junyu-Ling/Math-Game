@@ -246,6 +246,8 @@ export function SnakePage() {
   const practice = Boolean(local && !room);
   const serverView = room?.view as SnakeState | undefined;
   const youId = practice ? "you" : user?.id;
+  // Must be React state (not liveRef) so the canvas mounts and paint effect can attach.
+  const showing = Boolean(serverView || local);
 
   useEffect(() => {
     if (!user) return;
@@ -267,25 +269,19 @@ export function SnakePage() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (room) setLocal(null);
+    if (room) {
+      setLocal(null);
+      return;
+    }
+    // Left the world — drop predicted state so entry/rejoin starts clean.
+    liveRef.current = null;
+    lastServerTickRef.current = -1;
+    setHud(null);
   }, [room]);
 
   useEffect(() => {
-    if (!serverView || practice) return;
-    // Ignore duplicate/stale snapshots — re-applying an old pose causes rubber-band teleports.
-    if (serverView.tick < lastServerTickRef.current) return;
-    lastServerTickRef.current = serverView.tick;
-    liveRef.current = reconcileSnake(serverView, liveRef.current, youId);
-    const me = youId ? liveRef.current.players.find((p) => p.id === youId) : undefined;
-    setHud({
-      score: me?.score ?? 0,
-      energy: me?.energy ?? 0,
-      boosting: Boolean(me?.boosting),
-      players: liveRef.current.players.length,
-      alive: Boolean(me?.alive ?? true),
-      shieldLeft: me?.shieldUntil ? Math.max(0, me.shieldUntil - Date.now()) : 0,
-    });
-  }, [serverView, practice, youId, serverView?.tick]);
+    lastServerTickRef.current = -1;
+  }, [room?.id]);
 
   useEffect(() => {
     if (practice && local) liveRef.current = local;
@@ -331,6 +327,14 @@ export function SnakePage() {
       shieldLeft: me?.shieldUntil ? Math.max(0, me.shieldUntil - Date.now()) : 0,
     });
   }
+
+  useEffect(() => {
+    if (!serverView || practice) return;
+    if (serverView.tick < lastServerTickRef.current && liveRef.current) return;
+    lastServerTickRef.current = serverView.tick;
+    liveRef.current = reconcileSnake(serverView, liveRef.current, youId);
+    pushHud(liveRef.current);
+  }, [serverView, practice, youId, serverView?.tick]);
 
   // Local simulation for practice AND online — online feels instant; server only corrects peers/events.
   useEffect(() => {
@@ -395,6 +399,7 @@ export function SnakePage() {
   }, [practice, room]);
 
   useEffect(() => {
+    if (!showing) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     let raf = 0;
@@ -423,7 +428,7 @@ export function SnakePage() {
     };
     raf = window.requestAnimationFrame(paint);
     return () => window.cancelAnimationFrame(raf);
-  }, [youId]);
+  }, [youId, showing]);
 
   function aimFromStick(clientX: number, clientY: number) {
     const el = stickRef.current;
@@ -474,7 +479,6 @@ export function SnakePage() {
     applyLocal({ type: "aim", angle });
   }
 
-  const showing = Boolean(liveRef.current || local || serverView);
   const top = [...(liveRef.current ?? serverView ?? local)?.players ?? []]
     .sort((a, b) => b.score - a.score)
     .slice(0, 8);

@@ -45,6 +45,7 @@ export function isGameOver(room: RoomSnap | null | undefined) {
   const view = viewOf(room);
   if (!room || !view) return false;
   if (room.game === "roulette" || room.game === "slots") return false;
+  if (room.game === "snake") return false;
   if (room.game === "holdem") return view.street === "over";
   return view.phase === "over";
 }
@@ -53,6 +54,8 @@ export function isGameOver(room: RoomSnap | null | undefined) {
 function isLiveMatch(room: RoomSnap | null | undefined) {
   if (!room?.view) return false;
   if (room.game === "roulette" || room.game === "slots") return false;
+  // Shared snake world is not a scored match — leaving must not treat it as a forfeit bout.
+  if (room.game === "snake") return false;
   if (isLobbyRoom(room) || isGameOver(room)) return false;
   return true;
 }
