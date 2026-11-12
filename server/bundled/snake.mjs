@@ -396,29 +396,103 @@ function viewSnake(state, viewerId) {
     })
   };
 }
+var AI_LOOK = 14;
+var AI_WALL_MARGIN = 16;
+var AI_BODY_CLEAR = 11;
+function foodNearThreat(state, food, selfId) {
+  for (const p of state.players) {
+    if (p.id === selfId || !p.alive) continue;
+    if (dist2(food, { x: p.x, y: p.y }) < 9 * 9) return true;
+    for (let i = 0; i < p.path.length; i += 3) {
+      if (dist2(food, p.path[i]) < 7 * 7) return true;
+    }
+  }
+  return false;
+}
+function scoreAiHeading(state, me, aim) {
+  let x = me.x;
+  let y = me.y;
+  let angle = me.angle;
+  let score = 0;
+  for (let step = 0; step < AI_LOOK; step++) {
+    angle = turnToward(angle, aim, TURN_RATE);
+    x += Math.cos(angle) * SPEED;
+    y += Math.sin(angle) * SPEED;
+    if (x < HEAD_R || y < HEAD_R || x > WORLD - HEAD_R || y > WORLD - HEAD_R) {
+      return -1e7 + step;
+    }
+    if (x < AI_WALL_MARGIN) score -= (AI_WALL_MARGIN - x) * 18;
+    if (y < AI_WALL_MARGIN) score -= (AI_WALL_MARGIN - y) * 18;
+    if (x > WORLD - AI_WALL_MARGIN) score -= (x - (WORLD - AI_WALL_MARGIN)) * 18;
+    if (y > WORLD - AI_WALL_MARGIN) score -= (y - (WORLD - AI_WALL_MARGIN)) * 18;
+    for (const p of state.players) {
+      if (p.id === me.id || !p.alive) continue;
+      const headDist = Math.sqrt(dist2({ x, y }, { x: p.x, y: p.y }));
+      if (headDist < AI_BODY_CLEAR) score -= (AI_BODY_CLEAR - headDist) * 55;
+      if (headDist < 16) {
+        const closing = Math.cos(p.angle) * (x - p.x) + Math.sin(p.angle) * (y - p.y);
+        if (closing > 0) score -= closing * 1.4;
+      }
+      if (segmentHit({ x, y }, p.path, 0, HEAD_R * 2.4)) score -= 800;
+      for (let i = 0; i < p.path.length; i += 4) {
+        const d = Math.sqrt(dist2({ x, y }, p.path[i]));
+        if (d < AI_BODY_CLEAR) score -= (AI_BODY_CLEAR - d) * 22;
+      }
+    }
+    for (const f of state.foods) {
+      if (foodNearThreat(state, f, me.id)) continue;
+      const d = Math.sqrt(dist2({ x, y }, f));
+      if (d < 18) score += (18 - d) * 0.28;
+    }
+  }
+  const cx = WORLD / 2;
+  const cy = WORLD / 2;
+  score -= Math.hypot(x - cx, y - cy) * 0.015;
+  return score;
+}
 function aiSnake(state, cpuId) {
   const me = state.players.find((p) => p.id === cpuId);
   if (!me || !me.alive) return { type: "aim", angle: 0 };
-  let best = null;
-  let bestD = Infinity;
-  for (const f of state.foods) {
-    const d = dist2({ x: me.x, y: me.y }, f);
-    if (d < bestD) {
-      bestD = d;
-      best = f;
-    }
-  }
-  if (!best) return { type: "aim", angle: me.angle };
-  const angle = Math.atan2(best.y - me.y, best.x - me.x);
+  const candidates = [];
+  for (let k = -7; k <= 7; k++) candidates.push(normAngle(me.angle + k * 0.2));
+  candidates.push(Math.atan2(WORLD / 2 - me.y, WORLD / 2 - me.x));
+  if (me.x < AI_WALL_MARGIN) candidates.push(0);
+  if (me.x > WORLD - AI_WALL_MARGIN) candidates.push(Math.PI);
+  if (me.y < AI_WALL_MARGIN) candidates.push(Math.PI / 2);
+  if (me.y > WORLD - AI_WALL_MARGIN) candidates.push(-Math.PI / 2);
   for (const p of state.players) {
     if (p.id === me.id || !p.alive) continue;
     const d = Math.sqrt(dist2({ x: me.x, y: me.y }, { x: p.x, y: p.y }));
-    if (d < 10) {
+    if (d < 22) {
+      candidates.push(Math.atan2(me.y - p.y, me.x - p.x));
       const away = Math.atan2(me.y - p.y, me.x - p.x);
-      return { type: "aim", angle: away };
+      candidates.push(normAngle(away + Math.PI / 2));
+      candidates.push(normAngle(away - Math.PI / 2));
     }
   }
-  return { type: "aim", angle };
+  let safestFood = null;
+  let safestD = Infinity;
+  for (const f of state.foods) {
+    if (foodNearThreat(state, f, me.id)) continue;
+    const d = dist2({ x: me.x, y: me.y }, f);
+    if (d < safestD) {
+      safestD = d;
+      safestFood = f;
+    }
+  }
+  if (safestFood) {
+    candidates.push(Math.atan2(safestFood.y - me.y, safestFood.x - me.x));
+  }
+  let bestAngle = me.angle;
+  let bestScore = -Infinity;
+  for (const aim of candidates) {
+    const s = scoreAiHeading(state, me, aim);
+    if (s > bestScore) {
+      bestScore = s;
+      bestAngle = aim;
+    }
+  }
+  return { type: "aim", angle: bestAngle };
 }
 function cameraOrigin(focus, view = VIEW_RADIUS) {
   const ox = clamp(focus.x - view / 2, 0, Math.max(0, WORLD - view));

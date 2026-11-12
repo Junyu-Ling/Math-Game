@@ -388,6 +388,56 @@ function playUntil(start, step, cap, name) {
   }
   ok("snake practice AI runs without crashing", bots.phase === "play" && bots.players.length >= 2);
 
+  let edge = snake.startSnakePractice(1);
+  edge = {
+    ...edge,
+    foods: [{ id: "bait", x: 1.5, y: 40 }],
+    players: edge.players.map((p) =>
+      p.id === "cpu"
+        ? {
+            ...p,
+            x: 6,
+            y: 40,
+            angle: Math.PI,
+            aim: Math.PI,
+            path: Array.from({ length: 18 }, (_, i) => ({ x: 6 + i * 0.55, y: 40 })),
+            shieldUntil: null,
+          }
+        : { ...p, x: 120, y: 120, alive: true, path: [{ x: 120, y: 120 }], shieldUntil: Date.now() + 999999 },
+    ),
+  };
+  for (let t = 0; t < 50; t++) {
+    edge = snake.applySnakeAction(edge, "cpu", snake.aiSnake(edge, "cpu"));
+    edge = snake.stepSnake(edge);
+  }
+  ok("snake AI keeps clear of walls", edge.players.find((p) => p.id === "cpu").alive === true);
+
+  let dodge = snake.startSnakePractice(1);
+  const body = Array.from({ length: 30 }, (_, i) => ({ x: 80, y: 50 + i * 0.55 }));
+  dodge = {
+    ...dodge,
+    foods: [{ id: "bait2", x: 80, y: 55 }],
+    players: dodge.players.map((p) => {
+      if (p.id === "you") {
+        return { ...p, x: 80, y: 50, angle: Math.PI / 2, aim: Math.PI / 2, path: body, alive: true, shieldUntil: null };
+      }
+      return {
+        ...p,
+        x: 70,
+        y: 55,
+        angle: 0,
+        aim: 0,
+        path: Array.from({ length: 18 }, (_, i) => ({ x: 70 - i * 0.55, y: 55 })),
+        shieldUntil: null,
+      };
+    }),
+  };
+  for (let t = 0; t < 40; t++) {
+    dodge = snake.applySnakeAction(dodge, "cpu", snake.aiSnake(dodge, "cpu"));
+    dodge = snake.stepSnake(dodge);
+  }
+  ok("snake AI prefers survival over bait food", dodge.players.find((p) => p.id === "cpu").alive === true);
+
   const view = snake.viewSnake(bots, "you");
   ok("snake view keeps the viewer snake", Boolean(view.players.find((p) => p.id === "you")));
 
