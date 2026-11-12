@@ -3,6 +3,7 @@ import {
   aiSnake,
   applySnakeAction,
   canBoost,
+  ENERGY_MAX,
   HEAD_R,
   isShielded,
   predictSelf,
@@ -222,6 +223,7 @@ export function SnakePage() {
   const [joining, setJoining] = useState(false);
   const [hud, setHud] = useState<{
     score: number;
+    energy: number;
     boosting: boolean;
     players: number;
     alive: boolean;
@@ -272,6 +274,7 @@ export function SnakePage() {
     const me = youId ? liveRef.current.players.find((p) => p.id === youId) : undefined;
     setHud({
       score: me?.score ?? 0,
+      energy: me?.energy ?? 0,
       boosting: Boolean(me?.boosting),
       players: liveRef.current.players.length,
       alive: Boolean(me?.alive ?? true),
@@ -335,6 +338,7 @@ export function SnakePage() {
       const me = youId ? cur.players.find((p) => p.id === youId) : undefined;
       setHud({
         score: me?.score ?? 0,
+        energy: me?.energy ?? 0,
         boosting: Boolean(me?.boosting),
         players: cur.players.length,
         alive: Boolean(me?.alive),
@@ -557,9 +561,6 @@ export function SnakePage() {
                     <span className="snake-hud-k">{world ? "Online" : "Practice"}</span>
                     <strong>{hud?.players ?? top.length}</strong>
                   </div>
-                  <div className={`snake-boost-pill${(hud?.boosting ?? meLive?.boosting) ? " on" : ""}${(meLive && canBoost(meLive)) || hud?.boosting ? "" : " dim"}`}>
-                    {(hud?.boosting ?? meLive?.boosting) ? "BOOST" : "SPACE boost"}
-                  </div>
                   {(hud?.shieldLeft ?? 0) > 0 || (meLive && isShielded(meLive)) ? (
                     <div className="snake-boost-pill on">
                       SHIELD {Math.ceil((hud?.shieldLeft ?? Math.max(0, (meLive?.shieldUntil ?? 0) - Date.now())) / 1000)}s
@@ -568,31 +569,23 @@ export function SnakePage() {
                 </div>
                 {!hud?.alive && meLive && !meLive.alive ? <div className="snake-respawn">Respawning…</div> : null}
               </div>
-              <div className="snake-pads" aria-label="Controls">
-                {(
-                  [
-                    { angle: -Math.PI / 2, label: "↑" },
-                    { angle: Math.PI, label: "←" },
-                    { angle: 0, label: "→" },
-                    { angle: Math.PI / 2, label: "↓" },
-                  ] as const
-                ).map((d) => (
-                  <button
-                    key={d.label}
-                    type="button"
-                    className="snake-pad"
-                    onPointerDown={() => {
-                      aimRef.current = d.angle;
-                      applyLocal({ type: "aim", angle: d.angle });
-                    }}
-                  >
-                    {d.label}
-                  </button>
-                ))}
+              <div className="snake-energy" aria-label="Energy">
+                <div className="snake-energy-meta">
+                  <span>Energy</span>
+                  <b>
+                    {Math.round(hud?.energy ?? meLive?.energy ?? 0)} / {ENERGY_MAX}
+                  </b>
+                  <span className={`snake-energy-boost${hud?.boosting ? " on" : ""}${(meLive && canBoost(meLive)) || (hud?.energy ?? 0) > 0 ? "" : " dim"}`}>
+                    {hud?.boosting ? "BOOSTING" : "Hold Space / bar to boost"}
+                  </span>
+                </div>
                 <button
                   type="button"
-                  className={`snake-pad boost${hud?.boosting ? " on" : ""}`}
-                  onPointerDown={() => {
+                  className={`snake-energy-track${hud?.boosting ? " on" : ""}${(hud?.energy ?? meLive?.energy ?? 0) <= 0 ? " empty" : ""}`}
+                  disabled={(hud?.energy ?? meLive?.energy ?? 0) <= 0 && !hud?.boosting}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    if ((hud?.energy ?? meLive?.energy ?? 0) <= 0) return;
                     boostRef.current = true;
                     applyLocal({ type: "boost", on: true });
                   }}
@@ -606,10 +599,13 @@ export function SnakePage() {
                     applyLocal({ type: "boost", on: false });
                   }}
                 >
-                  BOOST
+                  <span
+                    className="snake-energy-fill"
+                    style={{ width: `${Math.max(0, Math.min(100, ((hud?.energy ?? meLive?.energy ?? 0) / ENERGY_MAX) * 100))}%` }}
+                  />
                 </button>
               </div>
-              <p className="snake-hint">Mouse aim · WASD · hold Space / Shift to boost (burns score)</p>
+              <p className="snake-hint">Mouse / WASD aim · eat to fill energy & grow · boost burns energy only</p>
             </div>
           )}
         </div>

@@ -66,7 +66,7 @@ const RULES: Record<string, string[]> = {
   ],
   snake: [
     "Shared world: sign in and open Snake — every online player on this page is on the same continuous map. The camera follows your head.",
-    "Aim with the mouse, arrows, or WASD. Your body bends as you turn. Eat pellets to grow. Hold Space or Shift to boost (burns score for speed). Hitting yourself is safe — walls and other snakes kill you. After spawn/respawn you get a 5s shield (full invulnerability). On death your body scatters into colored remains. Practice vs CPU works offline.",
+    "Aim with the mouse, arrows, or WASD. Your body bends as you turn. Eat pellets to grow longer and fill your energy bar. Hold Space / Shift (or the energy bar) to boost — boost spends energy only, not length. No energy means no boost. Hitting yourself is safe — walls and other snakes kill you. After spawn/respawn you get a 5s shield. On death your body scatters into colored remains. Practice vs CPU works offline.",
   ],
   ludo: [
     "2–4 players. Each color has four planes. Practice is you (blue) plus 1–3 CPUs.",
@@ -784,8 +784,8 @@ export function GameRules({ game }: { game: string }) {
           },
           {
             name: "Boost",
-            tip: "Hold Space or Shift to sprint. Boost burns score and shortens you.",
-            demo: <span className="rule-call">SPACE</span>,
+            tip: "Eat to fill energy. Hold Space/Shift or the energy bar to sprint — energy only, length stays.",
+            demo: <span className="rule-call">ENERGY</span>,
           },
           {
             name: "Survive",

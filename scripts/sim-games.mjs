@@ -395,7 +395,14 @@ function playUntil(start, step, cap, name) {
   fat = {
     ...fat,
     players: fat.players.map((p) =>
-      p.id === "you" ? { ...p, score: 8, path: Array.from({ length: 40 }, (_, i) => ({ x: 40 - i * 0.5, y: 40 })) } : p,
+      p.id === "you"
+        ? {
+            ...p,
+            score: 8,
+            energy: 80,
+            path: Array.from({ length: 40 }, (_, i) => ({ x: 40 - i * 0.5, y: 40 })),
+          }
+        : p,
     ),
   };
   fat = snake.applySnakeAction(fat, "you", { type: "boost", on: true });
@@ -403,7 +410,27 @@ function playUntil(start, step, cap, name) {
   ok("snake boost arms when held", beforeBoost.boosting === true);
   for (let i = 0; i < 12; i++) fat = snake.stepSnake(fat);
   const afterBoost = fat.players.find((p) => p.id === "you");
-  ok("snake boost drains score", afterBoost.score < beforeBoost.score);
+  ok("snake boost drains energy not length", afterBoost.energy < beforeBoost.energy && afterBoost.score === beforeBoost.score);
+
+  let hungry = snake.startSnakePractice(0);
+  const you0 = hungry.players.find((p) => p.id === "you");
+  hungry = {
+    ...hungry,
+    foods: [{ id: "pellet", x: you0.x + 0.4, y: you0.y }],
+    players: hungry.players.map((p) => (p.id === "you" ? { ...p, energy: 10, score: 0 } : p)),
+  };
+  hungry = snake.stepSnake(hungry);
+  const fed = hungry.players.find((p) => p.id === "you");
+  ok("snake food raises energy and score", fed.score === 1 && fed.energy > 10);
+
+  let empty = snake.startSnakePractice(0);
+  empty = {
+    ...empty,
+    players: empty.players.map((p) => (p.id === "you" ? { ...p, energy: 0, score: 9 } : p)),
+  };
+  empty = snake.applySnakeAction(empty, "you", { type: "boost", on: true });
+  empty = snake.stepSnake(empty);
+  ok("snake cannot boost without energy", empty.players.find((p) => p.id === "you").boosting === false);
 }
 
 /* ---------- other live tables: AI vs AI, no crash ---------- */

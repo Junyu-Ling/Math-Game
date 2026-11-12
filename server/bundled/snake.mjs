@@ -14,8 +14,11 @@ var CORPSE_STRIDE = 2;
 var CORPSE_MAX = 52;
 var SPEED = 0.58;
 var BOOST_MULT = 1.85;
-var BOOST_DRAIN_EVERY = 5;
-var MIN_BOOST_SCORE = 1;
+var BOOST_DRAIN_EVERY = 4;
+var BOOST_DRAIN = 2.5;
+var ENERGY_MAX = 100;
+var ENERGY_PER_FOOD = 14;
+var ENERGY_START = 24;
 var TURN_RATE = 0.65;
 var HEAD_R = 1.35;
 var FOOD_R = 0.85;
@@ -67,7 +70,7 @@ function buildPath(x, y, angle, len) {
   return path;
 }
 function canBoost(p) {
-  return Boolean(p.alive && p.score >= MIN_BOOST_SCORE && p.path.length > START_LEN);
+  return Boolean(p.alive && p.energy > 0);
 }
 function isShielded(p, now = Date.now()) {
   return Boolean(p.alive && p.shieldUntil != null && now < p.shieldUntil);
@@ -86,6 +89,7 @@ function spawnPlayer(person, index, now = Date.now()) {
     path: buildPath(pt.x, pt.y, angle, START_LEN),
     alive: true,
     score: 0,
+    energy: ENERGY_START,
     hue: hueFor(person.id, index),
     respawnAt: null,
     boosting: false,
@@ -207,7 +211,7 @@ function segmentHit(head, path, skip, radius) {
 }
 function respawnNow(p, index, now) {
   const fresh = spawnPlayer({ id: p.id, name: p.name, human: p.human }, index, now);
-  return { ...fresh, score: 0, hue: p.hue, boosting: false, shieldUntil: now + SHIELD_MS };
+  return { ...fresh, score: 0, energy: ENERGY_START, hue: p.hue, boosting: false, shieldUntil: now + SHIELD_MS };
 }
 function scatterCorpse(path, hue) {
   if (!path.length) return [];
@@ -239,6 +243,7 @@ function killSnake(p, now) {
       alive: false,
       boosting: false,
       score: 0,
+      energy: 0,
       respawnAt: now + RESPAWN_MS,
       path: p.path.slice(0, 3),
       shieldUntil: null
@@ -256,19 +261,20 @@ function stepSnake(state, now = Date.now()) {
       if (p.respawnAt && now >= p.respawnAt) return respawnNow(p, index, now);
       return { ...p, boosting: false };
     }
+    let energy = p.energy;
     const boosting = Boolean(p.boosting) && canBoost(p);
     const spd = boosting ? SPEED * BOOST_MULT : SPEED;
     const angle = turnToward(p.angle, p.aim, TURN_RATE);
     const x = p.x + Math.cos(angle) * spd;
     const y = p.y + Math.sin(angle) * spd;
     let path = [{ x, y }, ...p.path];
-    let score = p.score;
+    const score = p.score;
     if (boosting && tick % BOOST_DRAIN_EVERY === 0) {
-      score = Math.max(0, score - 1);
+      energy = Math.max(0, energy - BOOST_DRAIN);
     }
     const maxPts = START_LEN + Math.floor(score * 2.2);
     if (path.length > maxPts) path = path.slice(0, maxPts);
-    return { ...p, x, y, angle, path, score, boosting };
+    return { ...p, x, y, angle, path, score, energy, boosting: boosting && energy > 0 };
   });
   const next = players.map((p, i) => {
     if (!p.alive) return p;
@@ -302,17 +308,25 @@ function stepSnake(state, now = Date.now()) {
       return killed.player;
     }
     let score = p.score;
+    let energy = p.energy;
     let path = p.path;
     const kept = [];
     for (const f of foods) {
       if (dist2({ x: p.x, y: p.y }, f) <= (HEAD_R + FOOD_R) * (HEAD_R + FOOD_R)) {
         score += 1;
+        energy = Math.min(ENERGY_MAX, energy + ENERGY_PER_FOOD);
         const tip = path[path.length - 1] ?? { x: p.x, y: p.y };
         path = [...path, { x: tip.x, y: tip.y }];
       } else kept.push(f);
     }
     foods = kept;
-    return { ...p, score, path, boosting: p.boosting && canBoost({ ...p, score, path }) };
+    return {
+      ...p,
+      score,
+      energy,
+      path,
+      boosting: p.boosting && canBoost({ alive: p.alive, energy })
+    };
   });
   while (foods.length < FOOD_COUNT) {
     const pt = randomPoint(4);
@@ -346,20 +360,23 @@ function predictSelf(state, youId, ticks) {
     ...state,
     players: state.players.map((p) => {
       if (p.id !== youId || !p.alive) return p;
-      let { x, y, angle, path, score } = p;
+      let { x, y, angle, path, score, energy } = p;
       let boosting = Boolean(p.boosting);
       for (let i = 0; i < n; i++) {
-        boosting = boosting && canBoost({ alive: true, score, path });
+        boosting = boosting && canBoost({ alive: true, energy });
         const spd = boosting ? SPEED * BOOST_MULT : SPEED;
         angle = turnToward(angle, p.aim, TURN_RATE);
         x += Math.cos(angle) * spd;
         y += Math.sin(angle) * spd;
         path = [{ x, y }, ...path];
-        if (boosting && (state.tick + i + 1) % BOOST_DRAIN_EVERY === 0) score = Math.max(0, score - 1);
+        if (boosting && (state.tick + i + 1) % BOOST_DRAIN_EVERY === 0) {
+          energy = Math.max(0, energy - BOOST_DRAIN);
+        }
         const maxPts = START_LEN + Math.floor(score * 2.2);
         if (path.length > maxPts) path = path.slice(0, maxPts);
+        boosting = boosting && energy > 0;
       }
-      return { ...p, x, y, angle, path, score, boosting };
+      return { ...p, x, y, angle, path, score, energy, boosting };
     })
   };
 }
@@ -415,18 +432,21 @@ var VIEW_ROWS = Math.floor(VIEW_RADIUS);
 var COUNTDOWN_MS = 0;
 var GOAL = 999;
 export {
+  BOOST_DRAIN,
   BOOST_DRAIN_EVERY,
   BOOST_MULT,
   COLS,
   CORPSE_MAX,
   CORPSE_STRIDE,
   COUNTDOWN_MS,
+  ENERGY_MAX,
+  ENERGY_PER_FOOD,
+  ENERGY_START,
   FOOD_COUNT,
   FOOD_R,
   FOOD_SOFT_CAP,
   GOAL,
   HEAD_R,
-  MIN_BOOST_SCORE,
   PATH_STEP,
   RESPAWN_MS,
   ROWS,
