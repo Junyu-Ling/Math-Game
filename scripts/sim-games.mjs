@@ -306,6 +306,36 @@ function playUntil(start, step, cap, name) {
   const after = aimed.players.find((p) => p.id === "you");
   ok("snake aim updates facing intent", Math.abs(after.aim - Math.PI / 2) < 1e-6);
 
+  const short = {
+    ...s,
+    foods: [],
+    players: s.players.map((p) =>
+      p.id === "you"
+        ? { ...p, x: 100, y: 100, angle: 0, aim: Math.PI / 2, score: 0, path: Array.from({ length: 18 }, (_, i) => ({ x: 100 - i * 0.55, y: 100 })) }
+        : { ...p, alive: false, path: [] },
+    ),
+  };
+  const long = {
+    ...short,
+    players: short.players.map((p) =>
+      p.id === "you"
+        ? {
+            ...p,
+            score: 40,
+            path: Array.from({ length: 110 }, (_, i) => ({ x: 100 - i * 0.55, y: 100 })),
+          }
+        : p,
+    ),
+  };
+  const shortTurn = snake.turnRateFor(short.players.find((p) => p.id === "you"));
+  const longTurn = snake.turnRateFor(long.players.find((p) => p.id === "you"));
+  ok("snake longer body turns slower", longTurn < shortTurn * 0.72);
+  let shortStep = snake.stepSnake(short);
+  let longStep = snake.stepSnake(long);
+  const shortFacing = shortStep.players.find((p) => p.id === "you").angle;
+  const longFacing = longStep.players.find((p) => p.id === "you").angle;
+  ok("snake short body yaws farther per tick", Math.abs(shortFacing) > Math.abs(longFacing) + 0.15);
+
   const ghost = snake.applySnakeAction(s, "nobody", { type: "aim", angle: 0 });
   ok("snake ignores unknown actor", ghost.players[0].aim === s.players[0].aim);
 

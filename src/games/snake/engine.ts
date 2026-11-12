@@ -16,7 +16,14 @@ export const BOOST_DRAIN = 2.5;
 export const ENERGY_MAX = 100;
 export const ENERGY_PER_FOOD = 7;
 export const ENERGY_START = 24;
-export const TURN_RATE = 0.95;
+/** Peak yaw rate for a short / newborn snake (rad per tick). */
+export const TURN_RATE_MAX = 0.92;
+/** Floor yaw rate for a very long snake — wide turning arc. */
+export const TURN_RATE_MIN = 0.2;
+/** Path+score mass that pulls turn rate about halfway to the floor. */
+export const TURN_MASS_HALF = 48;
+/** @deprecated use turnRateFor — kept as the short-snake peak. */
+export const TURN_RATE = TURN_RATE_MAX;
 export const HEAD_R = 1.35;
 export const FOOD_R = 0.85;
 export const PATH_STEP = 0.55;
@@ -118,6 +125,15 @@ function buildPath(x: number, y: number, angle: number, len: number): Point[] {
 
 export function canBoost(p: Pick<SnakePlayer, "alive" | "energy">): boolean {
   return Boolean(p.alive && p.energy > 0);
+}
+
+/** Longer body → slower yaw, like a real snake sweeping a wider arc. */
+export function turnRateFor(p: Pick<SnakePlayer, "path" | "score" | "boosting">): number {
+  const mass = Math.max(START_LEN, p.path.length) + Math.max(0, p.score) * 1.6;
+  const agility = 1 / (1 + (mass - START_LEN) / TURN_MASS_HALF);
+  let rate = TURN_RATE_MIN + (TURN_RATE_MAX - TURN_RATE_MIN) * agility;
+  if (p.boosting) rate *= 0.86;
+  return rate;
 }
 
 export function isShielded(p: Pick<SnakePlayer, "alive" | "shieldUntil">, now = Date.now()): boolean {
@@ -342,7 +358,7 @@ export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
     let energy = p.energy;
     const boosting = Boolean(p.boosting) && canBoost(p);
     const spd = boosting ? SPEED * BOOST_MULT : SPEED;
-    const angle = turnToward(p.angle, p.aim, TURN_RATE);
+    const angle = turnToward(p.angle, p.aim, turnRateFor({ ...p, boosting }));
     const x = p.x + Math.cos(angle) * spd;
     const y = p.y + Math.sin(angle) * spd;
     let path = [{ x, y }, ...p.path];
@@ -526,7 +542,7 @@ function scoreAiHeading(state: SnakeState, me: SnakePlayer, aim: number): number
   let angle = me.angle;
   let score = 0;
   for (let step = 0; step < AI_LOOK; step++) {
-    angle = turnToward(angle, aim, TURN_RATE);
+    angle = turnToward(angle, aim, turnRateFor(me));
     x += Math.cos(angle) * SPEED;
     y += Math.sin(angle) * SPEED;
 

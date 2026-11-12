@@ -19,7 +19,10 @@ var BOOST_DRAIN = 2.5;
 var ENERGY_MAX = 100;
 var ENERGY_PER_FOOD = 7;
 var ENERGY_START = 24;
-var TURN_RATE = 0.95;
+var TURN_RATE_MAX = 0.92;
+var TURN_RATE_MIN = 0.2;
+var TURN_MASS_HALF = 48;
+var TURN_RATE = TURN_RATE_MAX;
 var HEAD_R = 1.35;
 var FOOD_R = 0.85;
 var PATH_STEP = 0.55;
@@ -71,6 +74,13 @@ function buildPath(x, y, angle, len) {
 }
 function canBoost(p) {
   return Boolean(p.alive && p.energy > 0);
+}
+function turnRateFor(p) {
+  const mass = Math.max(START_LEN, p.path.length) + Math.max(0, p.score) * 1.6;
+  const agility = 1 / (1 + (mass - START_LEN) / TURN_MASS_HALF);
+  let rate = TURN_RATE_MIN + (TURN_RATE_MAX - TURN_RATE_MIN) * agility;
+  if (p.boosting) rate *= 0.86;
+  return rate;
 }
 function isShielded(p, now = Date.now()) {
   return Boolean(p.alive && p.shieldUntil != null && now < p.shieldUntil);
@@ -264,7 +274,7 @@ function stepSnake(state, now = Date.now()) {
     let energy = p.energy;
     const boosting = Boolean(p.boosting) && canBoost(p);
     const spd = boosting ? SPEED * BOOST_MULT : SPEED;
-    const angle = turnToward(p.angle, p.aim, TURN_RATE);
+    const angle = turnToward(p.angle, p.aim, turnRateFor({ ...p, boosting }));
     const x = p.x + Math.cos(angle) * spd;
     const y = p.y + Math.sin(angle) * spd;
     let path = [{ x, y }, ...p.path];
@@ -428,7 +438,7 @@ function scoreAiHeading(state, me, aim) {
   let angle = me.angle;
   let score = 0;
   for (let step = 0; step < AI_LOOK; step++) {
-    angle = turnToward(angle, aim, TURN_RATE);
+    angle = turnToward(angle, aim, turnRateFor(me));
     x += Math.cos(angle) * SPEED;
     y += Math.sin(angle) * SPEED;
     if (x < HEAD_R || y < HEAD_R || x > WORLD - HEAD_R || y > WORLD - HEAD_R) {
@@ -542,7 +552,10 @@ export {
   SPEED,
   START_LEN,
   TICK_MS,
+  TURN_MASS_HALF,
   TURN_RATE,
+  TURN_RATE_MAX,
+  TURN_RATE_MIN,
   VIEW_COLS,
   VIEW_RADIUS,
   VIEW_ROWS,
@@ -563,5 +576,6 @@ export {
   startSnakePractice,
   stepSnake,
   stepSnakeWorld,
+  turnRateFor,
   viewSnake
 };

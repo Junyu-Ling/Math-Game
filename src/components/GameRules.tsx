@@ -779,7 +779,7 @@ export function GameRules({ game }: { game: string }) {
         rows={[
           {
             name: "Steer",
-            tip: "Mouse, arrows, or WASD set your aim. The body curves as you turn.",
+            tip: "Mouse, arrows, or WASD set your aim. Short snakes whip around; long ones sweep wider, slower arcs.",
             demo: <span className="rule-call">MOUSE</span>,
           },
           {
