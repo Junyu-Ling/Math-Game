@@ -495,7 +495,7 @@ export function SnakePage() {
               <p>
                 {joining
                   ? "Dropping you onto the global map…"
-                  : "One continuous arena for everyone online. Steer with mouse or WASD, hold Space to burn length for speed."}
+                  : "One continuous arena for everyone online. Steer with mouse or WASD, eat to grow and fill energy, hold Space to boost."}
               </p>
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {user ? (
