@@ -102,10 +102,6 @@ function Preview({ kind }: { kind: CatalogPreview }) {
         <div className="home-preview home-preview-gomoku" aria-hidden>
           <svg viewBox="0 0 120 78" className="home-preview-svg">
             <defs>
-              <linearGradient id="gomo-wood" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#e8c89a" />
-                <stop offset="100%" stopColor="#c49a5c" />
-              </linearGradient>
               <radialGradient id="gomo-b" cx="35%" cy="30%" r="65%">
                 <stop offset="0%" stopColor="#555" />
                 <stop offset="55%" stopColor="#1a1a1a" />
@@ -117,12 +113,11 @@ function Preview({ kind }: { kind: CatalogPreview }) {
                 <stop offset="100%" stopColor="#cfc6b8" />
               </radialGradient>
             </defs>
-            <rect x="6" y="6" width="108" height="66" rx="8" fill="url(#gomo-wood)" stroke="#a67c45" strokeWidth="1.2" />
             {[18, 30, 42, 54, 66, 78, 90, 102].map((x) => (
-              <line key={`vx${x}`} x1={x} y1="14" x2={x} y2="64" stroke="#8b6914" strokeOpacity="0.35" strokeWidth="0.8" />
+              <line key={`vx${x}`} x1={x} y1="14" x2={x} y2="64" stroke="#94a3b8" strokeOpacity="0.55" strokeWidth="0.9" />
             ))}
             {[18, 30, 42, 54].map((y) => (
-              <line key={`hy${y}`} x1="18" y1={y} x2="102" y2={y} stroke="#8b6914" strokeOpacity="0.35" strokeWidth="0.8" />
+              <line key={`hy${y}`} x1="18" y1={y} x2="102" y2={y} stroke="#94a3b8" strokeOpacity="0.55" strokeWidth="0.9" />
             ))}
             {[
               [42, 30],
@@ -145,13 +140,6 @@ function Preview({ kind }: { kind: CatalogPreview }) {
       <div className="preview-row preview-scene-row">
         <div className="home-preview home-preview-ttt" aria-hidden>
           <svg viewBox="0 0 120 78" className="home-preview-svg">
-            <defs>
-              <linearGradient id="ttt-panel" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#f8fafc" />
-                <stop offset="100%" stopColor="#e2e8f0" />
-              </linearGradient>
-            </defs>
-            <rect x="18" y="4" width="84" height="70" rx="10" fill="url(#ttt-panel)" stroke="#cbd5e1" strokeWidth="1.4" />
             <line x1="46" y1="12" x2="46" y2="66" stroke="#94a3b8" strokeWidth="2.4" strokeLinecap="round" />
             <line x1="74" y1="12" x2="74" y2="66" stroke="#94a3b8" strokeWidth="2.4" strokeLinecap="round" />
             <line x1="26" y1="30" x2="94" y2="30" stroke="#94a3b8" strokeWidth="2.4" strokeLinecap="round" />
@@ -177,11 +165,6 @@ function Preview({ kind }: { kind: CatalogPreview }) {
         <div className="home-preview home-preview-c4" aria-hidden>
           <svg viewBox="0 0 120 78" className="home-preview-svg">
             <defs>
-              <linearGradient id="c4-frame" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#60a5fa" />
-                <stop offset="55%" stopColor="#2563eb" />
-                <stop offset="100%" stopColor="#1e3a8a" />
-              </linearGradient>
               <radialGradient id="c4-red" cx="32%" cy="28%" r="70%">
                 <stop offset="0%" stopColor="#fca5a5" />
                 <stop offset="55%" stopColor="#dc2626" />
@@ -193,7 +176,6 @@ function Preview({ kind }: { kind: CatalogPreview }) {
                 <stop offset="100%" stopColor="#854d0e" />
               </radialGradient>
             </defs>
-            <rect x="14" y="8" width="92" height="58" rx="8" fill="url(#c4-frame)" />
             {[0, 1, 2, 3, 4].flatMap((col) =>
               [0, 1, 2, 3].map((row) => {
                 const cx = 28 + col * 16;
@@ -202,14 +184,12 @@ function Preview({ kind }: { kind: CatalogPreview }) {
                 const red = (col === 1 && row === 3) || (col === 2 && row !== 2) || (col === 3 && row === 3);
                 return (
                   <g key={`${col}-${row}`}>
-                    <circle cx={cx} cy={cy} r="5.4" fill="#f1f5f9" opacity="0.95" />
+                    <circle cx={cx} cy={cy} r="5.6" fill="none" stroke="#2563eb" strokeWidth="1.6" />
                     {filled ? <circle cx={cx} cy={cy} r="4.6" fill={red ? "url(#c4-red)" : "url(#c4-yel)"} /> : null}
                   </g>
                 );
               }),
             )}
-            <rect x="18" y="66" width="10" height="8" rx="2" fill="#1e3a8a" />
-            <rect x="92" y="66" width="10" height="8" rx="2" fill="#1e3a8a" />
           </svg>
         </div>
       </div>
@@ -221,17 +201,12 @@ function Preview({ kind }: { kind: CatalogPreview }) {
         <div className="home-preview home-preview-snake" aria-hidden>
           <svg viewBox="0 0 120 78" className="home-preview-svg">
             <defs>
-              <radialGradient id="snake-sky" cx="50%" cy="35%" r="70%">
-                <stop offset="0%" stopColor="#1a4a52" />
-                <stop offset="100%" stopColor="#07151d" />
-              </radialGradient>
               <linearGradient id="snake-body" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stopColor="#0f766e" />
                 <stop offset="55%" stopColor="#14b8a6" />
                 <stop offset="100%" stopColor="#5eead4" />
               </linearGradient>
             </defs>
-            <rect x="4" y="4" width="112" height="70" rx="12" fill="url(#snake-sky)" stroke="#134e4a" strokeWidth="1.2" />
             <path d="M18 52 C28 52 32 28 48 28 S72 52 86 40" fill="none" stroke="url(#snake-body)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
             <circle cx="86" cy="40" r="7" fill="#2dd4bf" />
             <circle cx="88.5" cy="38" r="1.6" fill="#0f172a" />

@@ -64,33 +64,14 @@
 
 .home-preview {
   display: block;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow:
-    0 8px 18px rgba(15, 23, 42, 0.08),
-    inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+  background: transparent;
+  box-shadow: none;
 }
 
 .home-preview-svg {
   display: block;
   width: 100%;
   height: 100%;
-}
-
-.home-preview-gomoku {
-  background: #d4a574;
-}
-
-.home-preview-ttt {
-  background: #eef2f7;
-}
-
-.home-preview-c4 {
-  background: #dbeafe;
-}
-
-.home-preview-snake {
-  background: #0b2430;
 }
 
 .table-c4 {
