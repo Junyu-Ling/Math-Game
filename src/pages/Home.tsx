@@ -113,23 +113,23 @@ function Preview({ kind }: { kind: CatalogPreview }) {
                 <stop offset="100%" stopColor="#cfc6b8" />
               </radialGradient>
             </defs>
-            {[18, 30, 42, 54, 66, 78, 90, 102].map((x) => (
-              <line key={`vx${x}`} x1={x} y1="14" x2={x} y2="64" stroke="#94a3b8" strokeOpacity="0.55" strokeWidth="0.9" />
+            {[16, 34, 52, 70, 88, 106].map((x) => (
+              <line key={`vx${x}`} x1={x} y1="12" x2={x} y2="66" stroke="#94a3b8" strokeOpacity="0.55" strokeWidth="0.9" />
             ))}
-            {[18, 30, 42, 54].map((y) => (
-              <line key={`hy${y}`} x1="18" y1={y} x2="102" y2={y} stroke="#94a3b8" strokeOpacity="0.55" strokeWidth="0.9" />
+            {[16, 34, 52, 66].map((y) => (
+              <line key={`hy${y}`} x1="16" y1={y} x2="106" y2={y} stroke="#94a3b8" strokeOpacity="0.55" strokeWidth="0.9" />
             ))}
             {[
-              [42, 30],
-              [54, 30],
-              [66, 30],
-              [78, 30],
-              [90, 30],
+              [16, 34],
+              [34, 34],
+              [52, 34],
+              [70, 34],
+              [88, 34],
             ].map(([cx, cy], i) => (
-              <circle key={`b${i}`} cx={cx} cy={cy} r="7.2" fill="url(#gomo-b)" />
+              <circle key={`b${i}`} cx={cx} cy={cy} r="6" fill="url(#gomo-b)" />
             ))}
-            <circle cx="66" cy="42" r="7.2" fill="url(#gomo-w)" stroke="#b8aea0" strokeWidth="0.6" />
-            <circle cx="54" cy="54" r="7.2" fill="url(#gomo-w)" stroke="#b8aea0" strokeWidth="0.6" />
+            <circle cx="52" cy="52" r="6" fill="url(#gomo-w)" stroke="#b8aea0" strokeWidth="0.6" />
+            <circle cx="70" cy="66" r="6" fill="url(#gomo-w)" stroke="#b8aea0" strokeWidth="0.6" />
           </svg>
         </div>
       </div>
