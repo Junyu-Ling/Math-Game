@@ -461,11 +461,14 @@ function playUntil(start, step, cap, name) {
   fat = snake.applySnakeAction(fat, "you", { type: "boost", on: true });
   const beforeBoost = fat.players.find((p) => p.id === "you");
   ok("snake boost arms when held", beforeBoost.boosting === true);
-  for (let i = 0; i < 16; i++) fat = snake.stepSnake(fat);
+  for (let i = 0; i < 20; i++) {
+    fat = snake.applySnakeAction(fat, "you", { type: "boost", on: true });
+    fat = snake.stepSnake(fat);
+  }
   const afterBoost = fat.players.find((p) => p.id === "you");
   ok(
     "snake boost drains energy not length",
-    afterBoost.energy < beforeBoost.energy - 1 && afterBoost.score === beforeBoost.score,
+    afterBoost.alive && afterBoost.energy < beforeBoost.energy - 1 && afterBoost.score === beforeBoost.score,
   );
 
   let hungry = snake.startSnakePractice(0);

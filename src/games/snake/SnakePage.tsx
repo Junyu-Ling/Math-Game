@@ -238,6 +238,7 @@ export function SnakePage() {
   const lastNetRef = useRef(0);
   const lastAimSent = useRef<number | null>(null);
   const lastBoostSent = useRef(false);
+  const lastServerTickRef = useRef(-1);
   const [stickKnob, setStickKnob] = useState({ x: 0, y: 0 });
   const [stickLive, setStickLive] = useState(false);
 
@@ -271,6 +272,9 @@ export function SnakePage() {
 
   useEffect(() => {
     if (!serverView || practice) return;
+    // Ignore duplicate/stale snapshots — re-applying an old pose causes rubber-band teleports.
+    if (serverView.tick < lastServerTickRef.current) return;
+    lastServerTickRef.current = serverView.tick;
     liveRef.current = reconcileSnake(serverView, liveRef.current, youId);
     const me = youId ? liveRef.current.players.find((p) => p.id === youId) : undefined;
     setHud({

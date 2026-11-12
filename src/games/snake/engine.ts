@@ -426,9 +426,14 @@ export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
 /** Alias used by lobby tick. */
 export const stepSnakeWorld = stepSnake;
 
+function lerpAngle(a: number, b: number, t: number) {
+  return normAngle(a + normAngle(b - a) * t);
+}
+
 /**
- * Merge a server snapshot into local prediction without rubber-banding your own snake.
- * Others / foods / hard events (death, respawn) come from the server.
+ * Merge server into local prediction.
+ * Never hard-teleport yourself while both sides say you're alive — only death/respawn snaps.
+ * Other snakes are eased toward the server pose to avoid pops.
  */
 export function reconcileSnake(server: SnakeState, local: SnakeState | null, youId?: string): SnakeState {
   if (!local || !youId) return server;
@@ -436,36 +441,50 @@ export function reconcileSnake(server: SnakeState, local: SnakeState | null, you
   const theirs = server.players.find((p) => p.id === youId);
   if (!mine || !theirs) return server;
 
-  const hardEvent =
-    mine.alive !== theirs.alive ||
-    Boolean(mine.respawnAt) !== Boolean(theirs.respawnAt) ||
-    (theirs.alive && !mine.alive) ||
-    (mine.alive && theirs.alive && Math.hypot(mine.x - theirs.x, mine.y - theirs.y) > 14);
+  const lifeChanged = mine.alive !== theirs.alive;
 
-  const self = hardEvent
-    ? {
-        ...theirs,
-        aim: mine.aim,
-        boosting: mine.boosting && theirs.alive,
-      }
-    : {
-        ...mine,
-        id: theirs.id,
-        name: theirs.name,
-        human: theirs.human,
-        hue: theirs.hue,
-        score: theirs.score,
-        shieldUntil: theirs.shieldUntil,
-        // Keep local aim/boost/motion; gently pull energy toward server
-        energy: Math.abs(mine.energy - theirs.energy) > 25 ? theirs.energy : mine.energy,
-        aim: mine.aim,
-        boosting: mine.boosting && mine.alive,
-      };
+  let self: SnakePlayer;
+  if (lifeChanged) {
+    self = {
+      ...theirs,
+      aim: mine.aim,
+      boosting: mine.boosting && theirs.alive,
+    };
+  } else if (!theirs.alive) {
+    self = { ...theirs, aim: mine.aim, boosting: false };
+  } else {
+    // Fully trust local motion while alive — any positional pull looked like teleporting.
+    self = {
+      ...mine,
+      id: theirs.id,
+      name: theirs.name,
+      human: theirs.human,
+      hue: theirs.hue,
+      score: theirs.score,
+      shieldUntil: theirs.shieldUntil,
+      energy: Math.abs(mine.energy - theirs.energy) > 30 ? theirs.energy : mine.energy,
+      aim: mine.aim,
+      boosting: mine.boosting && mine.alive,
+      alive: true,
+      respawnAt: null,
+    };
+  }
 
+  const prevById = new Map(local.players.map((p) => [p.id, p]));
   return {
     ...server,
     tick: Math.max(server.tick, local.tick),
-    players: server.players.map((p) => (p.id === youId ? self : p)),
+    players: server.players.map((p) => {
+      if (p.id === youId) return self;
+      const prev = prevById.get(p.id);
+      if (!prev || !prev.alive || !p.alive) return p;
+      const t = 0.28;
+      const x = prev.x + (p.x - prev.x) * t;
+      const y = prev.y + (p.y - prev.y) * t;
+      const angle = lerpAngle(prev.angle, p.angle, t);
+      const path = p.path.length ? [{ x, y }, ...p.path.slice(1)] : [{ x, y }];
+      return { ...p, x, y, angle, path };
+    }),
   };
 }
 

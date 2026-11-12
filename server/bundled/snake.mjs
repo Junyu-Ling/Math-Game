@@ -342,33 +342,55 @@ function stepSnake(state, now = Date.now()) {
   };
 }
 var stepSnakeWorld = stepSnake;
+function lerpAngle(a, b, t) {
+  return normAngle(a + normAngle(b - a) * t);
+}
 function reconcileSnake(server, local, youId) {
   if (!local || !youId) return server;
   const mine = local.players.find((p) => p.id === youId);
   const theirs = server.players.find((p) => p.id === youId);
   if (!mine || !theirs) return server;
-  const hardEvent = mine.alive !== theirs.alive || Boolean(mine.respawnAt) !== Boolean(theirs.respawnAt) || theirs.alive && !mine.alive || mine.alive && theirs.alive && Math.hypot(mine.x - theirs.x, mine.y - theirs.y) > 14;
-  const self = hardEvent ? {
-    ...theirs,
-    aim: mine.aim,
-    boosting: mine.boosting && theirs.alive
-  } : {
-    ...mine,
-    id: theirs.id,
-    name: theirs.name,
-    human: theirs.human,
-    hue: theirs.hue,
-    score: theirs.score,
-    shieldUntil: theirs.shieldUntil,
-    // Keep local aim/boost/motion; gently pull energy toward server
-    energy: Math.abs(mine.energy - theirs.energy) > 25 ? theirs.energy : mine.energy,
-    aim: mine.aim,
-    boosting: mine.boosting && mine.alive
-  };
+  const lifeChanged = mine.alive !== theirs.alive;
+  let self;
+  if (lifeChanged) {
+    self = {
+      ...theirs,
+      aim: mine.aim,
+      boosting: mine.boosting && theirs.alive
+    };
+  } else if (!theirs.alive) {
+    self = { ...theirs, aim: mine.aim, boosting: false };
+  } else {
+    self = {
+      ...mine,
+      id: theirs.id,
+      name: theirs.name,
+      human: theirs.human,
+      hue: theirs.hue,
+      score: theirs.score,
+      shieldUntil: theirs.shieldUntil,
+      energy: Math.abs(mine.energy - theirs.energy) > 30 ? theirs.energy : mine.energy,
+      aim: mine.aim,
+      boosting: mine.boosting && mine.alive,
+      alive: true,
+      respawnAt: null
+    };
+  }
+  const prevById = new Map(local.players.map((p) => [p.id, p]));
   return {
     ...server,
     tick: Math.max(server.tick, local.tick),
-    players: server.players.map((p) => p.id === youId ? self : p)
+    players: server.players.map((p) => {
+      if (p.id === youId) return self;
+      const prev = prevById.get(p.id);
+      if (!prev || !prev.alive || !p.alive) return p;
+      const t = 0.28;
+      const x = prev.x + (p.x - prev.x) * t;
+      const y = prev.y + (p.y - prev.y) * t;
+      const angle = lerpAngle(prev.angle, p.angle, t);
+      const path = p.path.length ? [{ x, y }, ...p.path.slice(1)] : [{ x, y }];
+      return { ...p, x, y, angle, path };
+    })
   };
 }
 function viewSnake(state, viewerId) {
