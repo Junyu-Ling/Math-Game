@@ -230,14 +230,18 @@ export function SnakePage() {
     shieldLeft: number;
   } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const stickRef = useRef<HTMLDivElement | null>(null);
   const aimRef = useRef<number | null>(null);
   const boostRef = useRef(false);
+  const stickActiveRef = useRef(false);
   const camRef = useRef({ x: WORLD / 2, y: WORLD / 2 });
   const liveRef = useRef<SnakeState | null>(null);
   const lastNetRef = useRef(0);
   const lastAimSent = useRef<number | null>(null);
   const lastBoostSent = useRef(false);
   const serverAtRef = useRef(performance.now());
+  const [stickKnob, setStickKnob] = useState({ x: 0, y: 0 });
+  const [stickLive, setStickLive] = useState(false);
 
   const world = Boolean(room && (room.id === SNAKE_WORLD_ID || (room.view as SnakeState | undefined)?.mode === "world"));
   const practice = Boolean(local && !room);
@@ -433,7 +437,39 @@ export function SnakePage() {
     return () => window.cancelAnimationFrame(raf);
   }, [youId, world]);
 
+  function aimFromStick(clientX: number, clientY: number) {
+    const el = stickRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    let dx = clientX - cx;
+    let dy = clientY - cy;
+    const max = rect.width * 0.36;
+    const mag = Math.hypot(dx, dy);
+    // Tiny deadzone = higher stick sensitivity
+    if (mag < 4) {
+      setStickKnob({ x: 0, y: 0 });
+      return;
+    }
+    if (mag > max) {
+      dx = (dx / mag) * max;
+      dy = (dy / mag) * max;
+    }
+    setStickKnob({ x: dx, y: dy });
+    const angle = Math.atan2(dy, dx);
+    aimRef.current = angle;
+    applyLocal({ type: "aim", angle });
+  }
+
+  function endStick() {
+    stickActiveRef.current = false;
+    setStickLive(false);
+    setStickKnob({ x: 0, y: 0 });
+  }
+
   function aimFromPointer(clientX: number, clientY: number) {
+    if (stickActiveRef.current) return;
     const canvas = canvasRef.current;
     const state = liveRef.current;
     if (!canvas || !state || !youId) return;
@@ -576,7 +612,7 @@ export function SnakePage() {
                     {Math.round(hud?.energy ?? meLive?.energy ?? 0)} / {ENERGY_MAX}
                   </b>
                   <span className={`snake-energy-boost${hud?.boosting ? " on" : ""}${(meLive && canBoost(meLive)) || (hud?.energy ?? 0) > 0 ? "" : " dim"}`}>
-                    {hud?.boosting ? "BOOSTING" : "Hold Space / bar to boost"}
+                    {hud?.boosting ? "BOOSTING" : "Hold Space / BOOST"}
                   </span>
                 </div>
                 <button
@@ -605,7 +641,53 @@ export function SnakePage() {
                   />
                 </button>
               </div>
-              <p className="snake-hint">Mouse / WASD aim · eat to fill energy & grow · boost burns energy only</p>
+              <div className="snake-touch-bar" aria-label="Mobile controls">
+                <div
+                  ref={stickRef}
+                  className={`snake-stick${stickLive ? " active" : ""}`}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    stickActiveRef.current = true;
+                    setStickLive(true);
+                    stickRef.current?.setPointerCapture(e.pointerId);
+                    aimFromStick(e.clientX, e.clientY);
+                  }}
+                  onPointerMove={(e) => {
+                    if (!stickActiveRef.current) return;
+                    e.preventDefault();
+                    aimFromStick(e.clientX, e.clientY);
+                  }}
+                  onPointerUp={endStick}
+                  onPointerCancel={endStick}
+                >
+                  <span className="snake-stick-base" />
+                  <span className="snake-stick-knob" style={{ transform: `translate(${stickKnob.x}px, ${stickKnob.y}px)` }} />
+                </div>
+                <button
+                  type="button"
+                  className={`snake-boost-btn${hud?.boosting ? " on" : ""}${(hud?.energy ?? meLive?.energy ?? 0) <= 0 ? " empty" : ""}`}
+                  disabled={(hud?.energy ?? meLive?.energy ?? 0) <= 0 && !hud?.boosting}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    if ((hud?.energy ?? meLive?.energy ?? 0) <= 0) return;
+                    boostRef.current = true;
+                    applyLocal({ type: "boost", on: true });
+                  }}
+                  onPointerUp={() => {
+                    boostRef.current = false;
+                    applyLocal({ type: "boost", on: false });
+                  }}
+                  onPointerLeave={() => {
+                    if (!boostRef.current) return;
+                    boostRef.current = false;
+                    applyLocal({ type: "boost", on: false });
+                  }}
+                >
+                  BOOST
+                </button>
+              </div>
+              <p className="snake-hint">Mouse / WASD / stick · eat for energy & length · boost spends energy</p>
             </div>
           )}
         </div>
