@@ -335,7 +335,7 @@ function viewBjDuel(state, viewerId) {
     ...state,
     deck: [],
     players: state.players.map((p) => {
-      if (p.id === viewerId || showAll || p.stood) return p;
+      if (p.id === viewerId || showAll) return p;
       return {
         ...p,
         cards: p.cards.map(

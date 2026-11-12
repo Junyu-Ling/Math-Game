@@ -45,6 +45,88 @@ function playUntil(start, step, cap, name) {
 }
 
 {
+  const dash = (id, color) => ({ id, color, value: "joker", revealed: false });
+  const num = (id, color, value) => ({ id, color, value, revealed: false });
+  let open = coda.startCoda(true, 2, 2, 2);
+  open = {
+    ...open,
+    phase: "arrange",
+    resume: "draw",
+    arrangeId: 1,
+    players: open.players.map((p, i) =>
+      i === 0
+        ? {
+            ...p,
+            tiles: [num("n1", "black", 3), num("n2", "white", 8)],
+            stash: dash("d1", "black"),
+            queue: [dash("d2", "white")],
+          }
+        : { ...p, tiles: [num("c1", "black", 1)], stash: null, queue: [] },
+    ),
+    pending: dash("d1", "black"),
+    pendingSlot: 0,
+    stashSlots: { you: 0 },
+    drawn: dash("d1", "black"),
+  };
+  const first = coda.applyAction(open, "you", { type: "slot", index: 0 });
+  ok(
+    "coda opening first dash inserts immediately",
+    first.phase === "arrange" &&
+      first.resume === "draw" &&
+      first.arrangeId === open.arrangeId &&
+      first.players[0].stash?.id === "d2" &&
+      first.players[0].tiles.some((t) => t.id === "d1"),
+  );
+  const second = coda.applyAction(first, "you", { type: "slot", index: 1 });
+  ok(
+    "coda opening second dash inserts in same 5s window",
+    second.phase === "arrange" &&
+      second.arrangeId === open.arrangeId &&
+      !second.players[0].stash &&
+      (second.players[0].queue?.length ?? 0) === 0 &&
+      second.players[0].tiles.filter((t) => t.value === "joker").length === 2,
+  );
+  const locked = coda.finishArrange(second);
+  ok(
+    "coda opening finish drains without a second arrange",
+    locked.phase !== "arrange" && locked.players.every((p) => !p.stash && (p.queue?.length ?? 0) === 0),
+  );
+}
+
+{
+  const s = uno.startUnoPractice();
+  const v = uno.viewUno(s, "you");
+  const rival = v.players.find((p) => p.id !== "you");
+  ok(
+    "uno view hides rival card values",
+    Boolean(rival?.hand.length) && rival.hand.every((c) => c.value === undefined && c.kind === "wild"),
+  );
+}
+
+{
+  const s = bj.startBjPractice();
+  const you = s.players.find((p) => p.id === "you");
+  const cpu = s.players.find((p) => p.id === "cpu");
+  if (you && cpu) {
+    const mid = {
+      ...s,
+      turn: s.players.findIndex((p) => p.id === "cpu"),
+      players: s.players.map((p) =>
+        p.id === "you"
+          ? { ...p, stood: true, cards: [{ id: "a", rank: "9", suit: "H" }, { id: "b", rank: "8", suit: "S" }] }
+          : p,
+      ),
+    };
+    const v = bj.viewBjDuel(mid, "cpu");
+    const seen = v.players.find((p) => p.id === "you");
+    ok(
+      "bj view keeps stood rival hole masked until over",
+      Boolean(seen?.stood) && seen.cards[1]?.hidden === true,
+    );
+  }
+}
+
+{
   const s = uno.startUnoPractice();
   const me = s.players[s.turn];
   const wild4 = { id: "cheat-w4", color: "black", kind: "wild4" };

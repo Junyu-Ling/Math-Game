@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { aiC4, applyC4Action, COLS, dropRow, ROWS, startC4Practice, type C4Action, type C4State } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
 import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
@@ -154,7 +154,17 @@ export function C4Page() {
                             act({ type: "drop", col });
                           }}
                         >
-                          {v ? <span className={`c4-bead ${v === 1 ? "a" : "b"}`} /> : null}
+                          {v ? (
+                            <span
+                              key={last ? `drop-${state.last?.col}-${state.last?.row}` : `${col}-${row}`}
+                              className={`c4-bead ${v === 1 ? "a" : "b"}${last ? " drop" : ""}`}
+                              style={
+                                last
+                                  ? ({ ["--drop-cells"]: String(ROWS - row) } as CSSProperties)
+                                  : undefined
+                              }
+                            />
+                          ) : null}
                         </button>
                       );
                     });

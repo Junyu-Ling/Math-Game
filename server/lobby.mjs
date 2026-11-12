@@ -882,8 +882,9 @@ export async function snapshot(userId, light = false) {
 }
 
 async function expireArrange(room, force = false) {
-  const arranging = room.game === "coda" && room.state?.phase === "arrange";
-  const due = force && arranging ? true : Boolean(room.endsAt && Date.now() >= room.endsAt);
+  // Client "tick" may run a hair early — allow a tiny skew, never skip the deadline entirely.
+  const skewMs = force ? 120 : 0;
+  const due = Boolean(room.endsAt && Date.now() + skewMs >= room.endsAt);
   if (!due) return;
   if (room.game === "coda") {
     if (room.state.phase === "arrange") {
@@ -1150,7 +1151,7 @@ function mixCodaCpus(state, mods) {
   return next;
 }
 
-const CPU_THINK_MS = 1000;
+const CPU_THINK_MS = 400;
 
 function cpuIsToAct(room) {
   const s = room?.state;

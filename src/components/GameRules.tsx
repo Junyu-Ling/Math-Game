@@ -16,7 +16,7 @@ const RULES: Record<string, string[]> = {
     "2–4 players. Each player picks their own black/white opening mix, then ready. The deal waits until everyone is ready.",
     "On your draw, pick black or white. You cannot draw a color that is gone.",
     "Each color has 0–11 plus one dash. The dash is shuffled in with the numbers, so it is not guaranteed in the opening hand.",
-    "The veil is opening-only. Inserts wait the full 5 seconds even after you pick a slot.",
+    "The veil is opening-only. Opening dashes insert one by one inside one 5s window — two dashes must both land before it ends. Mid-turn inserts still wait the full 5 seconds.",
     "After the opening deal, two players play rock-paper-scissors and the loser guesses first. With 3 or 4, a random player draws first.",
     "When the deck is empty, play continues. Skip the draw and guess. A hit lets you guess again or end the turn. A miss knocks down one of your own hidden tiles.",
   ],
@@ -492,7 +492,7 @@ export function GameRules({ game }: { game: string }) {
           },
         ]}
         notes={[
-          "The veil is opening-only. Inserts wait the full 5 seconds even after you pick a slot.",
+          "The veil is opening-only. Opening dashes insert one by one in one 5s window. Mid-turn inserts still wait the full 5 seconds.",
           "Two players play rock-paper-scissors and the loser guesses first. With 3 or 4, a random player draws first.",
           "When the deck is empty, skip the draw and keep guessing.",
         ]}

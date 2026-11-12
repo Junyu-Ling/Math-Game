@@ -74,6 +74,7 @@
   grid-template-rows: repeat(6, var(--hole));
   gap: var(--gap);
   padding: 14px 16px 18px;
+  overflow: hidden;
   background: linear-gradient(180deg, #3b82f6, #1d4ed8 52%, #1e40af);
   border-radius: 12px 12px 6px 6px;
   box-shadow:
@@ -122,6 +123,19 @@
   box-shadow:
     inset -5px -6px 8px rgba(0, 0, 0, 0.18),
     inset 4px 4px 7px rgba(255, 255, 255, 0.38);
+}
+
+.c4-bead.drop {
+  animation: c4-drop calc(0.09s * var(--drop-cells, 1) + 0.14s) cubic-bezier(0.22, 0.82, 0.28, 1) both;
+}
+
+@keyframes c4-drop {
+  from {
+    transform: translateY(calc(-1 * var(--drop-cells, 1) * (var(--hole) + var(--gap))));
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 .c4-bead.a,

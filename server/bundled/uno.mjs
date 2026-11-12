@@ -385,11 +385,12 @@ function labelUno(card) {
   return "wild";
 }
 function viewUno(state, viewerId) {
+  const mask = (id) => ({ id, color: "black", kind: "wild", hidden: true });
   return {
     ...state,
-    deck: state.deck.map((c, i) => ({ ...c, id: `d${i}`, hidden: true, color: "black", kind: "wild" })),
+    deck: state.deck.map((_, i) => mask(`d${i}`)),
     players: state.players.map(
-      (p) => p.id === viewerId ? p : { ...p, hand: p.hand.map((c, i) => ({ ...c, id: `${p.id}-${i}`, hidden: true, color: "black", kind: "wild" })) }
+      (p) => p.id === viewerId ? p : { ...p, hand: p.hand.map((_, i) => mask(`${p.id}-${i}`)) }
     )
   };
 }

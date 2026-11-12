@@ -371,7 +371,8 @@ export function viewBjDuel(state: BjDuelState, viewerId: string): BjDuelState {
     ...state,
     deck: [],
     players: state.players.map((p) => {
-      if (p.id === viewerId || showAll || p.stood) return p;
+      if (p.id === viewerId || showAll) return p;
+      // Keep hole/extra cards masked while the other seat still acts — stood totals stay private until over.
       return {
         ...p,
         cards: p.cards.map((c, i) =>

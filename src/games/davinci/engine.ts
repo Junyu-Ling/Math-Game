@@ -441,7 +441,7 @@ function enterArrange(state: CodaState, pending: CodaTile | null, resume: "draw"
         id: uid("l"),
         text:
           resume === "draw"
-            ? "Opening arrange 5s: the tile stays out, then locks after insert."
+            ? "Opening arrange 5s: tap gaps to insert each dash one by one before the clock ends."
             : "Arrange 5s: the new tile stays out. Wait out the timer even after you pick a slot.",
       },
     ],
@@ -741,19 +741,65 @@ export function stay(state: CodaState): CodaState {
   );
 }
 
+function openingDashLeft(player: CodaPlayer): number {
+  return (player.stash ? 1 : 0) + (player.queue?.length ?? 0);
+}
+
+/** Opening: insert the current dash immediately, then promote the next queued dash. Same 5s window. */
+function insertOpeningDash(state: CodaState, actor: CodaPlayer, index: number): CodaState {
+  if (!actor.stash) return state;
+  const allowed = insertIndices(actor.tiles, actor.stash);
+  if (!allowed.includes(index)) return state;
+  const tiles = [...actor.tiles];
+  tiles.splice(index, 0, actor.stash);
+  const [nextStash, ...queue] = actor.queue ?? [];
+  const players = state.players.map((p) =>
+    p.id === actor.id ? { ...p, tiles, stash: nextStash ?? null, queue } : p,
+  );
+  const stashSlots: Partial<Record<string, number>> = { ...state.stashSlots };
+  delete stashSlots[actor.id];
+  for (const p of players) {
+    if (p.stash && stashSlots[p.id] === undefined) {
+      stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
+    }
+  }
+  const first = players.find((p) => p.stash);
+  const left = openingDashLeft(players.find((p) => p.id === actor.id)!);
+  return {
+    ...state,
+    players,
+    stashSlots,
+    pending: first?.stash ?? null,
+    pendingSlot: first ? (stashSlots[first.id] ?? 0) : null,
+    drawn: first?.stash ?? null,
+    log: [
+      ...state.log,
+      {
+        id: uid("l"),
+        text:
+          left > 0
+            ? `${actor.name} inserts a dash. ${left} more to place in this 5s.`
+            : `${actor.name} inserts a dash.`,
+      },
+    ],
+  };
+}
+
+function drainOpeningDashes(player: CodaPlayer, preferred: number | null): CodaPlayer {
+  let cur = player;
+  let guard = 0;
+  while ((cur.stash || (cur.queue ?? []).length > 0) && guard++ < 8) {
+    cur = lockOpeningDash(cur, preferred);
+  }
+  return { ...cur, stash: null, queue: [] };
+}
+
 export function setPendingSlot(state: CodaState, index: number, actorId?: string): CodaState {
   if (state.phase !== "arrange") return state;
   const actor = actorId ? state.players.find((p) => p.id === actorId) : currentPlayer(state);
   if (!actor) return state;
   if (actor.stash && state.resume === "draw") {
-    const allowed = insertIndices(actor.tiles, actor.stash);
-    if (!allowed.includes(index)) return state;
-    const next: CodaState = {
-      ...state,
-      stashSlots: { ...state.stashSlots, [actor.id]: index },
-    };
-    if (state.pending && state.pending.id === actor.stash.id) next.pendingSlot = index;
-    return next;
+    return insertOpeningDash(state, actor, index);
   }
   if (!state.pending || actor.id !== currentPlayer(state).id) return state;
   const row = state.humanDraft ?? actor.tiles;
@@ -783,27 +829,8 @@ function lockOpeningDash(player: CodaPlayer, preferred: number | null): CodaPlay
 export function finishArrange(state: CodaState): CodaState {
   if (state.phase !== "arrange") return state;
   if (state.resume === "draw") {
-    const players = state.players.map((p) => lockOpeningDash(p, state.stashSlots[p.id] ?? null));
-    if (players.some((p) => p.stash)) {
-      const stashSlots: Partial<Record<string, number>> = {};
-      for (const p of players) {
-        if (p.stash) stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
-      }
-      const first = players.find((p) => p.stash);
-      return {
-        ...state,
-        players,
-        phase: "arrange",
-        resume: "draw",
-        arrangeId: state.arrangeId + 1,
-        stashSlots,
-        pending: first?.stash ?? null,
-        pendingSlot: first ? (stashSlots[first.id] ?? 0) : null,
-        humanDraft: null,
-        drawn: first?.stash ?? null,
-        log: [...state.log, { id: uid("l"), text: "Opening arrange." }],
-      };
-    }
+    // One 5s window for every opening dash — drain leftovers instead of starting another timer.
+    const players = state.players.map((p) => drainOpeningDashes(p, state.stashSlots[p.id] ?? null));
     let next: CodaState = {
       ...state,
       players,

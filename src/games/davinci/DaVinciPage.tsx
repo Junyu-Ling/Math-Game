@@ -48,7 +48,14 @@ type Flash = {
   index?: number;
 };
 
-function statusText(state: CodaState, myTurn: boolean, remain: number, matching: boolean, ownDash = false): string {
+function statusText(
+  state: CodaState,
+  myTurn: boolean,
+  remain: number,
+  matching: boolean,
+  ownDash = false,
+  dashLeft = 0,
+): string {
   if (matching) return "Waiting for the invite to be accepted.";
   if (state.phase === "lobby") {
     const ready = state.players.filter((p) => p.ready).length;
@@ -65,9 +72,12 @@ function statusText(state: CodaState, myTurn: boolean, remain: number, matching:
   }
   if (state.phase === "arrange") {
     if (state.resume === "draw") {
-      return ownDash
-        ? `Opening arrange ${remain.toFixed(1)}s. Your new tile stays face-down — tap a gap so it sits in number order. Wait the full 5 seconds.`
-        : `Opening arrange ${remain.toFixed(1)}s. Tiles slide into order. Wait the full 5 seconds even after a slot is picked.`;
+      if (ownDash) {
+        return dashLeft > 1
+          ? `Opening arrange ${remain.toFixed(1)}s. Insert both dashes one by one before the clock ends — tap a gap for each.`
+          : `Opening arrange ${remain.toFixed(1)}s. Tap a gap to insert your dash now. Leftovers lock when the 5s ends.`;
+      }
+      return `Opening arrange ${remain.toFixed(1)}s. Rivals insert their dashes one by one in this same 5s.`;
     }
     return `Arrange ${remain.toFixed(1)}s. Insert the tile in order (small to large). The clock always runs the full 5 seconds.`;
   }
@@ -559,6 +569,7 @@ export function DaVinciPage() {
   }, [state, me, arranging, online, heldCoda, you?.id]);
 
   const numbers = useMemo(() => Array.from({ length: 12 }, (_, i) => i), []);
+  const openingDashLeft = you ? (you.stash ? 1 : 0) + (you.queue?.length ?? 0) : 0;
   const ownOpeningDash = Boolean(opening && you?.stash);
   const drawnTile = ownOpeningDash ? you?.stash ?? null : opening ? null : (state?.drawn ?? null);
   const showDrawn = Boolean(
@@ -1019,7 +1030,7 @@ export function DaVinciPage() {
                 : waiting && state
                   ? statusText(state, false, remain, false)
                   : playing && state
-                    ? statusText(state, myTurn, remain, false, ownOpeningDash)
+                    ? statusText(state, myTurn, remain, false, ownOpeningDash, openingDashLeft)
                     : `Opening mix: black ${blackN} · white ${whiteN}${seats > 2 ? ` · ${seats}P` : ""}`}
             </p>
           </div>

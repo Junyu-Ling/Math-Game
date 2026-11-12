@@ -356,7 +356,7 @@ function enterArrange(state, pending, resume) {
       ...state.log,
       {
         id: uid("l"),
-        text: resume === "draw" ? "Opening arrange 5s: the tile stays out, then locks after insert." : "Arrange 5s: the new tile stays out. Wait out the timer even after you pick a slot."
+        text: resume === "draw" ? "Opening arrange 5s: tap gaps to insert each dash one by one before the clock ends." : "Arrange 5s: the new tile stays out. Wait out the timer even after you pick a slot."
       }
     ]
   };
@@ -627,19 +627,58 @@ function stay(state) {
     "next"
   );
 }
+function openingDashLeft(player) {
+  return (player.stash ? 1 : 0) + (player.queue?.length ?? 0);
+}
+function insertOpeningDash(state, actor, index) {
+  if (!actor.stash) return state;
+  const allowed = insertIndices(actor.tiles, actor.stash);
+  if (!allowed.includes(index)) return state;
+  const tiles = [...actor.tiles];
+  tiles.splice(index, 0, actor.stash);
+  const [nextStash, ...queue] = actor.queue ?? [];
+  const players = state.players.map(
+    (p) => p.id === actor.id ? { ...p, tiles, stash: nextStash ?? null, queue } : p
+  );
+  const stashSlots = { ...state.stashSlots };
+  delete stashSlots[actor.id];
+  for (const p of players) {
+    if (p.stash && stashSlots[p.id] === void 0) {
+      stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
+    }
+  }
+  const first = players.find((p) => p.stash);
+  const left = openingDashLeft(players.find((p) => p.id === actor.id));
+  return {
+    ...state,
+    players,
+    stashSlots,
+    pending: first?.stash ?? null,
+    pendingSlot: first ? stashSlots[first.id] ?? 0 : null,
+    drawn: first?.stash ?? null,
+    log: [
+      ...state.log,
+      {
+        id: uid("l"),
+        text: left > 0 ? `${actor.name} inserts a dash. ${left} more to place in this 5s.` : `${actor.name} inserts a dash.`
+      }
+    ]
+  };
+}
+function drainOpeningDashes(player, preferred) {
+  let cur = player;
+  let guard = 0;
+  while ((cur.stash || (cur.queue ?? []).length > 0) && guard++ < 8) {
+    cur = lockOpeningDash(cur, preferred);
+  }
+  return { ...cur, stash: null, queue: [] };
+}
 function setPendingSlot(state, index, actorId) {
   if (state.phase !== "arrange") return state;
   const actor = actorId ? state.players.find((p) => p.id === actorId) : currentPlayer(state);
   if (!actor) return state;
   if (actor.stash && state.resume === "draw") {
-    const allowed2 = insertIndices(actor.tiles, actor.stash);
-    if (!allowed2.includes(index)) return state;
-    const next = {
-      ...state,
-      stashSlots: { ...state.stashSlots, [actor.id]: index }
-    };
-    if (state.pending && state.pending.id === actor.stash.id) next.pendingSlot = index;
-    return next;
+    return insertOpeningDash(state, actor, index);
   }
   if (!state.pending || actor.id !== currentPlayer(state).id) return state;
   const row = state.humanDraft ?? actor.tiles;
@@ -666,27 +705,7 @@ function lockOpeningDash(player, preferred) {
 function finishArrange(state) {
   if (state.phase !== "arrange") return state;
   if (state.resume === "draw") {
-    const players2 = state.players.map((p) => lockOpeningDash(p, state.stashSlots[p.id] ?? null));
-    if (players2.some((p) => p.stash)) {
-      const stashSlots = {};
-      for (const p of players2) {
-        if (p.stash) stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
-      }
-      const first = players2.find((p) => p.stash);
-      return {
-        ...state,
-        players: players2,
-        phase: "arrange",
-        resume: "draw",
-        arrangeId: state.arrangeId + 1,
-        stashSlots,
-        pending: first?.stash ?? null,
-        pendingSlot: first ? stashSlots[first.id] ?? 0 : null,
-        humanDraft: null,
-        drawn: first?.stash ?? null,
-        log: [...state.log, { id: uid("l"), text: "Opening arrange." }]
-      };
-    }
+    const players2 = state.players.map((p) => drainOpeningDashes(p, state.stashSlots[p.id] ?? null));
     let next2 = {
       ...state,
       players: players2,
