@@ -16,7 +16,7 @@ var SPEED = 0.58;
 var BOOST_MULT = 1.85;
 var BOOST_DRAIN_EVERY = 5;
 var MIN_BOOST_SCORE = 1;
-var TURN_RATE = 0.16;
+var TURN_RATE = 0.3;
 var HEAD_R = 1.35;
 var FOOD_R = 0.85;
 var PATH_STEP = 0.55;
@@ -252,7 +252,7 @@ function stepSnake(state, now = Date.now()) {
     }
     const boosting = Boolean(p.boosting) && canBoost(p);
     const spd = boosting ? SPEED * BOOST_MULT : SPEED;
-    const angle = turnToward(p.angle, p.aim, TURN_RATE * (boosting ? 0.85 : 1));
+    const angle = turnToward(p.angle, p.aim, TURN_RATE * (boosting ? 0.95 : 1));
     const x = p.x + Math.cos(angle) * spd;
     const y = p.y + Math.sin(angle) * spd;
     let path = [{ x, y }, ...p.path];
@@ -334,7 +334,7 @@ function predictSelf(state, youId, ticks) {
       for (let i = 0; i < n; i++) {
         boosting = boosting && canBoost({ alive: true, score, path });
         const spd = boosting ? SPEED * BOOST_MULT : SPEED;
-        angle = turnToward(angle, p.aim, TURN_RATE * (boosting ? 0.85 : 1));
+        angle = turnToward(angle, p.aim, TURN_RATE * (boosting ? 0.95 : 1));
         x += Math.cos(angle) * spd;
         y += Math.sin(angle) * spd;
         path = [{ x, y }, ...path];

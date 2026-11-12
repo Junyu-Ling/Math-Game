@@ -265,9 +265,9 @@ export function SnakePage() {
     const now = performance.now();
     if (action.type === "aim") {
       if (
-        now - lastNetRef.current < 24 &&
+        now - lastNetRef.current < 16 &&
         lastAimSent.current != null &&
-        Math.abs(normDiff(lastAimSent.current, action.angle)) < 0.06
+        Math.abs(normDiff(lastAimSent.current, action.angle)) < 0.04
       ) {
         return;
       }
