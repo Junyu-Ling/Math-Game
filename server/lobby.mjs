@@ -1,7 +1,9 @@
 import Redis from "ioredis";
 import { loadMods } from "./game-mods.mjs";
 import { rapfiAvailable, rapfiSuggest } from "./rapfi.mjs";
-import { SOLO_GAMES, applyForfeit, isLiveMatchState, isLobbyState, withForfeitView } from "./forfeit.mjs";
+import { SOLO_GAMES, WORLD_GAMES, applyForfeit, isLiveMatchState, isLobbyState, withForfeitView } from "./forfeit.mjs";
+
+const SNAKE_WORLD_ID = "snake-world";
 
 const ONLINE_SEC = 20;
 const INVITE_SEC = 60;
@@ -905,27 +907,31 @@ async function expireArrange(room, force = false) {
   } else if (room.game === "gomoku" && room.state.rpsReveal && room.mods.gomoku.finishGomokuRps) {
     room.state = room.mods.gomoku.finishGomokuRps(room.state);
   } else if (room.game === "snake") {
-    if (room.state.phase === "countdown" && room.mods.snake.finishCountdown) {
-      room.state = room.mods.snake.finishCountdown(room.state);
-      if (room.state.phase === "play") {
-        room.endsAt = Date.now() + (room.mods.snake.TICK_MS || 160);
-        armCpuThink(room);
-        room.seq = (room.seq || 0) + 1;
-        await saveRoom(room);
-        return;
-      }
-    } else if (room.state.phase === "play" && room.mods.snake.stepSnake) {
-      room.state = room.mods.snake.stepSnake(room.state);
-      if (room.state.phase === "play") {
-        room.endsAt = Date.now() + (room.mods.snake.TICK_MS || 160);
-        armCpuThink(room);
-        room.seq = (room.seq || 0) + 1;
-        await saveRoom(room);
-        return;
-      }
-    } else {
+    const humans = (room.state.players || []).filter((p) => p.human !== false);
+    if (!humans.length) {
+      room.endsAt = null;
+      room.seq = (room.seq || 0) + 1;
+      await saveRoom(room);
       return;
     }
+    if (room.mods.snake.stepSnake) {
+      room.state = room.mods.snake.stepSnake(room.state, Date.now());
+      // Practice bots in a private room still get AI aims each tick.
+      if (room.id !== SNAKE_WORLD_ID) {
+        for (const p of room.state.players || []) {
+          if (p.human === false && p.alive) {
+            room.state = room.mods.snake.applySnakeAction(room.state, p.id, room.mods.snake.aiSnake(room.state, p.id));
+          }
+        }
+      }
+      room.endsAt = Date.now() + (room.mods.snake.TICK_MS || 60);
+      room.seats = (room.state.players || []).filter((p) => p.human !== false).map((p) => String(p.id));
+      armCpuThink(room);
+      room.seq = (room.seq || 0) + 1;
+      await saveRoom(room);
+      return;
+    }
+    return;
   } else {
     return;
   }
@@ -938,6 +944,7 @@ async function expireArrange(room, force = false) {
 export async function createInvite(from, toId, game, meta = {}) {
   const fromId = String(from.id);
   toId = String(toId);
+  if (String(game) === "snake") throw new Error("Snake is a shared world — open /play/snake to join everyone online");
   if (fromId === toId) throw new Error("You cannot invite yourself");
   // Per-friend cooldown: same target needs 5s; other friends are independent.
   const cdKey = `axiom:invcd:${fromId}:${toId}`;
@@ -1542,7 +1549,7 @@ const OPEN_TABLES = new Set([
   "gomoku",
   "ttt",
   "c4",
-  "snake",
+  // snake is a shared world — not an open table
   "ecard",
   "bj",
   "m24",
@@ -1622,9 +1629,10 @@ export async function applyRoomAction(user, roomId, action, mods) {
     room.state = mods.c4.applyC4Action(room.state, user.id, action);
   } else if (room.game === "snake") {
     room.state = mods.snake.applySnakeAction(room.state, user.id, action);
-    if (room.state.phase === "countdown" && before.phase !== "countdown") {
-      room.endsAt = Date.now() + (mods.snake.COUNTDOWN_MS || 3000);
+    if (!room.endsAt || room.endsAt < Date.now()) {
+      room.endsAt = Date.now() + (mods.snake.TICK_MS || 60);
     }
+    await syncSnakeSeats(room);
   } else if (room.game === "werewolf") {
     room.state = mods.werewolf.applyWerewolfAction(room.state, user.id, action);
   } else if (room.game === "ludo") {
@@ -1714,12 +1722,75 @@ async function forfeitIfAbsent(rec, exceptId) {
   return rec;
 }
 
+async function syncSnakeSeats(rec) {
+  rec.seats = (rec.state?.players || []).filter((p) => p.human !== false).map((p) => String(p.id));
+  rec.faces = await seatFaces(rec.seats);
+}
+
+export async function joinSnakeWorld(user) {
+  const mods = await getMods();
+  const userId = String(user.id);
+  await touchPresence(user);
+  await leaveQueue(userId);
+  const seated = await getSeat(userId);
+  if (seated && seated !== SNAKE_WORLD_ID) {
+    const prior = await attachMods(await getRoomRecord(seated));
+    if (prior) await vacateSeat(userId, prior);
+    else await kvDel(`axiom:seat:${userId}`);
+  }
+  let rec = await attachMods(await getRoomRecord(SNAKE_WORLD_ID));
+  if (!rec) {
+    rec = {
+      id: SNAKE_WORLD_ID,
+      game: "snake",
+      seats: [],
+      faces: [],
+      state: mods.snake.createSnakeWorld(),
+      endsAt: null,
+      seq: 1,
+      mods,
+      readyIds: [],
+      matched: false,
+      seekingMatch: false,
+    };
+  } else {
+    rec = { ...rec, mods };
+  }
+  rec.state = mods.snake.joinSnake(rec.state, {
+    id: userId,
+    name: playerName(user),
+    human: true,
+  });
+  await syncSnakeSeats(rec);
+  if (!rec.endsAt || rec.endsAt < Date.now()) {
+    rec.endsAt = Date.now() + (mods.snake.TICK_MS || 60);
+  }
+  rec.seq = (rec.seq || 0) + 1;
+  await saveRoom(rec);
+  await wakeUsers(rec.seats);
+  return snapshot(userId);
+}
+
 export async function leaveRoom(userId) {
   await leaveQueue(userId);
   const rid = await getSeat(userId);
   if (!rid) return snapshot(userId);
   const rec = await attachMods(await getRoomRecord(rid));
   if (!rec) {
+    await kvDel(`axiom:seat:${userId}`);
+    return snapshot(userId);
+  }
+
+  // Shared snake world: drop the snake, keep the map alive.
+  if (rec.game === "snake" && (rec.id === SNAKE_WORLD_ID || rec.state?.mode === "world" || WORLD_GAMES.has(rec.game))) {
+    if (rec.mods?.snake?.leaveSnake) {
+      rec.state = rec.mods.snake.leaveSnake(rec.state, userId);
+      await syncSnakeSeats(rec);
+      if (!rec.seats.length) rec.endsAt = null;
+      rec.seq = (rec.seq || 0) + 1;
+      await saveRoom(rec);
+      await wakeUsers(rec.seats);
+    }
     await kvDel(`axiom:seat:${userId}`);
     return snapshot(userId);
   }
@@ -1866,6 +1937,7 @@ async function vacateSeat(userId, rec) {
 export async function adjustCpu(user, game, mode, mods, meta = {}) {
   mods = mods || (await getMods());
   game = String(game || "");
+  if (game === "snake") return joinSnakeWorld(user);
   if (!OPEN_TABLES.has(game)) throw new Error("This game has no open table");
   const userId = String(user.id);
   const hostSeat = await getSeat(userId);
@@ -2292,6 +2364,7 @@ async function createMatchedRoom(tickets, game, mods) {
 
 export async function enqueueMatch(user, game, meta = {}) {
   game = String(game || "");
+  if (game === "snake") return joinSnakeWorld(user);
   if (!OPEN_TABLES.has(game)) throw new Error("This game has no matchmaking");
   const userId = String(user.id);
   await touchPresence(user);

@@ -295,69 +295,58 @@ function playUntil(start, step, cap, name) {
   ok("c4 AI vs AI finishes", finished === games);
 }
 
-/* ---------- snake ---------- */
+/* ---------- snake (continuous world) ---------- */
 
 {
-  let s = snake.startSnakePractice();
-  ok("snake starts on countdown", s.phase === "countdown");
-  ok("snake arena is larger than the camera window", snake.COLS > snake.VIEW_COLS && snake.ROWS > snake.VIEW_ROWS);
-  const cam = snake.cameraOrigin({ x: 2, y: 2 });
-  ok("snake camera clamps near the corner", cam.ox === 0 && cam.oy === 0);
+  let s = snake.startSnakePractice(2);
+  ok("snake practice starts in play", s.phase === "play" && s.mode === "practice");
+  ok("snake world is larger than the camera view", snake.WORLD > snake.VIEW_RADIUS * 2);
   const you = s.players.find((p) => p.id === "you");
-  const reverse = snake.applySnakeAction(s, "you", { type: "dir", x: -you.dir.x, y: -you.dir.y });
-  const after = reverse.players.find((p) => p.id === "you");
-  ok("snake blocks a 180 reverse", after.pending.x === you.dir.x && after.pending.y === you.dir.y);
+  const aimed = snake.applySnakeAction(s, "you", { type: "aim", angle: Math.PI / 2 });
+  const after = aimed.players.find((p) => p.id === "you");
+  ok("snake aim updates facing intent", Math.abs(after.aim - Math.PI / 2) < 1e-6);
 
-  const steal = snake.applySnakeAction(s, "cpu", { type: "dir", x: 0, y: 1 });
-  const cpu = steal.players.find((p) => p.id === "cpu");
-  ok("snake CPU can steer during countdown", cpu.pending.y === 1 || cpu.dir.x === -1);
+  const ghost = snake.applySnakeAction(s, "nobody", { type: "aim", angle: 0 });
+  ok("snake ignores unknown actor", ghost.players[0].aim === s.players[0].aim);
 
-  const ghost = snake.applySnakeAction(s, "nobody", { type: "dir", x: 0, y: 1 });
-  ok("snake ignores unknown actor", ghost.players[0].pending.x === s.players[0].pending.x);
+  let stepped = s;
+  for (let i = 0; i < 12; i++) stepped = snake.stepSnake(stepped);
+  const moved = stepped.players.find((p) => p.id === "you");
+  ok("snake moves along path", Boolean(moved) && (moved.x !== you.x || moved.y !== you.y) && moved.path.length >= 2);
 
-  s = snake.finishCountdown(s);
   const wall = {
     ...s,
     players: s.players.map((p) =>
-      p.id === "you" ? { ...p, body: [{ x: 0, y: 0 }], dir: { x: -1, y: 0 }, pending: { x: -1, y: 0 } } : p,
+      p.id === "you"
+        ? { ...p, x: 0.2, y: 10, angle: Math.PI, aim: Math.PI, path: [{ x: 0.2, y: 10 }], alive: true, respawnAt: null }
+        : p,
     ),
   };
   const crashed = snake.stepSnake(wall);
-  ok("snake dies on a wall", crashed.players.find((p) => p.id === "you").alive === false);
+  const dead = crashed.players.find((p) => p.id === "you");
+  ok("snake dies on a wall", dead.alive === false && dead.respawnAt != null);
 
-  const view = snake.viewSnake(
-    snake.applySnakeAction(s, "cpu", { type: "dir", x: 0, y: 1 }),
-    "you",
-  );
-  const seenCpu = view.players.find((p) => p.id === "cpu");
-  ok("snake view hides rival pending turn", seenCpu.pending.x === seenCpu.dir.x && seenCpu.pending.y === seenCpu.dir.y);
+  const revived = snake.stepSnake(crashed, dead.respawnAt + 1);
+  ok("snake respawns after delay", revived.players.find((p) => p.id === "you").alive === true);
 
-  let ended = 0;
-  for (let g = 0; g < 8; g++) {
-    let st = snake.startSnakeDuel({ id: "a", name: "A", human: false }, { id: "b", name: "B", human: false });
-    st = snake.finishCountdown(st);
-    for (let t = 0; t < 800; t++) {
-      for (const p of st.players) {
-        if (p.alive) st = snake.applySnakeAction(st, p.id, snake.aiSnake(st, p.id));
-      }
-      st = snake.stepSnake(st);
-      if (st.phase === "over") break;
+  let world = snake.createSnakeWorld();
+  world = snake.joinSnake(world, { id: "a", name: "A" });
+  world = snake.joinSnake(world, { id: "b", name: "B" });
+  ok("snake world seats joiners", world.players.length === 2 && world.mode === "world");
+  world = snake.leaveSnake(world, "a");
+  ok("snake world removes leavers", world.players.length === 1 && world.players[0].id === "b");
+
+  let bots = snake.startSnakePractice(3);
+  for (let t = 0; t < 200; t++) {
+    for (const p of bots.players) {
+      if (!p.human && p.alive) bots = snake.applySnakeAction(bots, p.id, snake.aiSnake(bots, p.id));
     }
-    if (st.phase === "over") ended += 1;
+    bots = snake.stepSnake(bots);
   }
-  ok("snake AI vs AI reaches a result", ended === 8);
+  ok("snake practice AI runs without crashing", bots.phase === "play" && bots.players.length >= 2);
 
-  let four = snake.startSnakePractice(4);
-  ok("snake practice seats 4", four.players.length === 4);
-  four = snake.finishCountdown(four);
-  for (let t = 0; t < 800; t++) {
-    for (const p of four.players) {
-      if (!p.human && p.alive) four = snake.applySnakeAction(four, p.id, snake.aiSnake(four, p.id));
-    }
-    four = snake.stepSnake(four);
-    if (four.phase === "over") break;
-  }
-  ok("snake 4-seat practice ends", four.phase === "over");
+  const view = snake.viewSnake(bots, "you");
+  ok("snake view keeps the viewer snake", Boolean(view.players.find((p) => p.id === "you")));
 }
 
 /* ---------- other live tables: AI vs AI, no crash ---------- */

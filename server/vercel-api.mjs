@@ -20,6 +20,7 @@ import {
   findAccountByEmail,
   findAccountById,
   heartbeat,
+  joinSnakeWorld,
   leaveQueue,
   leaveRoom,
   lobbyStoreKind,
@@ -312,6 +313,10 @@ export async function handle(req, res, path) {
       }
       if (op === "queue") {
         send(res, 200, await enqueueMatch(user, String(body.game || ""), body.meta || {}));
+        return;
+      }
+      if (op === "snakeJoin") {
+        send(res, 200, await joinSnakeWorld(user));
         return;
       }
       if (op === "unqueue") {

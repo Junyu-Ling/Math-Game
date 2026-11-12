@@ -55,7 +55,7 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
         <p>Connect Four is heads-up. Open a table, add a CPU or invite one friend, then start. Drop into a column; four in a row wins.</p>
       ) : null}
       {game === "snake" ? (
-        <p>Snake is 2–4 on a large scrolling map. Open a table, add CPUs or invite, then start. Arrows or WASD. Last snake alive — or first to 8 apples — wins.</p>
+        <p>Snake is a shared world — no invites. Open /play/snake while signed in to join everyone else on the twisting map.</p>
       ) : null}
       {/* Deferred — Werewolf */}
       {game === "bj" ? (

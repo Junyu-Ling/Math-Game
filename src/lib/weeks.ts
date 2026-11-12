@@ -108,7 +108,7 @@ export const CATALOG: CatalogGame[] = [
     idx: "13",
     code: "SNAKE",
     name: "Snake",
-    blurb: "Large scrolling map. Steer, eat apples, don’t crash. Last snake alive — or first to 8 — wins.",
+    blurb: "Shared twisting arena. Everyone on /play/snake is on one map. Bend, eat, respawn.",
     preview: "snake",
     week: "steam",
   },

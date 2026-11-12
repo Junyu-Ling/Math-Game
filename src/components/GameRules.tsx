@@ -65,8 +65,8 @@ const RULES: Record<string, string[]> = {
     "Four of yours in a row — across, down, or diagonal — wins. A full grid with no four is a draw.",
   ],
   snake: [
-    "2–4 players on a 48×32 arena. The on-screen window follows your head. Open a table, add CPUs or invite, then start. Steer with arrows or WASD (or the on-screen pads).",
-    "Eat apples to grow and score. Hitting a wall, yourself, or another snake kills you. Last snake alive — or first to 8 apples — wins.",
+    "Shared world: sign in and open Snake — every online player on this page is on the same continuous map. The camera follows your head.",
+    "Aim with arrows or WASD. Your body bends as you turn. Eat pellets to grow. Hit a wall or another snake and you respawn. Practice vs CPU works offline.",
   ],
   ludo: [
     "2–4 players. Each color has four planes. Practice is you (blue) plus 1–3 CPUs.",
@@ -775,17 +775,17 @@ export function GameRules({ game }: { game: string }) {
   if (game === "snake") {
     return (
       <RuleSheet
-        lead="Large 48×32 map. The camera follows your head. Steer, eat apples, don’t crash."
+        lead="One shared twisting map. Aim, bend, eat, respawn."
         rows={[
           {
             name: "Steer",
-            tip: "Arrows or WASD. You cannot reverse into yourself. The view pans as you move.",
+            tip: "Arrows or WASD set your aim. The body curves as you turn.",
             demo: <span className="rule-call">WASD</span>,
           },
           {
-            name: "Win",
-            tip: "Last snake alive, or first to 8 apples. Hitting a wall, yourself, or another snake kills you.",
-            demo: <span className="rule-call">×8</span>,
+            name: "Survive",
+            tip: "Hit a wall or another snake and you respawn. Score is pellets eaten.",
+            demo: <span className="rule-call">∞</span>,
           },
         ]}
         notes={RULES.snake}

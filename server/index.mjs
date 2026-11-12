@@ -27,6 +27,7 @@ import {
   createInvite,
   enqueueMatch,
   heartbeat,
+  joinSnakeWorld,
   leaveQueue,
   leaveRoom,
   lobbyStoreKind,
@@ -532,7 +533,7 @@ async function createMatch(a, b) {
 }
 
 async function enqueuePlayer(ticket) {
-  await leaveQueue(ticket.userId);
+  await leaveCodaQueue(ticket.userId);
   if (redisReady) {
     try {
       const pair = await redis.eval(ENQUEUE, 1, QUEUE, JSON.stringify(ticket));
@@ -553,7 +554,7 @@ async function enqueuePlayer(ticket) {
   return true;
 }
 
-async function leaveQueue(userId) {
+async function leaveCodaQueue(userId) {
   for (let i = memQueue.length - 1; i >= 0; i--) {
     if (memQueue[i].userId === userId) memQueue.splice(i, 1);
   }
@@ -629,6 +630,9 @@ app.post("/api/lobby", auth, async (req, res) => {
     if (op === "queue") {
       return res.json(await enqueueMatch(req.user, String(req.body.game || ""), req.body.meta || {}));
     }
+    if (op === "snakeJoin") {
+      return res.json(await joinSnakeWorld(req.user));
+    }
     if (op === "unqueue") {
       await leaveQueue(req.user.id);
       return res.json(await snapshot(req.user.id));
@@ -697,7 +701,7 @@ wss.on("connection", (ws, req) => {
       return;
     }
     if (msg.type === "leave") {
-      await leaveQueue(user.id);
+      await leaveCodaQueue(user.id);
       const rid = userRoom.get(user.id);
       if (rid) {
         const room = rooms.get(rid);
@@ -729,7 +733,7 @@ wss.on("connection", (ws, req) => {
 
   ws.on("close", () => {
     if (sockets.get(user.id) === ws) sockets.delete(user.id);
-    leaveQueue(user.id);
+    leaveCodaQueue(user.id);
   });
 });
 

@@ -198,49 +198,19 @@
   text-decoration: line-through;
 }
 
-.snake-grid {
-  display: grid;
-  grid-template-columns: repeat(24, 1fr);
-  grid-template-rows: repeat(16, 1fr);
-  width: min(100%, 640px);
-  aspect-ratio: 24 / 16;
+.snake-canvas {
+  display: block;
+  width: min(100%, 720px);
+  height: min(62dvh, 480px);
   margin: 12px auto 0;
-  background: #111;
-  border-radius: 10px;
-  overflow: hidden;
-  gap: 1px;
-  box-shadow: inset 0 0 0 1px #374151;
-  transition: box-shadow 160ms ease;
+  border-radius: 12px;
+  background: #0b1220;
+  box-shadow: inset 0 0 0 1px #334155;
+  touch-action: none;
 }
 
-.snake-grid.at-edge {
-  box-shadow: inset 0 0 0 2px #f59e0b;
-}
-
-.snake-cell {
-  background: #1f2937;
-}
-
-.snake-cell.near-wall {
-  background: #111827;
-}
-
-.snake-cell.is-food {
-  background: #f59e0b;
-  border-radius: 50%;
-}
-
-.snake-cell.is-body,
-.snake-cell.is-head {
-  background: hsl(var(--hue, 150) 70% 48%);
-}
-
-.snake-cell.is-head {
-  box-shadow: inset 0 0 0 2px #fff;
-}
-
-.snake-cell.dead {
-  opacity: 0.35;
+.snake-grid {
+  display: none;
 }
 
 .snake-pads {

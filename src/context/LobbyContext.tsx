@@ -14,6 +14,7 @@ type LobbyCtx = {
   inviteCooldownMs: (toId: string) => number;
   invite: (toId: string, game: string, meta?: Record<string, unknown>) => Promise<void>;
   findMatch: (game: string, meta?: Record<string, unknown>) => Promise<void>;
+  joinSnakeWorld: () => Promise<void>;
   cancelMatch: () => Promise<void>;
   respond: (id: string, accept: boolean) => Promise<void>;
   sendAction: (action: object) => Promise<void>;
@@ -343,6 +344,21 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
           const path = GAME_PATH[next.room.game];
           if (path) nav(path);
         }
+      },
+      async joinSnakeWorld() {
+        if (!token) throw new Error("Sign in first");
+        dismissedRoomId.current = null;
+        settledRoom.current = null;
+        setSettlement(null);
+        const next = await lobbyApi.snakeJoin(token);
+        acceptRoom(next.room);
+        setSnap((prev) => ({
+          ...next,
+          online: next.online?.length ? next.online : prev.online,
+          room: takeRoom(next.room, prev.room),
+          queue: next.queue ?? null,
+        }));
+        if (next.room) roomSeq.current = next.room.seq || roomSeq.current;
       },
       async cancelMatch() {
         if (!token) return;

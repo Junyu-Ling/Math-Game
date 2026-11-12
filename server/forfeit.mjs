@@ -1,6 +1,9 @@
 /** Solo casino tables have no opponent. Leaving just exits. */
 export const SOLO_GAMES = new Set(["roulette", "slots"]);
 
+/** Shared persistent worlds — leaving removes you; the map keeps running. */
+export const WORLD_GAMES = new Set(["snake"]);
+
 function isCpuId(id) {
   return /^(cpu|bot|ai)/i.test(String(id || ""));
 }
@@ -21,7 +24,7 @@ export function isMatchOver(game, state) {
 
 /** In progress: not the waiting table, and nobody has won yet. */
 export function isLiveMatchState(game, state) {
-  if (!state || SOLO_GAMES.has(game)) return false;
+  if (!state || SOLO_GAMES.has(game) || WORLD_GAMES.has(game)) return false;
   if (isLobbyState(state) || isMatchOver(game, state)) return false;
   return true;
 }
