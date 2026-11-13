@@ -935,11 +935,9 @@ async function withRoomLock(roomId, fn) {
 async function expireArrange(room, force = false) {
   const skewMs = force ? 120 : 0;
   if (!room?.endsAt || Date.now() + skewMs < room.endsAt) return;
-  // Snake ticks are high frequency and tolerate a lost step; everything else must be serialised.
-  if (room.game === "snake") {
-    await expireArrangeCore(room, force);
-    return;
-  }
+  // Every table, snake included, steps under the room lock. The unlocked snake tick used to lose
+  // steps and aims to concurrent writers (the world ran at ~60% speed, so every client drifted
+  // away from the server and "ate" food the server never gave it).
   await withRoomLock(room.id, async () => {
     const fresh = await attachMods(await getRoomRecord(room.id));
     if (!fresh) return;
@@ -948,6 +946,48 @@ async function expireArrange(room, force = false) {
     await expireArrangeCore(fresh, force);
     Object.assign(room, fresh);
   });
+}
+
+/**
+ * Snake steering never touches the room record (that read-modify-write raced the tick and lost
+ * aims). Clients drop their latest aim/boost into tiny per-player keys; the tick folds them in.
+ */
+async function applySnakeControls(room, humans) {
+  const snake = room.mods.snake;
+  const ids = humans.map((p) => String(p.id));
+  if (!ids.length) return;
+  const aimKeys = ids.map((id) => `axiom:snakeaim:${id}`);
+  const boostKeys = ids.map((id) => `axiom:snakeboost:${id}`);
+  const rows = await mgetJson([...aimKeys, ...boostKeys]);
+  ids.forEach((id, i) => {
+    const aim = rows.get(aimKeys[i]);
+    if (aim && Number.isFinite(aim.angle)) {
+      room.state = snake.applySnakeAction(room.state, id, { type: "aim", angle: aim.angle, n: aim.n });
+    }
+    const boost = rows.get(boostKeys[i]);
+    if (boost) {
+      room.state = snake.applySnakeAction(room.state, id, { type: "boost", on: Boolean(boost.on), n: boost.n });
+    }
+  });
+}
+
+async function applySnakeControl(user, action) {
+  const id = String(user.id);
+  if ((await getSeat(id)) !== SNAKE_WORLD_ID) throw new Error("Game not found");
+  // Advance the world to *now* with the previous steering first, so this aim takes effect from the
+  // moment it arrived (ticks otherwise only run when somebody polls, i.e. in bursts of ~RTT).
+  const rec = await attachMods(await getRoomRecord(SNAKE_WORLD_ID));
+  if (rec) await expireArrange(rec);
+  const n = Number(action.n);
+  const seq = Number.isFinite(n) ? n : Date.now();
+  if (action.type === "boost") {
+    await kvSet(`axiom:snakeboost:${id}`, { on: Boolean(action.on), n: seq }, 300);
+    return null;
+  }
+  const angle = action.type === "dir" ? Math.atan2(Number(action.y), Number(action.x)) : Number(action.angle);
+  if (!Number.isFinite(angle)) return null;
+  await kvSet(`axiom:snakeaim:${id}`, { angle, n: seq }, 300);
+  return null;
 }
 
 async function expireArrangeCore(room, force = false) {
@@ -981,6 +1021,7 @@ async function expireArrangeCore(room, force = false) {
       return;
     }
     if (room.mods.snake.stepSnake) {
+      await applySnakeControls(room, humans);
       const tickMs = room.mods.snake.TICK_MS || 33;
       const now = Date.now();
       let guard = 0;
@@ -997,7 +1038,7 @@ async function expireArrangeCore(room, force = false) {
         }
         nextAt += tickMs;
       }
-      room.endsAt = Math.max(nextAt, now + tickMs);
+      room.endsAt = nextAt <= now ? now + tickMs : nextAt; // keep the 33ms phase (max(now+tick) lost a step per call)
       room.seats = (room.state.players || []).filter((p) => p.human !== false).map((p) => String(p.id));
       armCpuThink(room);
       room.seq = (room.seq || 0) + 1;
@@ -1641,6 +1682,13 @@ const OPEN_TABLES = new Set([
 ]);
 
 export async function applyRoomAction(user, roomId, action, mods) {
+  if (
+    String(roomId) === SNAKE_WORLD_ID &&
+    action &&
+    (action.type === "aim" || action.type === "dir" || action.type === "boost")
+  ) {
+    return applySnakeControl(user, action);
+  }
   mods = mods || (await getMods());
   const peek = await getRoomRecord(roomId);
   if (!peek || !peek.seats.includes(user.id)) throw new Error("Game not found");
@@ -1725,7 +1773,7 @@ async function applyRoomActionLocked(user, roomId, action, mods) {
       room.state = mods.snake.stepSnake(room.state, now);
       nextAt += tickMs;
     }
-    room.endsAt = Math.max(nextAt, now + tickMs);
+    room.endsAt = nextAt <= now ? now + tickMs : nextAt; // keep the 33ms phase (max(now+tick) lost a step per call)
     await syncSnakeSeats(room);
   } else if (room.game === "werewolf") {
     room.state = mods.werewolf.applyWerewolfAction(room.state, user.id, action);
@@ -1832,6 +1880,11 @@ export async function joinSnakeWorld(user) {
     if (prior) await vacateSeat(userId, prior);
     else await kvDel(`axiom:seat:${userId}`);
   }
+  // A previous session's last aim/boost must not steer (or boost) the fresh snake.
+  await kvDel(`axiom:snakeaim:${userId}`);
+  await kvDel(`axiom:snakeboost:${userId}`);
+  // Serialised with the world's tick: an unlocked join used to be overwritten by a concurrent step.
+  await withRoomLock(SNAKE_WORLD_ID, async () => {
   let rec = await attachMods(await getRoomRecord(SNAKE_WORLD_ID));
   if (!rec) {
     rec = {
@@ -1862,6 +1915,7 @@ export async function joinSnakeWorld(user) {
   rec.seq = (rec.seq || 0) + 1;
   await saveRoom(rec);
   await wakeUsers(rec.seats);
+  });
   return snapshot(userId);
 }
 
@@ -1878,12 +1932,16 @@ export async function leaveRoom(userId) {
   // Shared snake world: drop the snake, keep the map alive.
   if (rec.game === "snake" && (rec.id === SNAKE_WORLD_ID || rec.state?.mode === "world" || WORLD_GAMES.has(rec.game))) {
     if (rec.mods?.snake?.leaveSnake) {
-      rec.state = rec.mods.snake.leaveSnake(rec.state, userId);
-      await syncSnakeSeats(rec);
-      if (!rec.seats.length) rec.endsAt = null;
-      rec.seq = (rec.seq || 0) + 1;
-      await saveRoom(rec);
-      await wakeUsers(rec.seats);
+      await withRoomLock(rec.id, async () => {
+        const fresh = (await attachMods(await getRoomRecord(rec.id))) || rec;
+        fresh.mods = rec.mods;
+        fresh.state = fresh.mods.snake.leaveSnake(fresh.state, userId);
+        await syncSnakeSeats(fresh);
+        if (!fresh.seats.length) fresh.endsAt = null;
+        fresh.seq = (fresh.seq || 0) + 1;
+        await saveRoom(fresh);
+        await wakeUsers(fresh.seats);
+      });
     }
     await kvDel(`axiom:seat:${userId}`);
     return snapshot(userId);
@@ -2013,6 +2071,22 @@ async function vacateSeat(userId, rec) {
   if (!rec) return;
   const id = String(userId);
   await kvDel(`axiom:seat:${id}`);
+  if (rec.game === "snake") {
+    // Shared world: only this snake goes away. Treating "first seat" as host used to delete the
+    // whole map and kick everyone whenever that player opened another game.
+    const mods = rec.mods || (await getMods());
+    await withRoomLock(rec.id, async () => {
+      const fresh = (await attachMods(await getRoomRecord(rec.id))) || rec;
+      fresh.mods = mods;
+      fresh.state = mods.snake.leaveSnake(fresh.state, id);
+      await syncSnakeSeats(fresh);
+      if (!fresh.seats.length) fresh.endsAt = null;
+      fresh.seq = (fresh.seq || 0) + 1;
+      await saveRoom(fresh);
+      await wakeUsers(fresh.seats);
+    });
+    return;
+  }
   const hostLeft = rec.seats[0] === id;
   const humansLeft = humanSeatIds(rec.seats).filter((x) => x !== id);
   if (hostLeft || humansLeft.length < 1) {

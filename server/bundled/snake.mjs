@@ -26,6 +26,9 @@ var TURN_RATE = TURN_RATE_MAX;
 var HEAD_R = 1.35;
 var FOOD_R = 0.85;
 var PATH_STEP = 0.55;
+var FOOD_PICK = HEAD_R + FOOD_R;
+var FOOD_PICK_HUMAN = FOOD_PICK * 1.8;
+var FOOD_PICK_SURE = FOOD_PICK * 0.6;
 var RESPAWN_MS = 700;
 var SHIELD_MS = 5e3;
 var SNAKE_WORLD_ID = "snake-world";
@@ -186,11 +189,13 @@ function applySnakeAction(state, actorId, action) {
   if (action.type === "leave") return leaveSnake(state, actorId);
   const me = state.players.find((p) => p.id === actorId);
   if (!me || !me.alive && !me.respawnAt) return state;
+  const seq = typeof action.n === "number" && Number.isFinite(action.n) ? action.n : void 0;
+  if (seq !== void 0 && me.an !== void 0 && seq <= me.an) return state;
   if (action.type === "boost") {
     return {
       ...state,
       players: state.players.map(
-        (p) => p.id === actorId ? { ...p, boosting: Boolean(action.on) && p.alive } : p
+        (p) => p.id === actorId ? { ...p, boosting: Boolean(action.on) && p.alive, an: seq ?? p.an } : p
       )
     };
   }
@@ -200,7 +205,7 @@ function applySnakeAction(state, actorId, action) {
   if (angle == null) return state;
   return {
     ...state,
-    players: state.players.map((p) => p.id === actorId ? { ...p, aim: angle } : p)
+    players: state.players.map((p) => p.id === actorId ? { ...p, aim: angle, an: seq ?? p.an } : p)
   };
 }
 function segmentHit(head, path, skip, radius) {
@@ -221,7 +226,7 @@ function segmentHit(head, path, skip, radius) {
 }
 function respawnNow(p, index, now) {
   const fresh = spawnPlayer({ id: p.id, name: p.name, human: p.human }, index, now);
-  return { ...fresh, score: 0, energy: ENERGY_START, hue: p.hue, boosting: false, shieldUntil: now + SHIELD_MS };
+  return { ...fresh, score: 0, energy: ENERGY_START, hue: p.hue, boosting: false, shieldUntil: now + SHIELD_MS, an: p.an };
 }
 function scatterCorpse(path, hue) {
   if (!path.length) return [];
@@ -321,8 +326,10 @@ function stepSnake(state, now = Date.now()) {
     let energy = p.energy;
     let path = p.path;
     const kept = [];
+    const reachR = p.human ? FOOD_PICK_HUMAN : FOOD_PICK;
+    const reach2 = reachR * reachR;
     for (const f of foods) {
-      if (dist2({ x: p.x, y: p.y }, f) <= (HEAD_R + FOOD_R) * (HEAD_R + FOOD_R)) {
+      if (dist2({ x: p.x, y: p.y }, f) <= reach2) {
         score += 1;
         energy = Math.min(ENERGY_MAX, energy + ENERGY_PER_FOOD);
         const tip = path[path.length - 1] ?? { x: p.x, y: p.y };
@@ -355,21 +362,40 @@ var stepSnakeWorld = stepSnake;
 function lerpAngle(a, b, t) {
   return normAngle(a + normAngle(b - a) * t);
 }
-function reconcileSnake(server, local, youId) {
+function newNetMemo() {
+  return { eaten: /* @__PURE__ */ new Map(), peers: /* @__PURE__ */ new Map(), revived: /* @__PURE__ */ new Set() };
+}
+var SELF_LEAD_MAX = 5.5;
+var EATEN_TTL_MS = 1800;
+function shiftPlayer(p, dx, dy) {
+  return { ...p, x: p.x + dx, y: p.y + dy, path: p.path.map((c) => ({ x: c.x + dx, y: c.y + dy })) };
+}
+function reconcileSnake(server, local, youId, memo) {
+  const now = Date.now();
+  if (memo) {
+    memo.peers.clear();
+    for (const p of server.players) if (p.id !== youId) memo.peers.set(p.id, p);
+  }
   if (!local || !youId) return server;
   const mine = local.players.find((p) => p.id === youId);
   const theirs = server.players.find((p) => p.id === youId);
-  if (!mine || !theirs) return server;
-  const lifeChanged = mine.alive !== theirs.alive;
+  let foods = server.foods;
+  let pending = 0;
+  if (memo && memo.eaten.size) {
+    const live = new Set(server.foods.map((f) => f.id));
+    for (const [id, t] of memo.eaten) {
+      if (!live.has(id)) memo.eaten.delete(id);
+      else if (now - t > EATEN_TTL_MS) {
+        memo.eaten.delete(id);
+        memo.revived.add(id);
+      } else pending++;
+    }
+    if (memo.eaten.size) foods = server.foods.filter((f) => !memo.eaten.has(f.id));
+  }
+  if (!mine || !theirs) return { ...server, foods, tick: Math.max(server.tick, local.tick) };
   let self;
-  if (lifeChanged) {
-    self = {
-      ...theirs,
-      aim: mine.aim,
-      boosting: mine.boosting && theirs.alive
-    };
-  } else if (!theirs.alive) {
-    self = { ...theirs, aim: mine.aim, boosting: false };
+  if (mine.alive !== theirs.alive || !theirs.alive) {
+    self = { ...theirs, aim: mine.aim, boosting: Boolean(mine.boosting && theirs.alive) };
   } else {
     self = {
       ...mine,
@@ -377,7 +403,7 @@ function reconcileSnake(server, local, youId) {
       name: theirs.name,
       human: theirs.human,
       hue: theirs.hue,
-      score: theirs.score,
+      score: theirs.score + pending,
       shieldUntil: theirs.shieldUntil,
       energy: Math.abs(mine.energy - theirs.energy) > 30 ? theirs.energy : mine.energy,
       aim: mine.aim,
@@ -385,226 +411,285 @@ function reconcileSnake(server, local, youId) {
       alive: true,
       respawnAt: null
     };
+    const dx = self.x - theirs.x;
+    const dy = self.y - theirs.y;
+    const err = Math.hypot(dx, dy);
+    const lead = mine.boosting ? SELF_LEAD_MAX * 1.8 : SELF_LEAD_MAX;
+    if (err > lead * 3) {
+      self = { ...self, x: theirs.x, y: theirs.y, angle: theirs.angle, path: theirs.path.length ? theirs.path : self.path };
+    } else if (err > lead) {
+      const pull = (err - lead) * 0.25 / err;
+      self = shiftPlayer(self, -dx * pull, -dy * pull);
+    }
   }
   const prevById = new Map(local.players.map((p) => [p.id, p]));
-  const serverIds = new Set(server.players.map((p) => p.id));
   const players = server.players.map((p) => {
     if (p.id === youId) return self;
     const prev = prevById.get(p.id);
-    if (!prev || !prev.alive || !p.alive) return p;
-    if (!p.path.length && prev.path.length) {
-      return { ...prev, name: p.name, hue: p.hue, score: p.score, alive: p.alive };
-    }
-    const t = 0.22;
-    const x = prev.x + (p.x - prev.x) * t;
-    const y = prev.y + (p.y - prev.y) * t;
-    const angle = lerpAngle(prev.angle, p.angle, t);
-    const path = p.path.length ? [{ x, y }, ...p.path.slice(1)] : prev.path;
-    return { ...p, x, y, angle, path };
+    if (!prev || !prev.alive || !p.alive || !prev.path.length) return p;
+    if (!p.path.length) return { ...prev, name: p.name, hue: p.hue, score: p.score, alive: p.alive };
+    return {
+      ...p,
+      x: prev.x,
+      y: prev.y,
+      angle: prev.angle,
+      path: prev.path
+    };
   });
-  const foods = server.foods.length ? server.foods : local.foods;
-  return {
-    ...server,
-    foods,
-    tick: Math.max(server.tick, local.tick),
-    players: players.filter((p) => p.id === youId || serverIds.has(p.id))
-  };
+  return { ...server, foods, tick: Math.max(server.tick, local.tick), players };
 }
-function stepSelfPredict(state, youId, now = Date.now()) {
+function smoothPeers(state, memo, youId, k = 0.3) {
+  if (!memo.peers.size) return state;
+  let changed = false;
+  const players = state.players.map((p) => {
+    if (p.id === youId) return p;
+    const t = memo.peers.get(p.id);
+    if (!t || !t.alive || !p.alive || !t.path.length || !p.path.length) return p;
+    const off = Math.hypot(t.x - p.x, t.y - p.y);
+    if (off < 0.02 && p.path.length === t.path.length) return p;
+    changed = true;
+    if (off > 25) return { ...p, x: t.x, y: t.y, angle: t.angle, path: t.path };
+    const path = t.path.map((tp, i) => {
+      const dp = p.path[i];
+      return dp ? { x: dp.x + (tp.x - dp.x) * k, y: dp.y + (tp.y - dp.y) * k } : tp;
+    });
+    const head = path[0];
+    return { ...p, x: head.x, y: head.y, angle: lerpAngle(p.angle, t.angle, k), path };
+  });
+  return changed ? { ...state, players } : state;
+}
+function stepSelfPredict(state, youId, now = Date.now(), memo) {
   const tick = state.tick + 1;
   const me = state.players.find((p) => p.id === youId);
   if (!me) return { ...state, tick };
   if (!me.alive) {
-    if (me.respawnAt && now >= me.respawnAt) {
-      const idx = state.players.findIndex((p) => p.id === youId);
-      const fresh = respawnNow(me, Math.max(0, idx), now);
-      return {
-        ...state,
-        tick,
-        players: state.players.map((p) => p.id === youId ? fresh : p)
-      };
-    }
     return { ...state, tick, players: state.players.map((p) => p.id === youId ? { ...p, boosting: false } : p) };
   }
   let energy = me.energy;
   const boosting = Boolean(me.boosting) && canBoost(me);
   const spd = boosting ? SPEED * BOOST_MULT : SPEED;
   const angle = turnToward(me.angle, me.aim, turnRateFor({ ...me, boosting }));
-  let x = me.x + Math.cos(angle) * spd;
-  let y = me.y + Math.sin(angle) * spd;
+  const x = clamp(me.x + Math.cos(angle) * spd, HEAD_R * 0.5, WORLD - HEAD_R * 0.5);
+  const y = clamp(me.y + Math.sin(angle) * spd, HEAD_R * 0.5, WORLD - HEAD_R * 0.5);
   let path = [{ x, y }, ...me.path];
   let score = me.score;
   if (boosting && tick % BOOST_DRAIN_EVERY === 0) energy = Math.max(0, energy - BOOST_DRAIN);
   const maxPts = START_LEN + Math.floor(score * 2.2);
   if (path.length > maxPts) path = path.slice(0, maxPts);
-  const shielded = isShielded({ ...me, shieldUntil: me.shieldUntil }, now);
-  if (x < HEAD_R || y < HEAD_R || x > WORLD - HEAD_R || y > WORLD - HEAD_R) {
-    if (shielded) {
-      x = clamp(x, HEAD_R, WORLD - HEAD_R);
-      y = clamp(y, HEAD_R, WORLD - HEAD_R);
-    } else {
-      const killed = killSnake({ ...me, x, y, angle, path, energy, score, boosting: false }, now);
-      return {
-        ...state,
-        tick,
-        foods: state.foods.concat(killed.drops),
-        players: state.players.map((p) => p.id === youId ? killed.player : p)
-      };
-    }
-  }
-  for (const other of state.players) {
-    if (other.id === youId || !other.alive || !other.path.length) continue;
-    if (shielded || isShielded(other, now)) continue;
-    if (segmentHit({ x, y }, other.path, 0, HEAD_R * 0.95)) {
-      const killed = killSnake({ ...me, x, y, angle, path, energy, score, boosting: false }, now);
-      return {
-        ...state,
-        tick,
-        foods: state.foods.concat(killed.drops),
-        players: state.players.map((p) => p.id === youId ? killed.player : p)
-      };
-    }
-  }
-  let foods = state.foods;
   const kept = [];
-  for (const f of foods) {
-    if (dist2({ x, y }, f) <= (HEAD_R + FOOD_R) * (HEAD_R + FOOD_R)) {
+  const reach2 = FOOD_PICK_SURE * FOOD_PICK_SURE;
+  for (const f of state.foods) {
+    if (dist2({ x, y }, f) <= reach2) {
       score += 1;
       energy = Math.min(ENERGY_MAX, energy + ENERGY_PER_FOOD);
       const tip = path[path.length - 1] ?? { x, y };
       path = [...path, { x: tip.x, y: tip.y }];
+      memo?.eaten.set(f.id, now);
     } else kept.push(f);
   }
-  foods = kept;
-  const nextMe = {
-    ...me,
-    x,
-    y,
-    angle,
-    path,
-    score,
-    energy,
-    boosting: boosting && energy > 0
-  };
+  const nextMe = { ...me, x, y, angle, path, score, energy, boosting: boosting && energy > 0 };
   return {
     ...state,
     tick,
-    foods,
+    foods: kept.length === state.foods.length ? state.foods : kept,
     players: state.players.map((p) => p.id === youId ? nextMe : p)
   };
 }
+var VIEW_CULL = 100;
+var r2d = (n) => Math.round(n * 100) / 100;
 function viewSnake(state, viewerId) {
   const me = state.players.find((p) => p.id === viewerId);
   const focus = me ? { x: me.x, y: me.y } : { x: WORLD / 2, y: WORLD / 2 };
-  const r2 = VIEW_RADIUS * VIEW_RADIUS * 1.6;
+  const r2 = VIEW_CULL * VIEW_CULL;
   return {
     ...state,
-    foods: state.foods.filter((f) => dist2(f, focus) <= r2),
+    foods: state.foods.filter((f) => dist2(f, focus) <= r2).map((f) => f.hue == null ? { id: f.id, x: r2d(f.x), y: r2d(f.y) } : { id: f.id, x: r2d(f.x), y: r2d(f.y), hue: f.hue }),
     players: state.players.map((p) => {
       if (p.id === viewerId) return p;
       if (dist2({ x: p.x, y: p.y }, focus) > r2 && !p.path.some((c) => dist2(c, focus) <= r2)) {
         return { ...p, path: [], aim: p.angle };
       }
-      return { ...p, aim: p.angle };
+      return { ...p, aim: p.angle, x: r2d(p.x), y: r2d(p.y), path: p.path.map((c) => ({ x: r2d(c.x), y: r2d(c.y) })) };
     })
   };
 }
-var AI_LOOK = 14;
-var AI_WALL_MARGIN = 16;
-var AI_BODY_CLEAR = 11;
-function foodNearThreat(state, food, selfId) {
+var AI_LOOK = 26;
+var AI_HARD_BODY = HEAD_R * 2.05;
+var AI_SOFT_BODY = 8;
+var AI_WALL_SOFT = 7;
+var AI_SCAN = 46;
+var aiMemory = /* @__PURE__ */ new Map();
+function aiMem(id, tick) {
+  let m = aiMemory.get(id);
+  if (!m || tick < m.tick - 5) {
+    m = { tick, foodId: null, bad: /* @__PURE__ */ new Map(), wander: null, wanderUntil: 0, samples: [], lastAim: 0 };
+    aiMemory.set(id, m);
+  }
+  m.tick = tick;
+  return m;
+}
+function resetSnakeAi() {
+  aiMemory.clear();
+}
+function gatherObstacles(state, me) {
+  const bodies = [];
+  const heads = [];
+  const r2 = (AI_SCAN + 30) * (AI_SCAN + 30);
   for (const p of state.players) {
-    if (p.id === selfId || !p.alive) continue;
-    if (dist2(food, { x: p.x, y: p.y }) < 9 * 9) return true;
-    for (let i = 0; i < p.path.length; i += 3) {
-      if (dist2(food, p.path[i]) < 7 * 7) return true;
+    if (p.id === me.id || !p.alive) continue;
+    if (dist2(p, me) > r2) continue;
+    heads.push({ x: p.x, y: p.y, dx: Math.cos(p.angle), dy: Math.sin(p.angle) });
+    for (let i = 0; i < p.path.length; i += 2) {
+      const c = p.path[i];
+      if (dist2(c, me) <= r2) bodies.push(c);
     }
   }
-  return false;
+  return { bodies, heads };
 }
-function scoreAiHeading(state, me, aim) {
+function foodRisk(f, obs) {
+  let risk = 0;
+  for (const h of obs.heads) {
+    const d2 = dist2(f, h);
+    if (d2 < 10 * 10) risk += (10 - Math.sqrt(d2)) * 3;
+  }
+  for (const b of obs.bodies) {
+    const d2 = dist2(f, b);
+    if (d2 < 4.5 * 4.5) {
+      risk += 12;
+      break;
+    }
+  }
+  const edge = Math.min(f.x, f.y, WORLD - f.x, WORLD - f.y);
+  if (edge < 3) risk += (3 - edge) * 2;
+  return risk;
+}
+function pickTarget(me, state, obs, mem) {
+  if (mem.wander && mem.wanderUntil > state.tick) {
+    if (dist2(me, mem.wander) < 7 * 7) {
+      mem.wander = null;
+      mem.wanderUntil = 0;
+    } else return mem.wander;
+  }
+  let best = null;
+  let bestCost = Infinity;
+  for (const f of state.foods) {
+    const badUntil = mem.bad.get(f.id);
+    if (badUntil != null && badUntil > state.tick) continue;
+    const d = Math.sqrt(dist2(me, f));
+    const diff = Math.abs(normAngle(Math.atan2(f.y - me.y, f.x - me.x) - me.angle));
+    let cost = d + diff * 5 + foodRisk(f, obs);
+    if (f.id === mem.foodId) cost -= 9;
+    if (cost < bestCost) {
+      bestCost = cost;
+      best = f;
+    }
+  }
+  mem.foodId = best ? best.id : null;
+  return best ? { x: best.x, y: best.y } : null;
+}
+function nearbyFoods(state, me) {
+  const out = [];
+  const r2 = AI_SCAN * AI_SCAN;
+  for (const f of state.foods) if (dist2(f, me) <= r2) out.push(f);
+  return out;
+}
+function scoreAiHeading(me, aim, obs, foods, target, turn) {
   let x = me.x;
   let y = me.y;
   let angle = me.angle;
   let score = 0;
+  const pick2 = (HEAD_R + FOOD_R) * (HEAD_R + FOOD_R);
+  const hard2 = AI_HARD_BODY * AI_HARD_BODY;
+  const soft2 = AI_SOFT_BODY * AI_SOFT_BODY;
+  let taken = null;
   for (let step = 0; step < AI_LOOK; step++) {
-    angle = turnToward(angle, aim, turnRateFor(me));
+    angle = turnToward(angle, aim, turn);
     x += Math.cos(angle) * SPEED;
     y += Math.sin(angle) * SPEED;
-    if (x < HEAD_R || y < HEAD_R || x > WORLD - HEAD_R || y > WORLD - HEAD_R) {
-      return -1e7 + step;
+    const edge = Math.min(x, y, WORLD - x, WORLD - y);
+    if (edge < HEAD_R + 0.4) return -1e6 + step * 1e3 + score;
+    if (edge < AI_WALL_SOFT) score -= (AI_WALL_SOFT - edge) * (AI_WALL_SOFT - edge) * 0.9;
+    for (const b of obs.bodies) {
+      const dx = x - b.x;
+      const dy = y - b.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < hard2) return -1e6 + step * 1e3 + score;
+      if (d2 < soft2) score -= AI_SOFT_BODY - Math.sqrt(d2);
     }
-    if (x < AI_WALL_MARGIN) score -= (AI_WALL_MARGIN - x) * 18;
-    if (y < AI_WALL_MARGIN) score -= (AI_WALL_MARGIN - y) * 18;
-    if (x > WORLD - AI_WALL_MARGIN) score -= (x - (WORLD - AI_WALL_MARGIN)) * 18;
-    if (y > WORLD - AI_WALL_MARGIN) score -= (y - (WORLD - AI_WALL_MARGIN)) * 18;
-    for (const p of state.players) {
-      if (p.id === me.id || !p.alive) continue;
-      const headDist = Math.sqrt(dist2({ x, y }, { x: p.x, y: p.y }));
-      if (headDist < AI_BODY_CLEAR) score -= (AI_BODY_CLEAR - headDist) * 55;
-      if (headDist < 16) {
-        const closing = Math.cos(p.angle) * (x - p.x) + Math.sin(p.angle) * (y - p.y);
-        if (closing > 0) score -= closing * 1.4;
-      }
-      if (segmentHit({ x, y }, p.path, 0, HEAD_R * 2.4)) score -= 800;
-      for (let i = 0; i < p.path.length; i += 4) {
-        const d = Math.sqrt(dist2({ x, y }, p.path[i]));
-        if (d < AI_BODY_CLEAR) score -= (AI_BODY_CLEAR - d) * 22;
+    if (step < 12) {
+      for (const h of obs.heads) {
+        const hx = h.x + h.dx * SPEED * step;
+        const hy = h.y + h.dy * SPEED * step;
+        const dx = x - hx;
+        const dy = y - hy;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < hard2 * 1.6) return -1e6 + step * 1e3 + score;
+        if (d2 < soft2 * 1.5) score -= (AI_SOFT_BODY * 1.2 - Math.sqrt(d2)) * 2;
       }
     }
-    for (const f of state.foods) {
-      if (foodNearThreat(state, f, me.id)) continue;
-      const d = Math.sqrt(dist2({ x, y }, f));
-      if (d < 18) score += (18 - d) * 0.28;
+    for (const f of foods) {
+      const dx = x - f.x;
+      const dy = y - f.y;
+      if (dx * dx + dy * dy <= pick2) {
+        if (!taken) taken = /* @__PURE__ */ new Set();
+        if (taken.has(f.id)) continue;
+        taken.add(f.id);
+        score += 14 - step * 0.2;
+      }
     }
   }
-  const cx = WORLD / 2;
-  const cy = WORLD / 2;
-  score -= Math.hypot(x - cx, y - cy) * 0.015;
+  if (target) score -= Math.hypot(x - target.x, y - target.y) * 1.3;
   return score;
 }
 function aiSnake(state, cpuId) {
   const me = state.players.find((p) => p.id === cpuId);
   if (!me || !me.alive) return { type: "aim", angle: 0 };
+  const mem = aiMem(cpuId, state.tick);
+  let salt = 0;
+  for (let i = 0; i < cpuId.length; i++) salt += cpuId.charCodeAt(i);
+  if ((state.tick + salt) % 2 !== 0 && mem.samples.length) return { type: "aim", angle: mem.lastAim };
+  const last = mem.samples[mem.samples.length - 1];
+  if (!last || state.tick - last.tick >= 20) {
+    mem.samples.push({ tick: state.tick, x: me.x, y: me.y });
+    if (mem.samples.length > 6) mem.samples.shift();
+    if (mem.samples.length >= 5) {
+      const first = mem.samples[0];
+      if (Math.hypot(me.x - first.x, me.y - first.y) < 11) {
+        if (mem.foodId) mem.bad.set(mem.foodId, state.tick + 240);
+        const pad = 26;
+        mem.wander = {
+          x: pad + Math.random() * (WORLD - pad * 2),
+          y: pad + Math.random() * (WORLD - pad * 2)
+        };
+        mem.wanderUntil = state.tick + 150;
+        mem.foodId = null;
+        mem.samples = [];
+      }
+    }
+  }
+  if (mem.bad.size > 40) {
+    for (const [k, v] of mem.bad) if (v <= state.tick) mem.bad.delete(k);
+  }
+  const obs = gatherObstacles(state, me);
+  const foods = nearbyFoods(state, me);
+  const target = pickTarget(me, state, obs, mem) ?? { x: WORLD / 2, y: WORLD / 2 };
+  const turn = turnRateFor(me);
   const candidates = [];
-  for (let k = -7; k <= 7; k++) candidates.push(normAngle(me.angle + k * 0.2));
+  for (let k = 0; k < 24; k++) candidates.push(normAngle(k * (Math.PI / 12)));
+  for (let k = -3; k <= 3; k++) candidates.push(normAngle(me.angle + k * 0.12));
+  candidates.push(Math.atan2(target.y - me.y, target.x - me.x));
   candidates.push(Math.atan2(WORLD / 2 - me.y, WORLD / 2 - me.x));
-  if (me.x < AI_WALL_MARGIN) candidates.push(0);
-  if (me.x > WORLD - AI_WALL_MARGIN) candidates.push(Math.PI);
-  if (me.y < AI_WALL_MARGIN) candidates.push(Math.PI / 2);
-  if (me.y > WORLD - AI_WALL_MARGIN) candidates.push(-Math.PI / 2);
-  for (const p of state.players) {
-    if (p.id === me.id || !p.alive) continue;
-    const d = Math.sqrt(dist2({ x: me.x, y: me.y }, { x: p.x, y: p.y }));
-    if (d < 22) {
-      candidates.push(Math.atan2(me.y - p.y, me.x - p.x));
-      const away = Math.atan2(me.y - p.y, me.x - p.x);
-      candidates.push(normAngle(away + Math.PI / 2));
-      candidates.push(normAngle(away - Math.PI / 2));
-    }
-  }
-  let safestFood = null;
-  let safestD = Infinity;
-  for (const f of state.foods) {
-    if (foodNearThreat(state, f, me.id)) continue;
-    const d = dist2({ x: me.x, y: me.y }, f);
-    if (d < safestD) {
-      safestD = d;
-      safestFood = f;
-    }
-  }
-  if (safestFood) {
-    candidates.push(Math.atan2(safestFood.y - me.y, safestFood.x - me.x));
-  }
   let bestAngle = me.angle;
   let bestScore = -Infinity;
   for (const aim of candidates) {
-    const s = scoreAiHeading(state, me, aim);
+    let s = scoreAiHeading(me, aim, obs, foods, target, turn);
+    s -= Math.abs(normAngle(aim - me.angle)) * 0.4;
     if (s > bestScore) {
       bestScore = s;
       bestAngle = aim;
     }
   }
+  mem.lastAim = bestAngle;
   return { type: "aim", angle: bestAngle };
 }
 function cameraOrigin(focus, view = VIEW_RADIUS) {
@@ -630,6 +715,9 @@ export {
   ENERGY_PER_FOOD,
   ENERGY_START,
   FOOD_COUNT,
+  FOOD_PICK,
+  FOOD_PICK_HUMAN,
+  FOOD_PICK_SURE,
   FOOD_R,
   FOOD_SOFT_CAP,
   GOAL,
@@ -647,6 +735,7 @@ export {
   TURN_RATE_MAX,
   TURN_RATE_MIN,
   VIEW_COLS,
+  VIEW_CULL,
   VIEW_RADIUS,
   VIEW_ROWS,
   WORLD,
@@ -659,8 +748,11 @@ export {
   isShielded,
   joinSnake,
   leaveSnake,
+  newNetMemo,
   reconcileSnake,
+  resetSnakeAi,
   scatterCorpse,
+  smoothPeers,
   startSnakeDuel,
   startSnakeLobby,
   startSnakePractice,

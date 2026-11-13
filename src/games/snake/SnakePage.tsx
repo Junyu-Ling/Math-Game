@@ -6,7 +6,9 @@ import {
   ENERGY_MAX,
   HEAD_R,
   isShielded,
+  newNetMemo,
   reconcileSnake,
+  smoothPeers,
   SNAKE_WORLD_ID,
   startSnakePractice,
   stepSelfPredict,
@@ -37,6 +39,7 @@ function drawWorld(
   h: number,
   youId?: string,
   tMs = 0,
+  foodBorn?: Map<string, number>,
 ) {
   const scale = Math.min(w, h) / (VIEW_RADIUS * 2);
   const camX = focus.x - w / scale / 2;
@@ -82,11 +85,25 @@ function drawWorld(
   ctx.lineWidth = 10;
   ctx.strokeRect(a.sx - 4, a.sy - 4, b.sx - a.sx + 8, b.sy - a.sy + 8);
 
+  const firstFoodFrame = Boolean(foodBorn) && foodBorn!.size === 0;
   for (const f of state.foods) {
     const { sx, sy } = toScreen(f.x, f.y);
+    if (sx < -30 || sy < -30 || sx > w + 30 || sy > h + 30) continue;
     const pulse = 1 + Math.sin(tMs / 220 + f.x + f.y) * 0.12;
     const corpse = Number.isFinite(f.hue);
-    const r = Math.max(2.4, (corpse ? 1.05 : 0.9) * scale) * pulse;
+    let fade = 1;
+    if (foodBorn) {
+      let born = foodBorn.get(f.id);
+      if (born === undefined) {
+        // First frame of the map: show everything at once; later arrivals ease in.
+        born = firstFoodFrame ? tMs - 1000 : tMs;
+        foodBorn.set(f.id, born);
+      }
+      fade = Math.max(0, Math.min(1, (tMs - born) / 260));
+    }
+    if (fade <= 0) continue;
+    ctx.globalAlpha = fade;
+    const r = Math.max(2.4, (corpse ? 1.05 : 0.9) * scale) * pulse * (0.55 + 0.45 * fade);
     const hue = corpse ? f.hue! : 42;
     const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 3.2);
     glow.addColorStop(0, `hsla(${hue} 85% 58% / 0.55)`);
@@ -103,6 +120,7 @@ function drawWorld(
     ctx.fillStyle = corpse ? `hsl(${hue} 90% 78%)` : "#fff7d6";
     ctx.arc(sx - r * 0.25, sy - r * 0.25, r * 0.35, 0, Math.PI * 2);
     ctx.fill();
+    ctx.globalAlpha = 1;
   }
 
   for (const p of state.players) {
@@ -125,18 +143,27 @@ function drawWorld(
       ctx.stroke();
     }
 
-    ctx.strokeStyle = `hsl(${p.hue} 40% 18%)`;
-    ctx.lineWidth = width + 3;
-    ctx.beginPath();
-    p.path.forEach((pt, i) => {
-      const { sx, sy } = toScreen(pt.x, pt.y);
-      if (i === 0) ctx.moveTo(sx, sy);
-      else ctx.lineTo(sx, sy);
-    });
-    if (p.path.length === 1) {
-      const { sx, sy } = toScreen(p.path[0]!.x, p.path[0]!.y);
-      ctx.lineTo(sx + 0.01, sy);
-    }
+    // Outline for every snake: bright rim + dark inner edge, so bodies read clearly on any backdrop.
+    const tracePath = () => {
+      ctx.beginPath();
+      p.path.forEach((pt, i) => {
+        const { sx, sy } = toScreen(pt.x, pt.y);
+        if (i === 0) ctx.moveTo(sx, sy);
+        else ctx.lineTo(sx, sy);
+      });
+      if (p.path.length === 1) {
+        const { sx, sy } = toScreen(p.path[0]!.x, p.path[0]!.y);
+        ctx.lineTo(sx + 0.01, sy);
+      }
+    };
+    const rim = Math.max(2, width * 0.16);
+    tracePath();
+    ctx.strokeStyle = p.id === youId ? "#ffffff" : `hsl(${p.hue} 85% 90%)`;
+    ctx.lineWidth = width + rim * 2 + 2;
+    ctx.stroke();
+    tracePath();
+    ctx.strokeStyle = `hsl(${p.hue} 45% 14%)`;
+    ctx.lineWidth = width + 2.5;
     ctx.stroke();
 
     ctx.strokeStyle = `hsl(${p.hue} 78% ${p.alive ? (boosting ? 62 : 50) : 28}%)`;
@@ -174,11 +201,9 @@ function drawWorld(
     ctx.fillStyle = `hsl(${p.hue} 82% ${p.alive ? 58 : 34}%)`;
     ctx.arc(head.sx, head.sy, hr, 0, Math.PI * 2);
     ctx.fill();
-    if (p.id === youId) {
-      ctx.strokeStyle = "#f8fafc";
-      ctx.lineWidth = 2.2;
-      ctx.stroke();
-    }
+    ctx.strokeStyle = p.id === youId ? "#ffffff" : `hsl(${p.hue} 85% 90%)`;
+    ctx.lineWidth = p.id === youId ? 2.8 : 2.2;
+    ctx.stroke();
 
     const eyeAng = p.angle;
     const eyeDist = hr * 0.42;
@@ -240,6 +265,13 @@ export function SnakePage() {
   const lastAimSent = useRef<number | null>(null);
   const lastBoostSent = useRef(false);
   const lastServerTickRef = useRef(-1);
+  /** Foods eaten in prediction + latest rival poses (see NetMemo). */
+  const memoRef = useRef(newNetMemo());
+  const netSeqRef = useRef(0);
+  /** Logical time (ms) of the latest physics step — render interpolates from here. */
+  const stepAtRef = useRef(0);
+  /** First time each food id was drawn, for a short fade-in instead of popping. */
+  const foodBornRef = useRef<Map<string, number>>(new Map());
   const [stickKnob, setStickKnob] = useState({ x: 0, y: 0 });
   const [stickLive, setStickLive] = useState(false);
 
@@ -282,6 +314,8 @@ export function SnakePage() {
 
   useEffect(() => {
     lastServerTickRef.current = -1;
+    memoRef.current = newNetMemo();
+    foodBornRef.current = new Map();
   }, [room?.id]);
 
   useEffect(() => {
@@ -306,7 +340,11 @@ export function SnakePage() {
       if (action.on === lastBoostSent.current) return;
       lastBoostSent.current = action.on;
     }
-    void lobby.sendAction(action);
+    // Strictly increasing sequence: HTTP can deliver aim/boost out of order, and an old aim landing
+    // last left the server steering a different way than the screen (drift, food "eaten" twice).
+    const n = Math.max(netSeqRef.current + 1, Date.now());
+    netSeqRef.current = n;
+    void lobby.sendAction({ ...action, n });
   }
 
   function applyLocal(action: SnakeAction) {
@@ -339,14 +377,14 @@ export function SnakePage() {
     // Same tick / duplicate watch payloads must not re-merge — that flickers foods & peers.
     if (serverView.tick <= lastServerTickRef.current && liveRef.current) return;
     lastServerTickRef.current = serverView.tick;
-    liveRef.current = reconcileSnake(serverView, liveRef.current, youId);
+    liveRef.current = reconcileSnake(serverView, liveRef.current, youId, memoRef.current);
     pushHud(liveRef.current, true);
   }, [serverView, practice, youId, serverView?.tick]);
 
   // Practice: full local sim. Online: predict only yourself; peers/food come from server.
   useEffect(() => {
     if (!practice && !world) return;
-    const id = window.setInterval(() => {
+    const stepOnce = () => {
       let cur = liveRef.current;
       if (!cur) return;
       if (practice) {
@@ -365,11 +403,24 @@ export function SnakePage() {
           if (world) netSend({ type: "boost", on: boostRef.current });
         }
       }
-      cur = practice ? stepSnake(cur) : youId ? stepSelfPredict(cur, youId) : cur;
+      if (practice) cur = stepSnake(cur);
+      else if (youId) cur = smoothPeers(stepSelfPredict(cur, youId, Date.now(), memoRef.current), memoRef.current, youId);
       liveRef.current = cur;
       if (practice) setLocal(cur);
       pushHud(cur);
-    }, TICK_MS);
+    };
+    // Fixed-timestep accumulator: a late/throttled timer must not change game speed (it used to make
+    // the local snake lag behind the server, then rubber-band).
+    stepAtRef.current = performance.now();
+    const id = window.setInterval(() => {
+      const t = performance.now();
+      let n = Math.floor((t - stepAtRef.current) / TICK_MS);
+      if (n <= 0) return;
+      n = Math.min(n, 3);
+      stepAtRef.current += n * TICK_MS;
+      if (t - stepAtRef.current > 200) stepAtRef.current = t;
+      for (let i = 0; i < n; i++) stepOnce();
+    }, 16);
     return () => window.clearInterval(id);
   }, [practice, world, youId]);
 
@@ -410,6 +461,7 @@ export function SnakePage() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let raf = 0;
+    let frameNo = 0;
     const paint = (t: number) => {
       const state = liveRef.current;
       const ctx = canvas.getContext("2d");
@@ -423,13 +475,30 @@ export function SnakePage() {
           canvas.height = bh;
         }
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const me = youId ? state.players.find((p) => p.id === youId) : undefined;
-        const target = me && me.alive ? { x: me.x, y: me.y } : camRef.current;
-        camRef.current = {
-          x: camRef.current.x + (target.x - camRef.current.x) * 0.28,
-          y: camRef.current.y + (target.y - camRef.current.y) * 0.28,
-        };
-        drawWorld(ctx, state, camRef.current, rect.width, rect.height, youId, t);
+        // Physics runs at 30 Hz; slide every snake between its last two steps so 60/120 Hz screens
+        // show continuous motion instead of judder.
+        const alpha = Math.max(0, Math.min(1, (performance.now() - stepAtRef.current) / TICK_MS));
+        const shown = alpha < 1 ? interpolateState(state, alpha) : state;
+        const me = youId ? shown.players.find((p) => p.id === youId) : undefined;
+        if (me && me.alive) {
+          const dx = me.x - camRef.current.x;
+          const dy = me.y - camRef.current.y;
+          // Locked to the head while playing; only glide after a respawn / big jump.
+          if (Math.hypot(dx, dy) > 10) camRef.current = { x: camRef.current.x + dx * 0.28, y: camRef.current.y + dy * 0.28 };
+          else camRef.current = { x: me.x, y: me.y };
+        }
+        frameNo += 1;
+        const born = foodBornRef.current;
+        const revived = memoRef.current.revived;
+        if (revived.size) {
+          for (const id of revived) born.set(id, t);
+          revived.clear();
+        }
+        if (frameNo % 90 === 0 && born.size > 400) {
+          const ids = new Set(state.foods.map((f) => f.id));
+          for (const k of born.keys()) if (!ids.has(k)) born.delete(k);
+        }
+        drawWorld(ctx, shown, camRef.current, rect.width, rect.height, youId, t, born);
       }
       raf = window.requestAnimationFrame(paint);
     };
@@ -693,6 +762,26 @@ export function SnakePage() {
       </div>
     </div>
   );
+}
+
+/**
+ * Draw-time interpolation: each body point slides from where its predecessor was one step ago to
+ * where it is now (`path = [newHead, ...oldPath]`), so motion is continuous between 30 Hz steps.
+ */
+function interpolateState(state: SnakeState, alpha: number): SnakeState {
+  return {
+    ...state,
+    players: state.players.map((p) => {
+      if (!p.alive || p.path.length < 3) return p;
+      const path = p.path.map((pt, i) => {
+        const before = p.path[i + 1];
+        if (!before) return pt;
+        return { x: before.x + (pt.x - before.x) * alpha, y: before.y + (pt.y - before.y) * alpha };
+      });
+      const head = path[0]!;
+      return { ...p, x: head.x, y: head.y, path };
+    }),
+  };
 }
 
 function normDiff(a: number, b: number) {

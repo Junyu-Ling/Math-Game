@@ -131,7 +131,9 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       });
       setError("");
       const incoming = next.room && !(dismissedRoomId.current && next.room.id === dismissedRoomId.current) ? next.room : null;
-      if (incoming?.game && incoming.game !== roomGame.current) {
+      // The shared snake world is entered only by opening /play/snake. A leftover seat there must
+      // never yank you off another game's page (every game card used to land on the snake map).
+      if (incoming?.game && incoming.game !== "snake" && incoming.game !== roomGame.current) {
         const path = GAME_PATH[incoming.game];
         if (path && window.location.pathname !== path) nav(path);
       }
@@ -218,7 +220,8 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!token) return;
     const room = snap.room;
-    if (!isLiveMatch(room)) return;
+    // The snake world is not a scored match, but its seat must not outlive the snake page either.
+    if (!isLiveMatch(room) && room?.game !== "snake") return;
     const path = room?.game ? GAME_PATH[room.game] : "";
     if (!path || loc.pathname === path || leavingRef.current) return;
     leavingRef.current = true;
