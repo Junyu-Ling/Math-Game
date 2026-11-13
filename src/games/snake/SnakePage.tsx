@@ -246,6 +246,7 @@ export function SnakePage() {
   const room = lobby.room?.game === "snake" ? lobby.room : null;
   const [local, setLocal] = useState<SnakeState | null>(null);
   const [joining, setJoining] = useState(false);
+  const [joinErr, setJoinErr] = useState("");
   const [hud, setHud] = useState<{
     score: number;
     energy: number;
@@ -579,9 +580,10 @@ export function SnakePage() {
               <h2>Twist. Feed. Boost.</h2>
               <p>
                 {joining
-                  ? "Dropping you onto the global map…"
+                  ? "Dropping you onto the global map?"
                   : "One continuous arena for everyone online. Steer with mouse or WASD, eat to grow and fill energy, hold Space to boost."}
               </p>
+              {joinErr || lobby.error ? <p className="form-error">{joinErr || lobby.error}</p> : null}
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {user ? (
                   <button
@@ -590,15 +592,20 @@ export function SnakePage() {
                     disabled={joining}
                     onClick={() => {
                       setJoining(true);
+                      setJoinErr("");
                       void lobby
                         .joinSnakeWorld()
-                        .catch(() => {})
+                        .catch((ex) => {
+                          setJoinErr(ex instanceof Error ? ex.message : "Could not enter the snake world");
+                        })
                         .finally(() => setJoining(false));
                     }}
                   >
                     Enter world
                   </button>
-                ) : null}
+                ) : (
+                  <p className="muted">Sign in to enter the shared world, or practice offline.</p>
+                )}
                 <button
                   className="btn btn-ghost"
                   type="button"

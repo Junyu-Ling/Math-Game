@@ -1884,39 +1884,44 @@ export async function joinSnakeWorld(user) {
   await kvDel(`axiom:snakeaim:${userId}`);
   await kvDel(`axiom:snakeboost:${userId}`);
   // Serialised with the world's tick: an unlocked join used to be overwritten by a concurrent step.
+  let joined = null;
   await withRoomLock(SNAKE_WORLD_ID, async () => {
-  let rec = await attachMods(await getRoomRecord(SNAKE_WORLD_ID));
-  if (!rec) {
-    rec = {
-      id: SNAKE_WORLD_ID,
-      game: "snake",
-      seats: [],
-      faces: [],
-      state: mods.snake.createSnakeWorld(),
-      endsAt: null,
-      seq: 1,
-      mods,
-      readyIds: [],
-      matched: false,
-      seekingMatch: false,
-    };
-  } else {
-    rec = { ...rec, mods };
-  }
-  rec.state = mods.snake.joinSnake(rec.state, {
-    id: userId,
-    name: playerName(user),
-    human: true,
+    let rec = await attachMods(await getRoomRecord(SNAKE_WORLD_ID));
+    if (!rec) {
+      rec = {
+        id: SNAKE_WORLD_ID,
+        game: "snake",
+        seats: [],
+        faces: [],
+        state: mods.snake.createSnakeWorld(),
+        endsAt: null,
+        seq: 1,
+        mods,
+        readyIds: [],
+        matched: false,
+        seekingMatch: false,
+      };
+    } else {
+      rec = { ...rec, mods };
+    }
+    rec.state = mods.snake.joinSnake(rec.state, {
+      id: userId,
+      name: playerName(user),
+      human: true,
+    });
+    await syncSnakeSeats(rec);
+    if (!rec.endsAt || rec.endsAt < Date.now()) {
+      rec.endsAt = Date.now() + (mods.snake.TICK_MS || 33);
+    }
+    rec.seq = (rec.seq || 0) + 1;
+    await saveRoom(rec);
+    await wakeUsers(rec.seats);
+    joined = publicRoom(rec, userId);
   });
-  await syncSnakeSeats(rec);
-  if (!rec.endsAt || rec.endsAt < Date.now()) {
-    rec.endsAt = Date.now() + (mods.snake.TICK_MS || 33);
-  }
-  rec.seq = (rec.seq || 0) + 1;
-  await saveRoom(rec);
-  await wakeUsers(rec.seats);
-  });
-  return snapshot(userId);
+  const snap = await snapshot(userId);
+  // Prefer the seat we just wrote — a concurrent leave/forfeit poll must not blank the join reply.
+  if (!snap.room && joined) return { ...snap, room: joined };
+  return snap;
 }
 
 export async function leaveRoom(userId) {

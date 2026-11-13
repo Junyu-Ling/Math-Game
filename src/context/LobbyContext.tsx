@@ -78,6 +78,8 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   const settledRoom = useRef<string | null>(null);
   /** Ignore stale watch payloads for a room we just left (prevents bounce back to settlement). */
   const dismissedRoomId = useRef<string | null>(null);
+  /** Seat we just claimed — stale watch/sync with `room: null` must not wipe it. */
+  const expectRoomId = useRef<string | null>(null);
 
   function takeRoom(next: RoomSnap | null | undefined, prev: RoomSnap | null) {
     if (!next) return null;
@@ -109,6 +111,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       roomSeq.current = 0;
       dismissedRoomId.current = null;
       settledRoom.current = null;
+      expectRoomId.current = null;
       return;
     }
     let stop = false;
@@ -118,7 +121,16 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       if (next.settlement?.game && next.settlement.view) setSettlement(next.settlement);
       setSnap((prev) => {
         const light = Boolean(next.light);
-        let room = next.room ? takeRoom(next.room, prev.room) : null;
+        let room: RoomSnap | null;
+        if (next.room) {
+          room = takeRoom(next.room, prev.room);
+          if (expectRoomId.current && next.room.id === expectRoomId.current) expectRoomId.current = null;
+        } else if (expectRoomId.current && prev.room?.id === expectRoomId.current) {
+          // Stale watch/sync with room:null racing a just-finished join — keep the seat.
+          room = prev.room;
+        } else {
+          room = null;
+        }
         if (room && dismissedRoomId.current && room.id === dismissedRoomId.current) room = null;
         if (!room) roomSeq.current = 0;
         return {
@@ -227,6 +239,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     leavingRef.current = true;
     const id = room!.id;
     dismissedRoomId.current = id;
+    if (expectRoomId.current === id) expectRoomId.current = null;
     roomSeq.current = 0;
     void lobbyApi
       .leave(token)
@@ -277,6 +290,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     leavingRef.current = true;
     dismissedRoomId.current = room.id;
     settledRoom.current = room.id;
+    if (expectRoomId.current === room.id) expectRoomId.current = null;
     roomSeq.current = 0;
     roomGame.current = null;
     try {
@@ -370,9 +384,13 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         settledRoom.current = null;
         roomSeq.current = 0;
         setSettlement(null);
+        setError("");
         const next = await lobbyApi.snakeJoin(token);
-        if (!next.room || next.room.game !== "snake") throw new Error("Could not enter the snake world");
+        if (!next.room || next.room.game !== "snake") {
+          throw new Error((next as { error?: string }).error || "Could not enter the snake world");
+        }
         acceptRoom(next.room);
+        expectRoomId.current = next.room.id;
         roomSeq.current = next.room.seq || 1;
         setSnap((prev) => ({
           ...next,
