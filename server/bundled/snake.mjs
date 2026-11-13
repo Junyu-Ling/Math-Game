@@ -32,6 +32,17 @@ var FOOD_PICK_SURE = FOOD_PICK * 0.6;
 var RESPAWN_MS = 700;
 var SHIELD_MS = 5e3;
 var SNAKE_WORLD_ID = "snake-world";
+var CANDY_HUES = [348, 12, 32, 48, 145, 195, 265, 300, 330];
+var CANDY_KINDS = 8;
+function candyHue() {
+  return CANDY_HUES[Math.floor(Math.random() * CANDY_HUES.length)];
+}
+function candyKind() {
+  return Math.floor(Math.random() * CANDY_KINDS);
+}
+function makeFood(x, y, hue) {
+  return { id: uid("f"), x, y, hue: hue ?? candyHue(), kind: candyKind() };
+}
 var HUES = [150, 12, 210, 48, 280, 30, 190, 330];
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
@@ -112,7 +123,7 @@ function spawnPlayer(person, index, now = Date.now()) {
 function seedFoods(n = FOOD_COUNT) {
   return Array.from({ length: n }, () => {
     const p = randomPoint(4);
-    return { id: uid("f"), x: p.x, y: p.y };
+    return makeFood(p.x, p.y);
   });
 }
 function emptyWorld(mode = "world") {
@@ -236,7 +247,7 @@ function scatterCorpse(path, hue) {
     const pt = path[i];
     const x = clamp(pt.x + (Math.random() - 0.5) * 1.4, FOOD_R, WORLD - FOOD_R);
     const y = clamp(pt.y + (Math.random() - 0.5) * 1.4, FOOD_R, WORLD - FOOD_R);
-    drops.push({ id: uid("c"), x, y, hue });
+    drops.push({ id: uid("c"), x, y, hue, kind: candyKind() });
   }
   if (drops.length < 3) {
     for (const pt of path.slice(0, 3)) {
@@ -244,7 +255,8 @@ function scatterCorpse(path, hue) {
         id: uid("c"),
         x: clamp(pt.x, FOOD_R, WORLD - FOOD_R),
         y: clamp(pt.y, FOOD_R, WORLD - FOOD_R),
-        hue
+        hue,
+        kind: candyKind()
       });
     }
   }
@@ -347,7 +359,7 @@ function stepSnake(state, now = Date.now()) {
   });
   while (foods.length < FOOD_COUNT) {
     const pt = randomPoint(4);
-    foods.push({ id: uid("f"), x: pt.x, y: pt.y });
+    foods.push(makeFood(pt.x, pt.y));
   }
   if (foods.length > FOOD_SOFT_CAP) foods = foods.slice(foods.length - FOOD_SOFT_CAP);
   return {

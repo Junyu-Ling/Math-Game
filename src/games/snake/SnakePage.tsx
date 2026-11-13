@@ -16,6 +16,7 @@ import {
   TICK_MS,
   VIEW_RADIUS,
   WORLD,
+  type Food,
   type SnakeAction,
   type SnakeState,
 } from "./engine";
@@ -29,6 +30,203 @@ function keyAim(key: string): number | null {
   if (key === "ArrowLeft" || key === "a" || key === "A") return Math.PI;
   if (key === "ArrowRight" || key === "d" || key === "D") return 0;
   return null;
+}
+
+function hashKind(id: string) {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) % 8;
+}
+
+function drawCandy(
+  ctx: CanvasRenderingContext2D,
+  f: Food,
+  sx: number,
+  sy: number,
+  r: number,
+  tMs: number,
+) {
+  const kind = Number.isFinite(f.kind) ? ((f.kind! % 8) + 8) % 8 : hashKind(f.id);
+  const hue = Number.isFinite(f.hue) ? f.hue! : 42 + kind * 37;
+  const spin = tMs / 900 + f.x * 0.07 + f.y * 0.05;
+  const fill = `hsl(${hue} 78% 58%)`;
+  const deep = `hsl(${hue} 72% 42%)`;
+  const lite = `hsl(${hue} 90% 78%)`;
+  const foil = `hsl(${(hue + 40) % 360} 55% 72%)`;
+  const alt = `hsl(${(hue + 180) % 360} 70% 92%)`;
+
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(Math.sin(spin) * 0.18 + kind * 0.4);
+
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 3.1);
+  glow.addColorStop(0, `hsla(${hue} 85% 62% / 0.5)`);
+  glow.addColorStop(1, `hsla(${hue} 85% 62% / 0)`);
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 3.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (kind === 0) {
+    // Wrapped twist candy
+    ctx.fillStyle = foil;
+    ctx.beginPath();
+    ctx.moveTo(-r * 1.85, 0);
+    ctx.lineTo(-r * 0.85, -r * 0.55);
+    ctx.lineTo(-r * 0.85, r * 0.55);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(r * 1.85, 0);
+    ctx.lineTo(r * 0.85, -r * 0.55);
+    ctx.lineTo(r * 0.85, r * 0.55);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 0.95, r * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = lite;
+    ctx.lineWidth = Math.max(1, r * 0.18);
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.55, -r * 0.35);
+    ctx.quadraticCurveTo(0, r * 0.15, r * 0.55, -r * 0.35);
+    ctx.stroke();
+  } else if (kind === 1) {
+    // Lollipop
+    ctx.strokeStyle = "rgba(241, 245, 249, 0.85)";
+    ctx.lineWidth = Math.max(1.4, r * 0.28);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, r * 0.35);
+    ctx.lineTo(0, r * 1.85);
+    ctx.stroke();
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.15, r * 0.95, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = alt;
+    ctx.lineWidth = Math.max(1.2, r * 0.22);
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.15, r * 0.55, -0.4, Math.PI * 1.4);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.beginPath();
+    ctx.arc(-r * 0.28, -r * 0.42, r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 2) {
+    // Gumdrop
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.95, r * 0.55);
+    ctx.quadraticCurveTo(-r * 1.05, -r * 0.2, 0, -r * 1.05);
+    ctx.quadraticCurveTo(r * 1.05, -r * 0.2, r * 0.95, r * 0.55);
+    ctx.quadraticCurveTo(0, r * 0.95, -r * 0.95, r * 0.55);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.22, -r * 0.25, r * 0.28, r * 0.18, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = deep;
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.62, r * 0.72, r * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 3) {
+    // Peppermint disc
+    ctx.fillStyle = alt;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = fill;
+    for (let i = 0; i < 6; i++) {
+      const a0 = (i / 6) * Math.PI * 2;
+      const a1 = a0 + Math.PI / 6;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r, a0, a1);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 4) {
+    // Soft square chocolate / toffee
+    const s = r * 1.35;
+    ctx.fillStyle = deep;
+    ctx.beginPath();
+    ctx.roundRect(-s * 0.5, -s * 0.5, s, s, r * 0.22);
+    ctx.fill();
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.roundRect(-s * 0.38, -s * 0.38, s * 0.76, s * 0.76, r * 0.16);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.28)";
+    ctx.lineWidth = Math.max(1, r * 0.12);
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.38);
+    ctx.lineTo(0, s * 0.38);
+    ctx.moveTo(-s * 0.38, 0);
+    ctx.lineTo(s * 0.38, 0);
+    ctx.stroke();
+  } else if (kind === 5) {
+    // Jelly bean
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 0.72, r * 1.05, 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = lite;
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.18, -r * 0.35, r * 0.22, r * 0.38, 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = deep;
+    ctx.beginPath();
+    ctx.ellipse(r * 0.12, r * 0.45, r * 0.35, r * 0.18, 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 6) {
+    // Star candy
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI * 2) / 5;
+      const b = a + Math.PI / 5;
+      const ox = Math.cos(a) * r;
+      const oy = Math.sin(a) * r;
+      const ix = Math.cos(b) * r * 0.42;
+      const iy = Math.sin(b) * r * 0.42;
+      if (i === 0) ctx.moveTo(ox, oy);
+      else ctx.lineTo(ox, oy);
+      ctx.lineTo(ix, iy);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.beginPath();
+    ctx.arc(-r * 0.12, -r * 0.18, r * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Round gumball with ribbon
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = foil;
+    ctx.lineWidth = Math.max(1.4, r * 0.28);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.62, 0.2, Math.PI * 1.3);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.beginPath();
+    ctx.arc(-r * 0.28, -r * 0.32, r * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
 
 function drawWorld(
@@ -90,7 +288,6 @@ function drawWorld(
     const { sx, sy } = toScreen(f.x, f.y);
     if (sx < -30 || sy < -30 || sx > w + 30 || sy > h + 30) continue;
     const pulse = 1 + Math.sin(tMs / 220 + f.x + f.y) * 0.12;
-    const corpse = Number.isFinite(f.hue);
     let fade = 1;
     if (foodBorn) {
       let born = foodBorn.get(f.id);
@@ -103,23 +300,8 @@ function drawWorld(
     }
     if (fade <= 0) continue;
     ctx.globalAlpha = fade;
-    const r = Math.max(2.4, (corpse ? 1.05 : 0.9) * scale) * pulse * (0.55 + 0.45 * fade);
-    const hue = corpse ? f.hue! : 42;
-    const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 3.2);
-    glow.addColorStop(0, `hsla(${hue} 85% 58% / 0.55)`);
-    glow.addColorStop(1, `hsla(${hue} 85% 58% / 0)`);
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(sx, sy, r * 3.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.fillStyle = corpse ? `hsl(${hue} 78% 56%)` : "#fbbf24";
-    ctx.arc(sx, sy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.fillStyle = corpse ? `hsl(${hue} 90% 78%)` : "#fff7d6";
-    ctx.arc(sx - r * 0.25, sy - r * 0.25, r * 0.35, 0, Math.PI * 2);
-    ctx.fill();
+    const r = Math.max(2.6, 0.95 * scale) * pulse * (0.55 + 0.45 * fade);
+    drawCandy(ctx, f, sx, sy, r, tMs);
     ctx.globalAlpha = 1;
   }
 

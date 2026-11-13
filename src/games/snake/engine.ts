@@ -66,7 +66,23 @@ export type SnakePlayer = {
   an?: number;
 };
 
-export type Food = { id: string; x: number; y: number; hue?: number };
+/** Visual candy variety (0–7). Corpse drops keep snake hue; map candy gets its own. */
+export type Food = { id: string; x: number; y: number; hue?: number; kind?: number };
+
+const CANDY_HUES = [348, 12, 32, 48, 145, 195, 265, 300, 330];
+const CANDY_KINDS = 8;
+
+function candyHue() {
+  return CANDY_HUES[Math.floor(Math.random() * CANDY_HUES.length)]!;
+}
+
+function candyKind() {
+  return Math.floor(Math.random() * CANDY_KINDS);
+}
+
+function makeFood(x: number, y: number, hue?: number): Food {
+  return { id: uid("f"), x, y, hue: hue ?? candyHue(), kind: candyKind() };
+}
 
 export type SnakeState = {
   mode: "world" | "practice";
@@ -182,7 +198,7 @@ function spawnPlayer(
 function seedFoods(n = FOOD_COUNT): Food[] {
   return Array.from({ length: n }, () => {
     const p = randomPoint(4);
-    return { id: uid("f"), x: p.x, y: p.y };
+    return makeFood(p.x, p.y);
   });
 }
 
@@ -329,7 +345,7 @@ export function scatterCorpse(path: Point[], hue: number): Food[] {
     const pt = path[i]!;
     const x = clamp(pt.x + (Math.random() - 0.5) * 1.4, FOOD_R, WORLD - FOOD_R);
     const y = clamp(pt.y + (Math.random() - 0.5) * 1.4, FOOD_R, WORLD - FOOD_R);
-    drops.push({ id: uid("c"), x, y, hue });
+    drops.push({ id: uid("c"), x, y, hue, kind: candyKind() });
   }
   if (drops.length < 3) {
     for (const pt of path.slice(0, 3)) {
@@ -338,6 +354,7 @@ export function scatterCorpse(path: Point[], hue: number): Food[] {
         x: clamp(pt.x, FOOD_R, WORLD - FOOD_R),
         y: clamp(pt.y, FOOD_R, WORLD - FOOD_R),
         hue,
+        kind: candyKind(),
       });
     }
   }
@@ -444,7 +461,7 @@ export function stepSnake(state: SnakeState, now = Date.now()): SnakeState {
 
   while (foods.length < FOOD_COUNT) {
     const pt = randomPoint(4);
-    foods.push({ id: uid("f"), x: pt.x, y: pt.y });
+    foods.push(makeFood(pt.x, pt.y));
   }
   if (foods.length > FOOD_SOFT_CAP) foods = foods.slice(foods.length - FOOD_SOFT_CAP);
 
