@@ -191,9 +191,72 @@ function Row({
       node: <span className="gap reserve" aria-hidden />,
     });
   }
+  const fitRef = useRef<HTMLDivElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
+  // Long rows used to overflow a clipped, centred box: both edge tiles ended up outside the
+  // clip rect and could not be clicked. Shrink the whole row to the box so every tile stays hittable.
+  useLayoutEffect(() => {
+    const fit = fitRef.current;
+    const row = rowRef.current;
+    if (!fit || !row) return;
+    const table = vertical ? fit.closest<HTMLElement>(".table-coda") : null;
+    const reset = () => {
+      if (row.style.transform) row.style.transform = "";
+      if (row.style.transformOrigin) row.style.transformOrigin = "";
+      if (fit.style.height) fit.style.height = "";
+      if (fit.style.alignItems) fit.style.alignItems = "";
+    };
+    /** Height the side columns may use: the table is viewport-sized and the other seats keep their rows. */
+    const sideHeight = (): number | null => {
+      if (!table || getComputedStyle(table).maxHeight === "none") return null;
+      const ts = getComputedStyle(table);
+      let avail = table.clientHeight - parseFloat(ts.paddingTop) - parseFloat(ts.paddingBottom);
+      for (const el of table.querySelectorAll<HTMLElement>(":scope > .seat-you, :scope > .seat-rival, :scope > .seat-partner")) {
+        avail -= el.offsetHeight;
+      }
+      const seat = fit.closest<HTMLElement>(".seat");
+      const plaque = seat?.querySelector<HTMLElement>(".seat-plaque");
+      if (plaque) avail -= plaque.offsetHeight + 12;
+      return avail > 60 ? avail : null;
+    };
+    const apply = () => {
+      const cs = getComputedStyle(fit);
+      const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      let scale = 1;
+      if (vertical) {
+        const avail = sideHeight();
+        const natural = row.offsetHeight;
+        if (avail !== null && natural > 0) scale = Math.max(0.3, Math.min(1, (avail - padY) / natural));
+      } else {
+        const avail = fit.clientWidth - padX;
+        const natural = row.offsetWidth;
+        if (natural > 0 && avail > 0) scale = Math.max(0.3, Math.min(1, avail / natural));
+      }
+      if (scale >= 0.999) {
+        reset();
+        return;
+      }
+      const t = `scale(${scale.toFixed(4)})`;
+      if (row.style.transform !== t) row.style.transform = t;
+      row.style.transformOrigin = "top center";
+      fit.style.alignItems = "flex-start";
+      const h = `${Math.ceil(row.offsetHeight * scale + padY)}px`;
+      if (fit.style.height !== h) fit.style.height = h;
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(fit);
+    ro.observe(row);
+    if (table) {
+      ro.observe(table);
+      for (const el of table.querySelectorAll(":scope > .seat-you, :scope > .seat-rival, :scope > .seat-partner")) ro.observe(el);
+    }
+    return () => ro.disconnect();
+  }, [vertical, tiles.length, gapSet.size]);
   return (
-    <div className={`tiles-fit ${vertical ? "is-vertical" : ""}`}>
-      <div className="tiles">
+    <div ref={fitRef} className={`tiles-fit ${vertical ? "is-vertical" : ""}`}>
+      <div ref={rowRef} className="tiles">
         {cells.map((c) => (
           <span key={c.key}>{c.node}</span>
         ))}
@@ -376,6 +439,36 @@ function rpsCaption(
   return "Throw. Loser guesses first.";
 }
 
+type Optimistic =
+  | { kind: "slot"; at: number; arrangeId: number; tileId: string; index: number; opening: boolean }
+  | { kind: "select"; at: number; playerId: string; index: number; logLen: number };
+
+const OPTIMISTIC_MS = 2500;
+
+/** Re-apply the player's own not-yet-confirmed taps on top of a (possibly older) server snapshot. */
+function overlayOptimistic(view: CodaState, youId: string | null, pending: Optimistic[]): CodaState {
+  if (!youId || pending.length === 0) return view;
+  const now = Date.now();
+  let v = view;
+  for (const o of pending) {
+    if (now - o.at > OPTIMISTIC_MS) continue;
+    if (o.kind === "slot") {
+      if (v.phase !== "arrange" || o.arrangeId !== v.arrangeId) continue;
+      if (o.opening) {
+        const mine = v.players.find((p) => p.id === youId);
+        if (mine?.stash?.id === o.tileId) v = setPendingSlot(v, o.index, youId);
+      } else if (v.pending?.id === o.tileId && v.pendingSlot !== o.index) {
+        v = setPendingSlot(v, o.index, youId);
+      }
+    } else if (v.phase === "guess" && v.log.length === o.logLen && currentPlayer(v).id === youId) {
+      if (v.selected?.playerId !== o.playerId || v.selected.index !== o.index) {
+        v = selectTile(v, o.playerId, o.index);
+      }
+    }
+  }
+  return v;
+}
+
 export function DaVinciPage() {
   const { user } = useAuth();
   const lobby = useLobby();
@@ -395,6 +488,9 @@ export function DaVinciPage() {
   const [youId, setYouId] = useState<string | null>(null);
   const [rpsBeat, setRpsBeat] = useState(0);
   const endsAtRef = useRef<number | null>(null);
+  const clockOffsetRef = useRef(0);
+  const clockSamplesRef = useRef<number[]>([]);
+  const optimisticRef = useRef<Optimistic[]>([]);
   const prevLog = useRef(0);
   const online = Boolean(codaRoom);
   const matching = Boolean(user && lobby.invites.some((i) => i.game === "coda" && i.fromId === user.id));
@@ -438,7 +534,33 @@ export function DaVinciPage() {
 
   function dispatch(action: CodaAction) {
     if (codaRoom) {
-      void lobby.sendAction(action);
+      // Show the player's own choice at once; the server stays the source of truth and
+      // overlayOptimistic() keeps it from flickering back when an older snapshot lands.
+      if (action.type === "slot" && state && you && arranging) {
+        const openingNow = state.resume === "draw";
+        const tile = openingNow ? you.stash : state.pending;
+        if (tile) {
+          optimisticRef.current.push({
+            kind: "slot",
+            at: Date.now(),
+            arrangeId: state.arrangeId,
+            tileId: tile.id,
+            index: action.index,
+            opening: openingNow,
+          });
+          setState((s) => (s ? setPendingSlot(s, action.index, you.id) : s));
+        }
+      } else if (action.type === "select" && state && myTurn && state.phase === "guess") {
+        optimisticRef.current.push({
+          kind: "select",
+          at: Date.now(),
+          playerId: action.playerId,
+          index: action.index,
+          logLen: state.log.length,
+        });
+        setState((s) => (s ? selectTile(s, action.playerId, action.index) : s));
+      }
+      lobby.sendAction(action).catch(() => {});
       return;
     }
     if (action.type === "draw") setState((s) => (s ? drawCard(s, action.color) : s));
@@ -489,17 +611,26 @@ export function DaVinciPage() {
     const roomEnds = online ? codaRoom?.endsAt ?? endsAtRef.current : null;
     // Never start a fresh 5s if the server deadline is missing or already past.
     const deadline = online ? (roomEnds ?? Date.now()) : Date.now() + ARRANGE_MS;
+    // Online the countdown runs on the server clock, so a fast/slow device clock cannot end it early or late.
+    const nowMs = () => Date.now() + (online ? clockOffsetRef.current : 0);
     let id = 0;
-    let flushed = false;
+    let lastTick = 0;
     const tick = () => {
-      const left = Math.max(0, deadline - Date.now());
+      const left = Math.max(0, deadline - nowMs());
       setRemain(left / 1000);
-      if (left <= 0) {
+      if (left > 0) return;
+      if (!online) {
         window.clearInterval(id);
-        if (flushed) return;
-        flushed = true;
         setState((s) => (s && s.phase === "arrange" ? finishArrange(s) : s));
-        if (online) void lobby.sendAction({ type: "tick" });
+        return;
+      }
+      // Online: never finish locally. Other players' rows are masked here, so a local guess put
+      // their tile in the wrong slot and it jumped when the real table arrived. Ask the server
+      // (it also wakes on its own at the deadline) and keep asking until it answers.
+      const t = Date.now();
+      if (t - lastTick >= 600) {
+        lastTick = t;
+        lobby.sendAction({ type: "tick" }).catch(() => {});
       }
     };
     tick();
@@ -640,6 +771,15 @@ export function DaVinciPage() {
     if (!codaRoom) return;
     const view = codaRoom.view as CodaState;
     setYouId(user?.id ?? null);
+    if (typeof codaRoom.serverNow === "number") {
+      // Latency only ever makes (serverNow - local) too small, so the largest recent sample is the truest.
+      const samples = clockSamplesRef.current;
+      samples.push(codaRoom.serverNow - Date.now());
+      if (samples.length > 8) samples.shift();
+      clockOffsetRef.current = Math.max(...samples);
+    }
+    const nowMs = Date.now();
+    optimisticRef.current = optimisticRef.current.filter((o) => nowMs - o.at <= OPTIMISTIC_MS);
     setState((prev) => {
       if (
         prev &&
@@ -658,7 +798,7 @@ export function DaVinciPage() {
         }
       }
       prevLog.current = view.log.length;
-      return view;
+      return overlayOptimistic(view, user?.id ?? null, optimisticRef.current);
     });
     endsAtRef.current = codaRoom.endsAt;
   }, [codaRoom, user?.id]);

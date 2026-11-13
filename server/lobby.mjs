@@ -717,6 +717,11 @@ async function getRoomRecord(roomId) {
   return readJson(`axiom:room:${roomId}`);
 }
 
+/** Test/debug only: the raw (unmasked) room record. */
+export async function peekRoomRecord(roomId) {
+  return getRoomRecord(roomId);
+}
+
 async function saveRoom(room, opts = {}) {
   const humans = humanSeatIds(room.seats);
   let faces = Array.isArray(room.faces)
@@ -884,7 +889,68 @@ export async function snapshot(userId, light = false) {
   };
 }
 
+const roomChains = new Map();
+const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Serialise every read-modify-write on one room. Without this, two watchers that both see an
+ * expired arrange timer (or an action racing a CPU step) each compute their own next state —
+ * with different random picks — and the loser silently overwrites the winner: players then hold
+ * different tables at the same seq (cards flash/teleport and never resync).
+ */
+async function withRoomLock(roomId, fn) {
+  const id = String(roomId);
+  const prev = roomChains.get(id) || Promise.resolve();
+  let release = () => {};
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const tail = prev.then(() => gate);
+  roomChains.set(id, tail);
+  await prev;
+  const lockKey = `axiom:roomlock:${id}`;
+  const token = `${process.pid}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  let held = false;
+  try {
+    if (client()) {
+      for (let i = 0; i < 120 && !held; i++) {
+        held = await kvSetNx(lockKey, token, 4);
+        if (!held) await sleepMs(20);
+      }
+    }
+    return await fn();
+  } finally {
+    if (held) {
+      try {
+        if ((await kvGet(lockKey)) === token) await kvDel(lockKey);
+      } catch {
+        /* lock expires on its own */
+      }
+    }
+    release();
+    if (roomChains.get(id) === tail) roomChains.delete(id);
+  }
+}
+
 async function expireArrange(room, force = false) {
+  const skewMs = force ? 120 : 0;
+  if (!room?.endsAt || Date.now() + skewMs < room.endsAt) return;
+  // Snake ticks are high frequency and tolerate a lost step; everything else must be serialised.
+  if (room.game === "snake") {
+    await expireArrangeCore(room, force);
+    return;
+  }
+  await withRoomLock(room.id, async () => {
+    const fresh = await attachMods(await getRoomRecord(room.id));
+    if (!fresh) return;
+    fresh.mods = room.mods || fresh.mods;
+    if (Array.isArray(room.faces) && room.faces.length) fresh.faces = fresh.faces ?? room.faces;
+    await expireArrangeCore(fresh, force);
+    Object.assign(room, fresh);
+  });
+}
+
+async function expireArrangeCore(room, force = false) {
   // Client "tick" may run a hair early — allow a tiny skew, never skip the deadline entirely.
   const skewMs = force ? 120 : 0;
   const due = Boolean(room.endsAt && Date.now() + skewMs >= room.endsAt);
@@ -1304,20 +1370,25 @@ async function pumpCpu(room) {
   const lockTtl = room.game === "gomoku" && rapfiAvailable() ? 30 : 4;
   if (!(await kvSetNx(`axiom:cpustep:${room.id}`, "1", lockTtl))) return false;
   try {
-    const fresh = await attachMods(await getRoomRecord(room.id));
-    if (!fresh) return false;
-    fresh.mods = fresh.mods || room.mods;
-    if (!fresh.cpuReadyAt || Date.now() + 40 < fresh.cpuReadyAt || !cpuIsToAct(fresh)) return false;
-    const ok = await playOneCpuTurn(fresh);
-    if (!ok) {
-      fresh.cpuReadyAt = null;
-    } else {
-      fresh.cpuReadyAt = cpuIsToAct(fresh) ? Date.now() + CPU_THINK_MS : null;
-    }
-    fresh.seq = (fresh.seq || 0) + 1;
-    await saveRoom(fresh);
-    Object.assign(room, fresh);
-    return true;
+    const step = async () => {
+      const fresh = await attachMods(await getRoomRecord(room.id));
+      if (!fresh) return false;
+      fresh.mods = fresh.mods || room.mods;
+      if (!fresh.cpuReadyAt || Date.now() + 40 < fresh.cpuReadyAt || !cpuIsToAct(fresh)) return false;
+      const ok = await playOneCpuTurn(fresh);
+      if (!ok) {
+        fresh.cpuReadyAt = null;
+      } else {
+        fresh.cpuReadyAt = cpuIsToAct(fresh) ? Date.now() + CPU_THINK_MS : null;
+      }
+      fresh.seq = (fresh.seq || 0) + 1;
+      await saveRoom(fresh);
+      Object.assign(room, fresh);
+      return true;
+    };
+    // Engine search (RAPFI) can run for seconds; the snake world is lock-free by design.
+    if (room.game === "snake" || (room.game === "gomoku" && rapfiAvailable())) return await step();
+    return await withRoomLock(room.id, step);
   } finally {
     await kvDel(`axiom:cpustep:${room.id}`);
   }
@@ -1571,12 +1642,20 @@ const OPEN_TABLES = new Set([
 
 export async function applyRoomAction(user, roomId, action, mods) {
   mods = mods || (await getMods());
+  const peek = await getRoomRecord(roomId);
+  if (!peek || !peek.seats.includes(user.id)) throw new Error("Game not found");
+  // Snake world keeps its own lock-free tick loop; every other table is serialised per room.
+  if (peek.game === "snake") return applyRoomActionLocked(user, roomId, action, mods);
+  return withRoomLock(roomId, () => applyRoomActionLocked(user, roomId, action, mods));
+}
+
+async function applyRoomActionLocked(user, roomId, action, mods) {
   const rec = await getRoomRecord(roomId);
   if (!rec || !rec.seats.includes(user.id)) throw new Error("Game not found");
   const room = { ...rec, mods };
-  await expireArrange(room);
+  await expireArrangeCore(room);
   if (action && action.type === "tick") {
-    await expireArrange(room, true);
+    await expireArrangeCore(room, true);
     return publicRoom(room, user.id);
   }
   if (
@@ -1904,6 +1983,8 @@ function publicRoom(room, viewerId) {
     game: room.game,
     seats: room.seats,
     endsAt: room.endsAt,
+    /** Server clock so clients can align countdowns (a skewed local clock made inserts fire early/late). */
+    serverNow: Date.now(),
     seq: room.seq || 0,
     seekingMatch: Boolean(room.seekingMatch),
     view,

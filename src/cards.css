@@ -1375,6 +1375,21 @@
   min-height: 0;
 }
 
+/* Seat boxes span whole grid cells and overlap each other; only real tiles/gaps/buttons take clicks,
+   so a neighbour's empty box can never swallow a tap on an edge tile. */
+.table-coda > .seat,
+.table-coda > .seat .tiles-wrap,
+.table-coda > .seat .tiles-fit,
+.table-coda > .seat .tiles {
+  pointer-events: none;
+}
+.table-coda > .seat .mj,
+.table-coda > .seat .gap.on,
+.table-coda > .seat button,
+.table-coda > .seat a {
+  pointer-events: auto;
+}
+
 .table-coda .seat.veiled .tiles {
   visibility: hidden;
 }

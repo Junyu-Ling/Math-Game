@@ -33,6 +33,8 @@ export type RoomSnap = {
   game: string;
   seats: string[];
   endsAt: number | null;
+  /** Server clock when this snapshot was built (aligns client countdowns). */
+  serverNow?: number;
   seq?: number;
   seekingMatch?: boolean;
   view: unknown;
