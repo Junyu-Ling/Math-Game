@@ -231,8 +231,19 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     void lobbyApi
       .leave(token)
       .then((next) => {
-        setSnap({ ...next, room: null });
-        roomGame.current = null;
+        setSnap((prev) => {
+          // A re-join while leave was in flight must keep the new seat.
+          if (dismissedRoomId.current !== id) {
+            return {
+              ...next,
+              online: next.online?.length ? next.online : prev.online,
+              room: prev.room,
+              queue: next.queue ?? prev.queue,
+            };
+          }
+          roomGame.current = null;
+          return { ...next, online: next.online?.length ? next.online : prev.online, room: null };
+        });
       })
       .catch(() => {})
       .finally(() => {
@@ -353,18 +364,22 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       },
       async joinSnakeWorld() {
         if (!token) throw new Error("Sign in first");
+        // Cancel any in-flight leave so it cannot wipe this seat a moment later.
+        leavingRef.current = false;
         dismissedRoomId.current = null;
         settledRoom.current = null;
+        roomSeq.current = 0;
         setSettlement(null);
         const next = await lobbyApi.snakeJoin(token);
+        if (!next.room || next.room.game !== "snake") throw new Error("Could not enter the snake world");
         acceptRoom(next.room);
+        roomSeq.current = next.room.seq || 1;
         setSnap((prev) => ({
           ...next,
           online: next.online?.length ? next.online : prev.online,
-          room: takeRoom(next.room, prev.room),
+          room: next.room,
           queue: next.queue ?? null,
         }));
-        if (next.room) roomSeq.current = next.room.seq || roomSeq.current;
       },
       async cancelMatch() {
         if (!token) return;

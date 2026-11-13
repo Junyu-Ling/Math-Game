@@ -283,30 +283,11 @@ export function SnakePage() {
   const showing = Boolean(serverView || local);
 
   useEffect(() => {
-    if (!user) return;
-    if (room?.game === "snake") return;
-    let stop = false;
-    setJoining(true);
-    void (async () => {
-      try {
-        await lobby.joinSnakeWorld();
-      } catch {
-        /* stay on practice entry */
-      } finally {
-        if (!stop) setJoining(false);
-      }
-    })();
-    return () => {
-      stop = true;
-    };
-  }, [user?.id]);
-
-  useEffect(() => {
     if (room) {
       setLocal(null);
       return;
     }
-    // Left the world — drop predicted state so entry/rejoin starts clean.
+    // Left the world ? drop predicted state so entry/rejoin starts clean.
     liveRef.current = null;
     lastServerTickRef.current = -1;
     setHud(null);
@@ -609,7 +590,10 @@ export function SnakePage() {
                     disabled={joining}
                     onClick={() => {
                       setJoining(true);
-                      void lobby.joinSnakeWorld().finally(() => setJoining(false));
+                      void lobby
+                        .joinSnakeWorld()
+                        .catch(() => {})
+                        .finally(() => setJoining(false));
                     }}
                   >
                     Enter world
