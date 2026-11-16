@@ -95,7 +95,8 @@ export type SnakeState = {
 
 export type SnakeAction =
   /** `n`: strictly increasing per client; the server drops anything older than what it applied. */
-  | { type: "aim"; angle: number; n?: number }
+  /** `boost` is only set by CPU brains (humans send a separate boost action). */
+  | { type: "aim"; angle: number; n?: number; boost?: boolean }
   | { type: "dir"; x: number; y: number; n?: number }
   | { type: "boost"; on: boolean; n?: number }
   | { type: "join" }
@@ -308,9 +309,19 @@ export function applySnakeAction(state: SnakeState, actorId: string, action: Sna
   if (action.type === "aim" && Number.isFinite(action.angle)) angle = action.angle;
   else if (action.type === "dir") angle = aimFromDir(action.x, action.y);
   if (angle == null) return state;
+  const cpuBoost = action.type === "aim" && typeof action.boost === "boolean" ? action.boost : undefined;
   return {
     ...state,
-    players: state.players.map((p) => (p.id === actorId ? { ...p, aim: angle!, an: seq ?? p.an } : p)),
+    players: state.players.map((p) =>
+      p.id === actorId
+        ? {
+            ...p,
+            aim: angle!,
+            an: seq ?? p.an,
+            ...(cpuBoost === undefined ? {} : { boosting: cpuBoost && p.alive && p.energy > 0 }),
+          }
+        : p,
+    ),
   };
 }
 
@@ -698,6 +709,13 @@ const AI_SOFT_BODY = 8;
 const AI_WALL_SOFT = 7;
 const AI_SCAN = 46;
 
+/**
+ * What a CPU is doing right now. "grow" is the default (eat, stay safe). A bot only turns
+ * predator after it has some body, for a few seconds, then goes back to eating — so fights
+ * happen between developed snakes instead of everyone suiciding at spawn.
+ */
+export type AiMode = "grow" | "hunt" | "flee";
+
 type AiMemory = {
   tick: number;
   foodId: string | null;
@@ -706,18 +724,60 @@ type AiMemory = {
   wanderUntil: number;
   samples: Array<{ tick: number; x: number; y: number }>;
   lastAim: number;
+  lastBoost: boolean;
+  mode: AiMode;
+  preyId: string | null;
+  modeUntil: number;
+  nextHuntCheck: number;
+  /** Which side of the prey's nose we are currently weaving across (+1 / -1). */
+  side: number;
+  sideUntil: number;
+  /** 0.3 (shy) .. 0.9 (bloodthirsty), fixed per bot. */
+  aggr: number;
 };
 
 const aiMemory = new Map<string, AiMemory>();
 
+function aiAggression(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return 0.3 + (((h >>> 0) % 1000) / 1000) * 0.6;
+}
+
 function aiMem(id: string, tick: number): AiMemory {
   let m = aiMemory.get(id);
   if (!m || tick < m.tick - 5) {
-    m = { tick, foodId: null, bad: new Map(), wander: null, wanderUntil: 0, samples: [], lastAim: 0 };
+    m = {
+      tick,
+      foodId: null,
+      bad: new Map(),
+      wander: null,
+      wanderUntil: 0,
+      samples: [],
+      lastAim: 0,
+      lastBoost: false,
+      mode: "grow",
+      preyId: null,
+      modeUntil: 0,
+      // Stagger so a room of fresh bots doesn't all turn on each other on the same tick.
+      nextHuntCheck: tick + 120 + Math.floor(Math.random() * 120),
+      side: Math.random() < 0.5 ? 1 : -1,
+      sideUntil: 0,
+      aggr: aiAggression(id),
+    };
     aiMemory.set(id, m);
   }
   m.tick = tick;
   return m;
+}
+
+/** Debug/test hook: what is this CPU doing? */
+export function snakeAiMode(id: string): { mode: AiMode; preyId: string | null; aggr: number } | null {
+  const m = aiMemory.get(id);
+  return m ? { mode: m.mode, preyId: m.preyId, aggr: m.aggr } : null;
 }
 
 /** Test hook: forget every CPU's memory (new match / new seed). */
@@ -782,6 +842,7 @@ function pickTarget(me: SnakePlayer, state: SnakeState, obs: AiObstacles, mem: A
     const diff = Math.abs(normAngle(Math.atan2(f.y - me.y, f.x - me.x) - me.angle));
     let cost = d + diff * 5 + foodRisk(f, obs);
     if (f.id === mem.foodId) cost -= 9; // stick with the current target
+    if (f.id.startsWith("c-")) cost -= 8; // a dead snake's remains: big, fast growth
     if (cost < bestCost) {
       bestCost = cost;
       best = f;
@@ -805,6 +866,7 @@ function scoreAiHeading(
   foods: Food[],
   target: Point | null,
   turn: number,
+  targetWeight = 1.3,
 ): number {
   let x = me.x;
   let y = me.y;
@@ -853,8 +915,129 @@ function scoreAiHeading(
       }
     }
   }
-  if (target) score -= Math.hypot(x - target.x, y - target.y) * 1.3;
+  if (target) score -= Math.hypot(x - target.x, y - target.y) * targetWeight;
   return score;
+}
+
+function clampInWorld(p: Point, pad = 5): Point {
+  return { x: clamp(p.x, pad, WORLD - pad), y: clamp(p.y, pad, WORLD - pad) };
+}
+
+/** Rival snakes a CPU may reason about (alive, not spawn-shielded). */
+function liveRivals(state: SnakeState, me: SnakePlayer, now: number): SnakePlayer[] {
+  return state.players.filter((p) => p.id !== me.id && p.alive && !isShielded(p, now));
+}
+
+/** A bigger snake bearing down on us: run (and boost if we can). */
+function findThreat(me: SnakePlayer, rivals: SnakePlayer[], aggr: number): SnakePlayer | null {
+  let best: SnakePlayer | null = null;
+  let bestD = Infinity;
+  const margin = 2 + (1 - aggr) * 3;
+  for (const r of rivals) {
+    if (r.score <= me.score + margin) continue;
+    const d = Math.sqrt(dist2(r, me));
+    if (d > 17 || d >= bestD) continue;
+    // Only counts if its nose points roughly at us.
+    const toMe = Math.atan2(me.y - r.y, me.x - r.x);
+    if (Math.abs(normAngle(toMe - r.angle)) > 1.1) continue;
+    best = r;
+    bestD = d;
+  }
+  return best;
+}
+
+function pickPrey(me: SnakePlayer, rivals: SnakePlayer[], aggr: number): SnakePlayer | null {
+  const reach = 14 + 38 * aggr;
+  let best: SnakePlayer | null = null;
+  let bestCost = Infinity;
+  for (const r of rivals) {
+    if (r.score > me.score + 3) continue; // never bully something clearly bigger
+    const d = Math.sqrt(dist2(r, me));
+    if (d > reach) continue;
+    // Bots like fighting each other; people get left a bit more alone.
+    const cost = d + (r.human ? 16 : 0) + Math.max(0, r.score - me.score) * 2;
+    if (cost < bestCost) {
+      bestCost = cost;
+      best = r;
+    }
+  }
+  return best;
+}
+
+/**
+ * Where to steer to kill `prey`. A snake only dies by hitting someone's body, so we don't ram the
+ * head: we aim *ahead* of its nose to lay our body across its path (cut-off), weaving from side to
+ * side once close so the gap in front of it gets boxed in (encircle).
+ */
+function huntTarget(me: SnakePlayer, prey: SnakePlayer, mem: AiMemory, tick: number): Point {
+  const d = Math.sqrt(dist2(me, prey));
+  const dx = Math.cos(prey.angle);
+  const dy = Math.sin(prey.angle);
+  let lead = clamp(d * 0.75, 6, 20);
+  if (prey.boosting) lead *= 1.3;
+  let tx = prey.x + dx * lead;
+  let ty = prey.y + dy * lead;
+  if (d < 15) {
+    if (tick >= mem.sideUntil) {
+      mem.side = -mem.side;
+      mem.sideUntil = tick + 30 + Math.floor(Math.random() * 25);
+    }
+    tx += -dy * mem.side * 5.5;
+    ty += dx * mem.side * 5.5;
+  }
+  return clampInWorld({ x: tx, y: ty }, 6);
+}
+
+function updateAiMode(me: SnakePlayer, state: SnakeState, mem: AiMemory, now: number): Point | null {
+  const rivals = liveRivals(state, me, now);
+  const tick = state.tick;
+
+  const threat = findThreat(me, rivals, mem.aggr);
+  if (threat) {
+    mem.mode = "flee";
+    mem.preyId = threat.id;
+    mem.modeUntil = tick + 36;
+  } else if (mem.mode === "flee" && tick >= mem.modeUntil) {
+    mem.mode = "grow";
+    mem.preyId = null;
+  }
+
+  if (mem.mode === "hunt") {
+    const prey = rivals.find((r) => r.id === mem.preyId);
+    const gone = !prey || tick >= mem.modeUntil || Math.sqrt(dist2(me, prey)) > 62 || prey.score > me.score + 5;
+    if (gone) {
+      mem.mode = "grow";
+      mem.preyId = null;
+      // Go back to developing for a while before the next fight.
+      mem.nextHuntCheck = tick + 70 + Math.floor((1 - mem.aggr) * 160) + Math.floor(Math.random() * 60);
+    }
+  }
+
+  // Only a bot with a real body goes hunting — everyone develops first.
+  const developed = me.score >= 3 + (1 - mem.aggr) * 6;
+  if (mem.mode === "grow" && developed && tick >= mem.nextHuntCheck) {
+    mem.nextHuntCheck = tick + 40;
+    const prey = pickPrey(me, rivals, mem.aggr);
+    if (prey && Math.random() < 0.3 + mem.aggr * 0.55) {
+      mem.mode = "hunt";
+      mem.preyId = prey.id;
+      mem.modeUntil = tick + 90 + Math.floor(mem.aggr * 140);
+      mem.sideUntil = 0;
+    }
+  }
+
+  if (mem.mode === "hunt") {
+    const prey = rivals.find((r) => r.id === mem.preyId);
+    if (prey) return huntTarget(me, prey, mem, tick);
+  }
+  if (mem.mode === "flee") {
+    const t = rivals.find((r) => r.id === mem.preyId);
+    if (t) {
+      const away = Math.atan2(me.y - t.y, me.x - t.x);
+      return clampInWorld({ x: me.x + Math.cos(away) * 24, y: me.y + Math.sin(away) * 24 }, 10);
+    }
+  }
+  return null;
 }
 
 export function aiSnake(state: SnakeState, cpuId: string): SnakeAction {
@@ -865,7 +1048,9 @@ export function aiSnake(state: SnakeState, cpuId: string): SnakeAction {
   // Re-plan every other tick (staggered per bot) — the heading only changes a little per tick anyway.
   let salt = 0;
   for (let i = 0; i < cpuId.length; i++) salt += cpuId.charCodeAt(i);
-  if ((state.tick + salt) % 2 !== 0 && mem.samples.length) return { type: "aim", angle: mem.lastAim };
+  if ((state.tick + salt) % 2 !== 0 && mem.samples.length) {
+    return { type: "aim", angle: mem.lastAim, boost: mem.lastBoost };
+  }
 
   // Hover / spin detector: if we've barely travelled in ~4s, drop the current food and roam elsewhere.
   const last = mem.samples[mem.samples.length - 1];
@@ -893,7 +1078,12 @@ export function aiSnake(state: SnakeState, cpuId: string): SnakeAction {
 
   const obs = gatherObstacles(state, me);
   const foods = nearbyFoods(state, me);
-  const target = pickTarget(me, state, obs, mem) ?? { x: WORLD / 2, y: WORLD / 2 };
+  // Predator / prey logic first; otherwise fall back to eating (develop).
+  const combatTarget = updateAiMode(me, state, mem, Date.now());
+  const foodTarget = pickTarget(me, state, obs, mem);
+  const target = combatTarget ?? foodTarget ?? { x: WORLD / 2, y: WORLD / 2 };
+  // While fighting the goal outweighs a stray candy; while growing, food wins.
+  const targetWeight = combatTarget ? (mem.mode === "flee" ? 2.2 : 2.0) : 1.3;
   const turn = turnRateFor(me);
 
   const candidates: number[] = [];
@@ -905,7 +1095,7 @@ export function aiSnake(state: SnakeState, cpuId: string): SnakeAction {
   let bestAngle = me.angle;
   let bestScore = -Infinity;
   for (const aim of candidates) {
-    let s = scoreAiHeading(me, aim, obs, foods, target, turn);
+    let s = scoreAiHeading(me, aim, obs, foods, target, turn, targetWeight);
     // Tiny hysteresis so near-equal headings don't dither.
     s -= Math.abs(normAngle(aim - me.angle)) * 0.4;
     if (s > bestScore) {
@@ -913,8 +1103,17 @@ export function aiSnake(state: SnakeState, cpuId: string): SnakeAction {
       bestAngle = aim;
     }
   }
+
+  // Sprint only with a purpose: to get ahead of prey, or to get away. Otherwise save the energy.
+  let boost = false;
+  if (combatTarget && bestScore > -1e5) {
+    const gap = Math.hypot(combatTarget.x - me.x, combatTarget.y - me.y);
+    if (mem.mode === "hunt") boost = me.energy > 38 && gap > 9;
+    else if (mem.mode === "flee") boost = me.energy > 22;
+  }
   mem.lastAim = bestAngle;
-  return { type: "aim", angle: bestAngle };
+  mem.lastBoost = boost;
+  return { type: "aim", angle: bestAngle, boost };
 }
 /** Camera top-left for a discrete cell UI (compat). */
 export function cameraOrigin(focus: Point, view = VIEW_RADIUS): { ox: number; oy: number } {

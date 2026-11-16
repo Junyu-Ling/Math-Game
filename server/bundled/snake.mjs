@@ -214,9 +214,17 @@ function applySnakeAction(state, actorId, action) {
   if (action.type === "aim" && Number.isFinite(action.angle)) angle = action.angle;
   else if (action.type === "dir") angle = aimFromDir(action.x, action.y);
   if (angle == null) return state;
+  const cpuBoost = action.type === "aim" && typeof action.boost === "boolean" ? action.boost : void 0;
   return {
     ...state,
-    players: state.players.map((p) => p.id === actorId ? { ...p, aim: angle, an: seq ?? p.an } : p)
+    players: state.players.map(
+      (p) => p.id === actorId ? {
+        ...p,
+        aim: angle,
+        an: seq ?? p.an,
+        ...cpuBoost === void 0 ? {} : { boosting: cpuBoost && p.alive && p.energy > 0 }
+      } : p
+    )
   };
 }
 function segmentHit(head, path, skip, radius) {
@@ -531,14 +539,43 @@ var AI_SOFT_BODY = 8;
 var AI_WALL_SOFT = 7;
 var AI_SCAN = 46;
 var aiMemory = /* @__PURE__ */ new Map();
+function aiAggression(id) {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return 0.3 + (h >>> 0) % 1e3 / 1e3 * 0.6;
+}
 function aiMem(id, tick) {
   let m = aiMemory.get(id);
   if (!m || tick < m.tick - 5) {
-    m = { tick, foodId: null, bad: /* @__PURE__ */ new Map(), wander: null, wanderUntil: 0, samples: [], lastAim: 0 };
+    m = {
+      tick,
+      foodId: null,
+      bad: /* @__PURE__ */ new Map(),
+      wander: null,
+      wanderUntil: 0,
+      samples: [],
+      lastAim: 0,
+      lastBoost: false,
+      mode: "grow",
+      preyId: null,
+      modeUntil: 0,
+      // Stagger so a room of fresh bots doesn't all turn on each other on the same tick.
+      nextHuntCheck: tick + 120 + Math.floor(Math.random() * 120),
+      side: Math.random() < 0.5 ? 1 : -1,
+      sideUntil: 0,
+      aggr: aiAggression(id)
+    };
     aiMemory.set(id, m);
   }
   m.tick = tick;
   return m;
+}
+function snakeAiMode(id) {
+  const m = aiMemory.get(id);
+  return m ? { mode: m.mode, preyId: m.preyId, aggr: m.aggr } : null;
 }
 function resetSnakeAi() {
   aiMemory.clear();
@@ -591,6 +628,7 @@ function pickTarget(me, state, obs, mem) {
     const diff = Math.abs(normAngle(Math.atan2(f.y - me.y, f.x - me.x) - me.angle));
     let cost = d + diff * 5 + foodRisk(f, obs);
     if (f.id === mem.foodId) cost -= 9;
+    if (f.id.startsWith("c-")) cost -= 8;
     if (cost < bestCost) {
       bestCost = cost;
       best = f;
@@ -605,7 +643,7 @@ function nearbyFoods(state, me) {
   for (const f of state.foods) if (dist2(f, me) <= r2) out.push(f);
   return out;
 }
-function scoreAiHeading(me, aim, obs, foods, target, turn) {
+function scoreAiHeading(me, aim, obs, foods, target, turn, targetWeight = 1.3) {
   let x = me.x;
   let y = me.y;
   let angle = me.angle;
@@ -650,8 +688,108 @@ function scoreAiHeading(me, aim, obs, foods, target, turn) {
       }
     }
   }
-  if (target) score -= Math.hypot(x - target.x, y - target.y) * 1.3;
+  if (target) score -= Math.hypot(x - target.x, y - target.y) * targetWeight;
   return score;
+}
+function clampInWorld(p, pad = 5) {
+  return { x: clamp(p.x, pad, WORLD - pad), y: clamp(p.y, pad, WORLD - pad) };
+}
+function liveRivals(state, me, now) {
+  return state.players.filter((p) => p.id !== me.id && p.alive && !isShielded(p, now));
+}
+function findThreat(me, rivals, aggr) {
+  let best = null;
+  let bestD = Infinity;
+  const margin = 2 + (1 - aggr) * 3;
+  for (const r of rivals) {
+    if (r.score <= me.score + margin) continue;
+    const d = Math.sqrt(dist2(r, me));
+    if (d > 17 || d >= bestD) continue;
+    const toMe = Math.atan2(me.y - r.y, me.x - r.x);
+    if (Math.abs(normAngle(toMe - r.angle)) > 1.1) continue;
+    best = r;
+    bestD = d;
+  }
+  return best;
+}
+function pickPrey(me, rivals, aggr) {
+  const reach = 14 + 38 * aggr;
+  let best = null;
+  let bestCost = Infinity;
+  for (const r of rivals) {
+    if (r.score > me.score + 3) continue;
+    const d = Math.sqrt(dist2(r, me));
+    if (d > reach) continue;
+    const cost = d + (r.human ? 16 : 0) + Math.max(0, r.score - me.score) * 2;
+    if (cost < bestCost) {
+      bestCost = cost;
+      best = r;
+    }
+  }
+  return best;
+}
+function huntTarget(me, prey, mem, tick) {
+  const d = Math.sqrt(dist2(me, prey));
+  const dx = Math.cos(prey.angle);
+  const dy = Math.sin(prey.angle);
+  let lead = clamp(d * 0.75, 6, 20);
+  if (prey.boosting) lead *= 1.3;
+  let tx = prey.x + dx * lead;
+  let ty = prey.y + dy * lead;
+  if (d < 15) {
+    if (tick >= mem.sideUntil) {
+      mem.side = -mem.side;
+      mem.sideUntil = tick + 30 + Math.floor(Math.random() * 25);
+    }
+    tx += -dy * mem.side * 5.5;
+    ty += dx * mem.side * 5.5;
+  }
+  return clampInWorld({ x: tx, y: ty }, 6);
+}
+function updateAiMode(me, state, mem, now) {
+  const rivals = liveRivals(state, me, now);
+  const tick = state.tick;
+  const threat = findThreat(me, rivals, mem.aggr);
+  if (threat) {
+    mem.mode = "flee";
+    mem.preyId = threat.id;
+    mem.modeUntil = tick + 36;
+  } else if (mem.mode === "flee" && tick >= mem.modeUntil) {
+    mem.mode = "grow";
+    mem.preyId = null;
+  }
+  if (mem.mode === "hunt") {
+    const prey = rivals.find((r) => r.id === mem.preyId);
+    const gone = !prey || tick >= mem.modeUntil || Math.sqrt(dist2(me, prey)) > 62 || prey.score > me.score + 5;
+    if (gone) {
+      mem.mode = "grow";
+      mem.preyId = null;
+      mem.nextHuntCheck = tick + 70 + Math.floor((1 - mem.aggr) * 160) + Math.floor(Math.random() * 60);
+    }
+  }
+  const developed = me.score >= 3 + (1 - mem.aggr) * 6;
+  if (mem.mode === "grow" && developed && tick >= mem.nextHuntCheck) {
+    mem.nextHuntCheck = tick + 40;
+    const prey = pickPrey(me, rivals, mem.aggr);
+    if (prey && Math.random() < 0.3 + mem.aggr * 0.55) {
+      mem.mode = "hunt";
+      mem.preyId = prey.id;
+      mem.modeUntil = tick + 90 + Math.floor(mem.aggr * 140);
+      mem.sideUntil = 0;
+    }
+  }
+  if (mem.mode === "hunt") {
+    const prey = rivals.find((r) => r.id === mem.preyId);
+    if (prey) return huntTarget(me, prey, mem, tick);
+  }
+  if (mem.mode === "flee") {
+    const t = rivals.find((r) => r.id === mem.preyId);
+    if (t) {
+      const away = Math.atan2(me.y - t.y, me.x - t.x);
+      return clampInWorld({ x: me.x + Math.cos(away) * 24, y: me.y + Math.sin(away) * 24 }, 10);
+    }
+  }
+  return null;
 }
 function aiSnake(state, cpuId) {
   const me = state.players.find((p) => p.id === cpuId);
@@ -659,7 +797,9 @@ function aiSnake(state, cpuId) {
   const mem = aiMem(cpuId, state.tick);
   let salt = 0;
   for (let i = 0; i < cpuId.length; i++) salt += cpuId.charCodeAt(i);
-  if ((state.tick + salt) % 2 !== 0 && mem.samples.length) return { type: "aim", angle: mem.lastAim };
+  if ((state.tick + salt) % 2 !== 0 && mem.samples.length) {
+    return { type: "aim", angle: mem.lastAim, boost: mem.lastBoost };
+  }
   const last = mem.samples[mem.samples.length - 1];
   if (!last || state.tick - last.tick >= 20) {
     mem.samples.push({ tick: state.tick, x: me.x, y: me.y });
@@ -684,7 +824,10 @@ function aiSnake(state, cpuId) {
   }
   const obs = gatherObstacles(state, me);
   const foods = nearbyFoods(state, me);
-  const target = pickTarget(me, state, obs, mem) ?? { x: WORLD / 2, y: WORLD / 2 };
+  const combatTarget = updateAiMode(me, state, mem, Date.now());
+  const foodTarget = pickTarget(me, state, obs, mem);
+  const target = combatTarget ?? foodTarget ?? { x: WORLD / 2, y: WORLD / 2 };
+  const targetWeight = combatTarget ? mem.mode === "flee" ? 2.2 : 2 : 1.3;
   const turn = turnRateFor(me);
   const candidates = [];
   for (let k = 0; k < 24; k++) candidates.push(normAngle(k * (Math.PI / 12)));
@@ -694,15 +837,22 @@ function aiSnake(state, cpuId) {
   let bestAngle = me.angle;
   let bestScore = -Infinity;
   for (const aim of candidates) {
-    let s = scoreAiHeading(me, aim, obs, foods, target, turn);
+    let s = scoreAiHeading(me, aim, obs, foods, target, turn, targetWeight);
     s -= Math.abs(normAngle(aim - me.angle)) * 0.4;
     if (s > bestScore) {
       bestScore = s;
       bestAngle = aim;
     }
   }
+  let boost = false;
+  if (combatTarget && bestScore > -1e5) {
+    const gap = Math.hypot(combatTarget.x - me.x, combatTarget.y - me.y);
+    if (mem.mode === "hunt") boost = me.energy > 38 && gap > 9;
+    else if (mem.mode === "flee") boost = me.energy > 22;
+  }
   mem.lastAim = bestAngle;
-  return { type: "aim", angle: bestAngle };
+  mem.lastBoost = boost;
+  return { type: "aim", angle: bestAngle, boost };
 }
 function cameraOrigin(focus, view = VIEW_RADIUS) {
   const ox = clamp(focus.x - view / 2, 0, Math.max(0, WORLD - view));
@@ -765,6 +915,7 @@ export {
   resetSnakeAi,
   scatterCorpse,
   smoothPeers,
+  snakeAiMode,
   startSnakeDuel,
   startSnakeLobby,
   startSnakePractice,
