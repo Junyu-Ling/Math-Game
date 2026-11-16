@@ -316,7 +316,7 @@ export async function handle(req, res, path) {
         return;
       }
       if (op === "snakeJoin") {
-        send(res, 200, await joinSnakeWorld(user));
+        send(res, 200, await joinSnakeWorld(user, body?.hue));
         return;
       }
       if (op === "unqueue") {

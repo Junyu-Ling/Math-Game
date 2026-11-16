@@ -631,7 +631,7 @@ app.post("/api/lobby", auth, async (req, res) => {
       return res.json(await enqueueMatch(req.user, String(req.body.game || ""), req.body.meta || {}));
     }
     if (op === "snakeJoin") {
-      return res.json(await joinSnakeWorld(req.user));
+      return res.json(await joinSnakeWorld(req.user, req.body?.hue));
     }
     if (op === "unqueue") {
       await leaveQueue(req.user.id);

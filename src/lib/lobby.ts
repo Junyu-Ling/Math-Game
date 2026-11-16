@@ -139,8 +139,8 @@ export const lobbyApi = {
   queue(token: string, game: string, meta: Record<string, unknown> = {}) {
     return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "queue", game, meta }) });
   },
-  snakeJoin(token: string) {
-    return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "snakeJoin" }) });
+  snakeJoin(token: string, hue?: number) {
+    return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "snakeJoin", hue }) });
   },
   unqueue(token: string) {
     return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "unqueue" }) });

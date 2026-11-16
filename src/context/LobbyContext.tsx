@@ -14,7 +14,8 @@ type LobbyCtx = {
   inviteCooldownMs: (toId: string) => number;
   invite: (toId: string, game: string, meta?: Record<string, unknown>) => Promise<void>;
   findMatch: (game: string, meta?: Record<string, unknown>) => Promise<void>;
-  joinSnakeWorld: () => Promise<void>;
+  /** `hue`: the colour picked on the entry screen (degrees). */
+  joinSnakeWorld: (hue?: number) => Promise<void>;
   cancelMatch: () => Promise<void>;
   respond: (id: string, accept: boolean) => Promise<void>;
   sendAction: (action: object) => Promise<void>;
@@ -385,7 +386,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
           if (path) nav(path);
         }
       },
-      async joinSnakeWorld() {
+      async joinSnakeWorld(hue) {
         if (!token) throw new Error("Sign in first");
         // Cancel any in-flight leave so it cannot wipe this seat a moment later.
         leavingRef.current = false;
@@ -394,7 +395,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         roomSeq.current = 0;
         setSettlement(null);
         setError("");
-        const next = await lobbyApi.snakeJoin(token);
+        const next = await lobbyApi.snakeJoin(token, hue);
         if (!next.room || next.room.game !== "snake") {
           throw new Error((next as { error?: string }).error || "Could not enter the snake world");
         }

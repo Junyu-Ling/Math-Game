@@ -104,6 +104,34 @@ export type SnakeAction =
 
 const HUES = [150, 12, 210, 48, 280, 30, 190, 330];
 
+/** Colours a player can pick before entering (hue in degrees). */
+export const SNAKE_COLORS: Array<{ hue: number; name: string }> = [
+  { hue: 150, name: "Emerald" },
+  { hue: 8, name: "Ruby" },
+  { hue: 28, name: "Orange" },
+  { hue: 48, name: "Gold" },
+  { hue: 95, name: "Lime" },
+  { hue: 185, name: "Cyan" },
+  { hue: 212, name: "Sky" },
+  { hue: 255, name: "Indigo" },
+  { hue: 285, name: "Violet" },
+  { hue: 325, name: "Pink" },
+];
+
+export const DEFAULT_SNAKE_HUE = 150;
+
+/** Accept only a real hue; anything else means "pick one for me". */
+export function cleanHue(h: unknown): number | undefined {
+  const n = typeof h === "number" ? h : typeof h === "string" && h.trim() !== "" ? Number(h) : NaN;
+  if (!Number.isFinite(n)) return undefined;
+  return ((Math.round(n) % 360) + 360) % 360;
+}
+
+function hueGap(a: number, b: number) {
+  const d = Math.abs(a - b) % 360;
+  return Math.min(d, 360 - d);
+}
+
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
@@ -171,7 +199,7 @@ export function isShielded(p: Pick<SnakePlayer, "alive" | "shieldUntil">, now = 
 }
 
 function spawnPlayer(
-  person: { id: string; name: string; human?: boolean },
+  person: { id: string; name: string; human?: boolean; hue?: number },
   index: number,
   now = Date.now(),
 ): SnakePlayer {
@@ -189,7 +217,7 @@ function spawnPlayer(
     alive: true,
     score: 0,
     energy: ENERGY_START,
-    hue: hueFor(person.id, index),
+    hue: cleanHue(person.hue) ?? hueFor(person.id, index),
     respawnAt: null,
     boosting: false,
     shieldUntil: now + SHIELD_MS,
@@ -218,14 +246,18 @@ export function createSnakeWorld(): SnakeState {
   return emptyWorld("world");
 }
 
-export function startSnakePractice(cpus = 2): SnakeState {
+export function startSnakePractice(cpus = 2, youHue?: number): SnakeState {
   const n = Math.max(0, Math.min(6, Math.floor(cpus) || 0));
+  const mine = cleanHue(youHue);
+  // CPUs take the palette colours that are not close to yours, so you can always tell yourself apart.
+  const pool = SNAKE_COLORS.map((c) => c.hue).filter((h) => mine == null || hueGap(h, mine) >= 40);
   const people = [
-    { id: "you", name: "YOU", human: true },
+    { id: "you", name: "YOU", human: true, hue: mine },
     ...Array.from({ length: n }, (_, i) => ({
       id: i === 0 ? "cpu" : `cpu-${i + 1}`,
       name: i === 0 ? "CPU" : `CPU ${i + 1}`,
       human: false,
+      hue: pool.length ? pool[i % pool.length] : undefined,
     })),
   ];
   const state = emptyWorld("practice");
@@ -255,7 +287,10 @@ export function finishCountdown(state: SnakeState): SnakeState {
   return { ...state, phase: "play" };
 }
 
-export function joinSnake(state: SnakeState, person: { id: string; name: string; human?: boolean }): SnakeState {
+export function joinSnake(
+  state: SnakeState,
+  person: { id: string; name: string; human?: boolean; hue?: number },
+): SnakeState {
   const id = String(person.id);
   if (state.players.some((p) => p.id === id)) return state;
   const player = spawnPlayer(person, state.players.length);

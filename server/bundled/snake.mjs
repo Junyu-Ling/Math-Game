@@ -44,6 +44,28 @@ function makeFood(x, y, hue) {
   return { id: uid("f"), x, y, hue: hue ?? candyHue(), kind: candyKind() };
 }
 var HUES = [150, 12, 210, 48, 280, 30, 190, 330];
+var SNAKE_COLORS = [
+  { hue: 150, name: "Emerald" },
+  { hue: 8, name: "Ruby" },
+  { hue: 28, name: "Orange" },
+  { hue: 48, name: "Gold" },
+  { hue: 95, name: "Lime" },
+  { hue: 185, name: "Cyan" },
+  { hue: 212, name: "Sky" },
+  { hue: 255, name: "Indigo" },
+  { hue: 285, name: "Violet" },
+  { hue: 325, name: "Pink" }
+];
+var DEFAULT_SNAKE_HUE = 150;
+function cleanHue(h) {
+  const n = typeof h === "number" ? h : typeof h === "string" && h.trim() !== "" ? Number(h) : NaN;
+  if (!Number.isFinite(n)) return void 0;
+  return (Math.round(n) % 360 + 360) % 360;
+}
+function hueGap(a, b) {
+  const d = Math.abs(a - b) % 360;
+  return Math.min(d, 360 - d);
+}
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
@@ -114,7 +136,7 @@ function spawnPlayer(person, index, now = Date.now()) {
     alive: true,
     score: 0,
     energy: ENERGY_START,
-    hue: hueFor(person.id, index),
+    hue: cleanHue(person.hue) ?? hueFor(person.id, index),
     respawnAt: null,
     boosting: false,
     shieldUntil: now + SHIELD_MS
@@ -139,14 +161,17 @@ function emptyWorld(mode = "world") {
 function createSnakeWorld() {
   return emptyWorld("world");
 }
-function startSnakePractice(cpus = 2) {
+function startSnakePractice(cpus = 2, youHue) {
   const n = Math.max(0, Math.min(6, Math.floor(cpus) || 0));
+  const mine = cleanHue(youHue);
+  const pool = SNAKE_COLORS.map((c) => c.hue).filter((h) => mine == null || hueGap(h, mine) >= 40);
   const people = [
-    { id: "you", name: "YOU", human: true },
+    { id: "you", name: "YOU", human: true, hue: mine },
     ...Array.from({ length: n }, (_, i) => ({
       id: i === 0 ? "cpu" : `cpu-${i + 1}`,
       name: i === 0 ? "CPU" : `CPU ${i + 1}`,
-      human: false
+      human: false,
+      hue: pool.length ? pool[i % pool.length] : void 0
     }))
   ];
   const state = emptyWorld("practice");
@@ -873,6 +898,7 @@ export {
   CORPSE_MAX,
   CORPSE_STRIDE,
   COUNTDOWN_MS,
+  DEFAULT_SNAKE_HUE,
   ENERGY_MAX,
   ENERGY_PER_FOOD,
   ENERGY_START,
@@ -888,6 +914,7 @@ export {
   RESPAWN_MS,
   ROWS,
   SHIELD_MS,
+  SNAKE_COLORS,
   SNAKE_WORLD_ID,
   SPEED,
   START_LEN,
@@ -905,6 +932,7 @@ export {
   applySnakeAction,
   cameraOrigin,
   canBoost,
+  cleanHue,
   createSnakeWorld,
   finishCountdown,
   isShielded,

@@ -241,6 +241,76 @@
   line-height: 1.55;
 }
 
+.snake-colors {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: 0 auto 22px;
+}
+
+.snake-colors-label {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.snake-colors-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  max-width: 28rem;
+}
+
+.snake-swatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid hsl(var(--hue) 85% 90% / 0.35);
+  background: radial-gradient(circle at 32% 30%, hsl(var(--hue) 90% 76%), hsl(var(--hue) 78% 50%) 62%, hsl(var(--hue) 70% 36%));
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.snake-swatch:hover:not(:disabled) {
+  transform: scale(1.1);
+}
+
+.snake-swatch.on {
+  border-color: #fff;
+  transform: scale(1.14);
+  box-shadow: 0 0 0 3px hsl(var(--hue) 80% 55% / 0.45), 0 6px 18px hsl(var(--hue) 80% 50% / 0.45);
+}
+
+.snake-swatch:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.snake-colors-preview {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.snake-colors-preview i {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: hsl(var(--hue) 78% 50%);
+  border: 2px solid hsl(var(--hue) 85% 90%);
+  margin-left: -5px;
+}
+
+.snake-colors-preview i.head {
+  width: 22px;
+  height: 22px;
+  background: hsl(var(--hue) 82% 58%);
+  border-color: #fff;
+}
+
 .snake-cta {
   background: linear-gradient(135deg, #14b8a6, #0f766e);
   border: none;

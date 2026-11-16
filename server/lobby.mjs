@@ -1920,7 +1920,7 @@ async function syncSnakeSeats(rec) {
   rec.faces = await seatFaces(rec.seats);
 }
 
-export async function joinSnakeWorld(user) {
+export async function joinSnakeWorld(user, hue) {
   const mods = await getMods();
   const userId = String(user.id);
   await touchPresence(user);
@@ -1959,6 +1959,7 @@ export async function joinSnakeWorld(user) {
       id: userId,
       name: playerName(user),
       human: true,
+      hue: mods.snake.cleanHue ? mods.snake.cleanHue(hue) : undefined,
     });
     await syncSnakeSeats(rec);
     if (!rec.endsAt || rec.endsAt < Date.now()) {

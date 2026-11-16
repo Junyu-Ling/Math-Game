@@ -3,12 +3,15 @@ import {
   aiSnake,
   applySnakeAction,
   canBoost,
+  cleanHue,
+  DEFAULT_SNAKE_HUE,
   ENERGY_MAX,
   HEAD_R,
   isShielded,
   newNetMemo,
   reconcileSnake,
   smoothPeers,
+  SNAKE_COLORS,
   SNAKE_WORLD_ID,
   startSnakePractice,
   stepSelfPredict,
@@ -30,6 +33,16 @@ function keyAim(key: string): number | null {
   if (key === "ArrowLeft" || key === "a" || key === "A") return Math.PI;
   if (key === "ArrowRight" || key === "d" || key === "D") return 0;
   return null;
+}
+
+const HUE_KEY = "axiom:snake:hue";
+
+function loadHue(): number {
+  try {
+    return cleanHue(window.localStorage.getItem(HUE_KEY)) ?? DEFAULT_SNAKE_HUE;
+  } catch {
+    return DEFAULT_SNAKE_HUE;
+  }
 }
 
 function hashKind(id: string) {
@@ -300,7 +313,7 @@ function drawWorld(
     }
     if (fade <= 0) continue;
     ctx.globalAlpha = fade;
-    const r = Math.max(2.6, 0.95 * scale) * pulse * (0.55 + 0.45 * fade);
+    const r = Math.max(4, 1.45 * scale) * pulse * (0.55 + 0.45 * fade);
     drawCandy(ctx, f, sx, sy, r, tMs);
     ctx.globalAlpha = 1;
   }
@@ -429,6 +442,15 @@ export function SnakePage() {
   const [local, setLocal] = useState<SnakeState | null>(null);
   const [joining, setJoining] = useState(false);
   const [joinErr, setJoinErr] = useState("");
+  const [myHue, setMyHue] = useState<number>(loadHue);
+  function pickHue(h: number) {
+    setMyHue(h);
+    try {
+      window.localStorage.setItem(HUE_KEY, String(h));
+    } catch {
+      /* private mode */
+    }
+  }
   const [hud, setHud] = useState<{
     score: number;
     energy: number;
@@ -762,9 +784,34 @@ export function SnakePage() {
               <h2>Twist. Feed. Boost.</h2>
               <p>
                 {joining
-                  ? "Dropping you onto the global map?"
+                  ? "Dropping you onto the global map..."
                   : "One continuous arena for everyone online. Steer with mouse or WASD, eat to grow and fill energy, hold Space to boost."}
               </p>
+              <div className="snake-colors" role="radiogroup" aria-label="Snake colour">
+                <span className="snake-colors-label">Your colour</span>
+                <div className="snake-colors-row">
+                  {SNAKE_COLORS.map((c) => (
+                    <button
+                      key={c.hue}
+                      type="button"
+                      role="radio"
+                      aria-checked={myHue === c.hue}
+                      aria-label={c.name}
+                      title={c.name}
+                      disabled={joining}
+                      className={`snake-swatch${myHue === c.hue ? " on" : ""}`}
+                      style={{ ["--hue" as string]: c.hue }}
+                      onClick={() => pickHue(c.hue)}
+                    />
+                  ))}
+                </div>
+                <div className="snake-colors-preview" aria-hidden style={{ ["--hue" as string]: myHue }}>
+                  <i />
+                  <i />
+                  <i />
+                  <i className="head" />
+                </div>
+              </div>
               {joinErr || lobby.error ? <p className="form-error">{joinErr || lobby.error}</p> : null}
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {user ? (
@@ -776,7 +823,7 @@ export function SnakePage() {
                       setJoining(true);
                       setJoinErr("");
                       void lobby
-                        .joinSnakeWorld()
+                        .joinSnakeWorld(myHue)
                         .catch((ex) => {
                           setJoinErr(ex instanceof Error ? ex.message : "Could not enter the snake world");
                         })
@@ -792,7 +839,7 @@ export function SnakePage() {
                   className="btn btn-ghost"
                   type="button"
                   onClick={() => {
-                    const s = startSnakePractice(2);
+                    const s = startSnakePractice(2, myHue);
                     liveRef.current = s;
                     setLocal(s);
                   }}
