@@ -1110,10 +1110,15 @@ export async function respondInvite(user, inviteId, accept, mods) {
   await kvDel(`axiom:inv:${inviteId}`);
   await srem(`axiom:uinv:${invite.fromId}`, inviteId);
   await srem(`axiom:uinv:${invite.toId}`, inviteId);
-  await wakeUsers([invite.fromId, invite.toId]);
-  if (!accept) return { ok: true, declined: true };
+  if (!accept) {
+    // Decline: wake after cleanup so both sides drop the toast together.
+    await wakeUsers([invite.fromId, invite.toId]);
+    return { ok: true, declined: true };
+  }
   await leaveQueue(user.id);
   await leaveQueue(invite.fromId);
+  // Do not wake until the seat exists — an early wake used to return invites:[] with room:null,
+  // so the host briefly thought the invite vanished and never got the table.
   if (OPEN_TABLES.has(invite.game)) {
     return joinOpenTable(user, invite, mods);
   }
@@ -1924,15 +1929,25 @@ export async function joinSnakeWorld(user) {
   return snap;
 }
 
-export async function leaveRoom(userId) {
-  await leaveQueue(userId);
-  const rid = await getSeat(userId);
-  if (!rid) return snapshot(userId);
+export async function leaveRoom(userId, expectedRoomId = null) {
+  const id = String(userId || "");
+  const expected = expectedRoomId ? String(expectedRoomId) : null;
+  const rid = await getSeat(id);
+  // Client leave-on-navigate can race a just-finished match/invite seat claim. If the seat already
+  // moved (or the expected room is already gone and we are only queued), do not cancel the queue
+  // or vacate the new table.
+  if (expected) {
+    if (rid && rid !== expected) return snapshot(id);
+    if (!rid) return snapshot(id);
+  }
+  await leaveQueue(id);
+  if (!rid) return snapshot(id);
   const rec = await attachMods(await getRoomRecord(rid));
   if (!rec) {
-    await kvDel(`axiom:seat:${userId}`);
-    return snapshot(userId);
+    await kvDel(`axiom:seat:${id}`);
+    return snapshot(id);
   }
+  userId = id;
 
   // Shared snake world: drop the snake, keep the map alive.
   if (rec.game === "snake" && (rec.id === SNAKE_WORLD_ID || rec.state?.mode === "world" || WORLD_GAMES.has(rec.game))) {

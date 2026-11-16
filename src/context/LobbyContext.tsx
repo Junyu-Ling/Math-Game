@@ -95,6 +95,9 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     if (dismissedRoomId.current && room.id === dismissedRoomId.current) {
       dismissedRoomId.current = null;
     }
+    // Protect a freshly claimed seat from a racing watch/sync that still has room:null.
+    expectRoomId.current = room.id;
+    settledRoom.current = null;
   }
 
   useEffect(() => {
@@ -208,7 +211,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     setSettlement({ game: room.game, view: room.view });
     setSnap((prev) => ({ ...prev, room: null }));
     void lobbyApi
-      .leave(token)
+      .leave(token, room.id)
       .catch(() => {})
       .finally(() => {
         leavingRef.current = false;
@@ -236,17 +239,19 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     if (!isLiveMatch(room) && room?.game !== "snake") return;
     const path = room?.game ? GAME_PATH[room.game] : "";
     if (!path || loc.pathname === path || leavingRef.current) return;
+    // A newer seat (match/invite) already replaced this one — do not leave the new table.
+    if (expectRoomId.current && expectRoomId.current !== room!.id) return;
     leavingRef.current = true;
     const id = room!.id;
     dismissedRoomId.current = id;
     if (expectRoomId.current === id) expectRoomId.current = null;
     roomSeq.current = 0;
     void lobbyApi
-      .leave(token)
+      .leave(token, id)
       .then((next) => {
         setSnap((prev) => {
           // A re-join while leave was in flight must keep the new seat.
-          if (dismissedRoomId.current !== id) {
+          if (dismissedRoomId.current !== id || (expectRoomId.current && expectRoomId.current !== id)) {
             return {
               ...next,
               online: next.online?.length ? next.online : prev.online,
@@ -271,7 +276,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       const room = snapRef.current.room;
       if (!isLiveMatch(room)) return;
       dismissedRoomId.current = room!.id;
-      lobbyApi.leaveKeepalive(token);
+      lobbyApi.leaveKeepalive(token, room!.id);
       roomSeq.current = 0;
       setSnap((prev) => ({ ...prev, room: null, queue: null }));
       roomGame.current = null;
@@ -294,7 +299,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     roomSeq.current = 0;
     roomGame.current = null;
     try {
-      const next = await lobbyApi.leave(token);
+      const next = await lobbyApi.leave(token, room.id);
       if (live && next.settlement) {
         setSettlement(next.settlement);
         setSnap({ ...next, room: null });
@@ -359,6 +364,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       },
       async findMatch(game, meta = {}) {
         if (!token) throw new Error("Sign in first");
+        leavingRef.current = false;
         dismissedRoomId.current = null;
         settledRoom.current = null;
         setSettlement(null);
@@ -411,6 +417,10 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       },
       async respond(id, accept) {
         if (!token) throw new Error("Sign in first");
+        if (accept) {
+          leavingRef.current = false;
+          dismissedRoomId.current = null;
+        }
         const next = await lobbyApi.respond(token, id, accept);
         if (accept && next.room) {
           setSettlement(null);

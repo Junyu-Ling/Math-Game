@@ -145,11 +145,14 @@ export const lobbyApi = {
   unqueue(token: string) {
     return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "unqueue" }) });
   },
-  leave(token: string) {
-    return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "leave" }) });
+  leave(token: string, roomId?: string | null) {
+    return call(token, "/api/lobby", {
+      method: "POST",
+      body: JSON.stringify({ op: "leave", roomId: roomId || undefined }),
+    });
   },
   /** Best-effort leave when the tab closes (does not await a JSON body). */
-  leaveKeepalive(token: string) {
+  leaveKeepalive(token: string, roomId?: string | null) {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
@@ -157,7 +160,7 @@ export const lobbyApi = {
     void fetch(`${apiBase}/api/lobby`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ op: "leave" }),
+      body: JSON.stringify({ op: "leave", roomId: roomId || undefined }),
       keepalive: true,
     });
   },

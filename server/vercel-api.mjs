@@ -308,7 +308,7 @@ export async function handle(req, res, path) {
         return;
       }
       if (op === "leave") {
-        send(res, 200, await leaveRoom(user.id));
+        send(res, 200, await leaveRoom(user.id, body?.roomId || null));
         return;
       }
       if (op === "queue") {

@@ -625,7 +625,7 @@ app.post("/api/lobby", auth, async (req, res) => {
       return res.json({ ...(await snapshot(req.user.id)), ...result });
     }
     if (op === "leave") {
-      return res.json(await leaveRoom(req.user.id));
+      return res.json(await leaveRoom(req.user.id, req.body?.roomId || null));
     }
     if (op === "queue") {
       return res.json(await enqueueMatch(req.user, String(req.body.game || ""), req.body.meta || {}));
