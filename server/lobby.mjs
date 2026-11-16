@@ -87,13 +87,44 @@ function peopleFromSeats(rec, extra) {
   });
 }
 
+/**
+ * Circuit breaker. When Redis rejects us outright (Upstash "max requests limit exceeded", auth
+ * lost, read-only…) every call used to fail one by one and silently fall back to *this process's*
+ * memory — so presence, seats and queues ended up half in Redis, half in memory, and players
+ * stopped seeing each other / matching. While tripped the whole lobby runs on memory consistently,
+ * and Redis is probed again every REDIS_RETRY_MS.
+ */
+const REDIS_RETRY_MS = 60_000;
+const REDIS_FATAL = /max requests limit|max daily request|NOAUTH|WRONGPASS|READONLY|OOM command|quota|exceeded/i;
+let redisDownUntil = 0;
+let redisDownReason = "";
+
+function noteRedisError(err) {
+  const msg = String(err?.message || err || "");
+  if (!REDIS_FATAL.test(msg)) return;
+  if (Date.now() >= redisDownUntil) {
+    console.warn(`[lobby] Redis unavailable (${msg.slice(0, 120)}). Using in-memory lobby for ${REDIS_RETRY_MS / 1000}s.`);
+  }
+  redisDownUntil = Date.now() + REDIS_RETRY_MS;
+  redisDownReason = msg;
+}
+
+export function redisHealthy() {
+  return Boolean(process.env.REDIS_URL) && Date.now() >= redisDownUntil;
+}
+
+export function redisDownInfo() {
+  return Date.now() < redisDownUntil ? redisDownReason : "";
+}
+
 export function lobbyStoreKind() {
-  return process.env.REDIS_URL ? "redis" : "memory";
+  return redisHealthy() ? "redis" : "memory";
 }
 
 function client() {
   const url = process.env.REDIS_URL;
   if (!url) return null;
+  if (Date.now() < redisDownUntil) return null;
   if (!redis && !redisTried) {
     redisTried = true;
     const tls = url.startsWith("rediss://") ? { rejectUnauthorized: true } : undefined;
@@ -104,7 +135,14 @@ function client() {
       lazyConnect: false,
       tls,
     });
-    redis.on("error", () => {});
+    redis.on("error", (err) => noteRedisError(err));
+    // Command rejections (quota, auth…) never reach the 'error' event — watch them here.
+    const send = redis.sendCommand.bind(redis);
+    redis.sendCommand = (cmd, stream) => {
+      const p = send(cmd, stream);
+      if (p && typeof p.catch === "function") p.catch(noteRedisError);
+      return p;
+    };
   }
   return redis;
 }
@@ -669,9 +707,11 @@ export async function purgeRetiredAccounts() {
 }
 
 let rosterScan = { at: 0, live: [], ids: [] };
+/** Short cache only: a newly online (or just-gone) player must show up within a poll or two. */
+const ROSTER_CACHE_MS = 2000;
 
 async function rosterSource() {
-  if (Date.now() - rosterScan.at < 15000) return rosterScan;
+  if (Date.now() - rosterScan.at < ROSTER_CACHE_MS) return rosterScan;
   const live = await listPresence();
   const ids = [...(await smembers("axiom:users")), ...live.map((p) => String(p.id))];
   rosterScan = { at: Date.now(), live, ids };
@@ -795,6 +835,12 @@ export async function touchPresence(user, href = "") {
   const id = String(user.id);
   const seat = await getSeat(id);
   const qGame = await kvGet(`axiom:quser:${id}`);
+  // First heartbeat (or coming back after expiring), or a seat/queue change: the cached roster
+  // that other players read is now stale.
+  const cached = rosterScan.live.find((p) => String(p.id) === id);
+  if (!cached || (cached.roomId || null) !== (seat || null) || (cached.queueGame || "") !== (qGame || "")) {
+    rosterScan.at = 0;
+  }
   if (qGame) {
     await kvSet(`axiom:quser:${id}`, qGame, QUEUE_TTL);
     const ticket = await kvGet(`axiom:qt:${id}`);
@@ -2585,6 +2631,8 @@ export async function enqueueMatch(user, game, meta = {}) {
   });
   await kvSet(`axiom:qt:${userId}`, ticket, QUEUE_TTL);
   await kvSet(`axiom:quser:${userId}`, game, QUEUE_TTL);
+  // Publish "Matching" right away so friends' player lists don't wait for our next heartbeat.
+  await touchPresence(user);
 
   // After queueing, try again in case a host started seeking while we were writing the ticket.
   const lateJoin = await tryJoinSeekingRoom(user, game, mods);

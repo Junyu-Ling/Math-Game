@@ -168,7 +168,10 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
           if (!stop) timer = window.setTimeout(tick, 20000);
           return;
         }
-        const needRoster = !inRoom && Date.now() - lastFull > 20000;
+        // Keep the player list fresh everywhere (table lobby, queue, idle) — it used to freeze
+        // while seated, so friends who came online later never appeared to invite.
+        const rosterEvery = snapRef.current.room?.game === "snake" ? 30000 : 8000;
+        const needRoster = Date.now() - lastFull > rosterEvery;
         const next = needRoster
           ? await lobbyApi.sync(token, window.location.pathname, false)
           : await lobbyApi.watch(
