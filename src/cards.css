@@ -1514,18 +1514,19 @@
   border-color: #d8d2c8;
 }
 
-/* End-of-match showdown: every code flips face-up before the result banner. */
-.table-coda.table-showdown .mj.face-up .coda-flip {
+/* End-of-match showdown: knocked tiles flip. Secret tiles stay standing — they are face-up
+   only to their owner, and must not flop open just because the table phase changed. */
+.table-coda.table-showdown .mj.down .coda-flip {
   animation: coda-showdown-flip 0.65s ease both;
 }
 
-.table-coda.table-showdown .mj.face-up:nth-child(2) .coda-flip { animation-delay: 0.06s; }
-.table-coda.table-showdown .mj.face-up:nth-child(3) .coda-flip { animation-delay: 0.12s; }
-.table-coda.table-showdown .mj.face-up:nth-child(4) .coda-flip { animation-delay: 0.18s; }
-.table-coda.table-showdown .mj.face-up:nth-child(5) .coda-flip { animation-delay: 0.24s; }
-.table-coda.table-showdown .mj.face-up:nth-child(6) .coda-flip { animation-delay: 0.3s; }
-.table-coda.table-showdown .mj.face-up:nth-child(7) .coda-flip { animation-delay: 0.36s; }
-.table-coda.table-showdown .mj.face-up:nth-child(8) .coda-flip { animation-delay: 0.42s; }
+.table-coda.table-showdown .mj.down:nth-child(2) .coda-flip { animation-delay: 0.06s; }
+.table-coda.table-showdown .mj.down:nth-child(3) .coda-flip { animation-delay: 0.12s; }
+.table-coda.table-showdown .mj.down:nth-child(4) .coda-flip { animation-delay: 0.18s; }
+.table-coda.table-showdown .mj.down:nth-child(5) .coda-flip { animation-delay: 0.24s; }
+.table-coda.table-showdown .mj.down:nth-child(6) .coda-flip { animation-delay: 0.3s; }
+.table-coda.table-showdown .mj.down:nth-child(7) .coda-flip { animation-delay: 0.36s; }
+.table-coda.table-showdown .mj.down:nth-child(8) .coda-flip { animation-delay: 0.42s; }
 
 @keyframes coda-showdown-flip {
   0% {

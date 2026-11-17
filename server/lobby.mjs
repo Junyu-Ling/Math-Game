@@ -6,6 +6,10 @@ import { SOLO_GAMES, WORLD_GAMES, applyForfeit, isLiveMatchState, isLobbyState, 
 const SNAKE_WORLD_ID = "snake-world";
 
 const ONLINE_SEC = 20;
+// A live match must not end because a poll was a few seconds late. The presence record
+// outlives the "online" dot, and a seated player is only forfeited after this long a gap.
+const PRESENCE_TTL_SEC = 240;
+const MATCH_ABSENT_MS = 180_000;
 const INVITE_SEC = 60;
 const ROOM_SEC = 7200;
 const QUEUE_TTL = 60;
@@ -504,7 +508,6 @@ async function listPresence() {
         }
         if (!p || now - p.seenAt > ONLINE_SEC * 1000) {
           await srem("axiom:online", ids[i]);
-          await kvDel(`axiom:p:${ids[i]}`);
           continue;
         }
         out.push(p);
@@ -518,7 +521,6 @@ async function listPresence() {
     const p = await readJson(`axiom:p:${id}`);
     if (!p || now - p.seenAt > ONLINE_SEC * 1000) {
       await srem("axiom:online", id);
-      await kvDel(`axiom:p:${id}`);
       continue;
     }
     out.push(p);
@@ -857,7 +859,7 @@ export async function touchPresence(user, href = "") {
     roomId: seat,
     queueGame: qGame || "",
   };
-  await kvSet(`axiom:p:${id}`, rec, ONLINE_SEC);
+  await kvSet(`axiom:p:${id}`, rec, PRESENCE_TTL_SEC);
   await sadd("axiom:online", id, ONLINE_SEC + 5);
 }
 
@@ -1733,6 +1735,7 @@ const OPEN_TABLES = new Set([
 ]);
 
 export async function applyRoomAction(user, roomId, action, mods) {
+  void touchPresence(user);
   if (
     String(roomId) === SNAKE_WORLD_ID &&
     action &&
@@ -1886,7 +1889,7 @@ function dropLeaver(rec, userId) {
   return null;
 }
 
-/** A seated human whose presence expired mid-match loses at once. */
+/** A seated human who has actually been gone for minutes loses. A late poll must not. */
 async function forfeitIfAbsent(rec, exceptId) {
   if (!rec || !isLiveMatchState(rec.game, rec.state)) return rec;
   const now = Date.now();
@@ -1894,7 +1897,10 @@ async function forfeitIfAbsent(rec, exceptId) {
   for (const id of humans) {
     if (id === exceptId) continue;
     const presence = await readJson(`axiom:p:${id}`);
-    if (presence && now - Number(presence.seenAt || 0) <= ONLINE_SEC * 1000) continue;
+    // The presence record lives for minutes. A missing one means that whole window
+    // passed; a record younger than MATCH_ABSENT_MS means they are still at the table.
+    // (A 20s lapse used to delete the record and forfeit the hand on the spot.)
+    if (presence && now - Number(presence.seenAt || 0) <= MATCH_ABSENT_MS) continue;
     const dropped = dropLeaver(rec, id);
     if (dropped) {
       rec.state = dropped;
