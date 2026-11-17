@@ -68,15 +68,14 @@ export type CodaState = {
   leftByColor?: { black: number; white: number };
 };
 
-function makeDeck(useJokers: boolean): CodaTile[] {
+/** Official deck: black 0–11, white 0–11, and one dash of each color. The dash is not optional. */
+function makeDeck(): CodaTile[] {
   const tiles: CodaTile[] = [];
   for (const color of ["black", "white"] as const) {
     for (let n = 0; n <= 11; n++) {
       tiles.push({ id: uid("t"), color, value: n, revealed: false });
     }
-    if (useJokers) {
-      tiles.push({ id: uid("t"), color, value: "joker", revealed: false });
-    }
+    tiles.push({ id: uid("t"), color, value: "joker", revealed: false });
   }
   return shuffle(tiles);
 }
@@ -250,7 +249,7 @@ function afterOpening(state: CodaState): CodaState {
 
 export function startCodaLobby(
   people: Array<{ id: string; name: string; human?: boolean }>,
-  useJokers: boolean,
+  _useJokers?: boolean,
 ): CodaState {
   const seated = people.slice(0, 4);
   const open = openingCount(seated.length);
@@ -263,7 +262,7 @@ export function startCodaLobby(
     phase: "lobby",
     drawn: null,
     selected: null,
-    useJokers,
+    useJokers: true,
     winnerId: null,
     arrangeId: 0,
     pending: null,
@@ -319,7 +318,7 @@ export function dealCodaTable(state: CodaState): CodaState {
   const seated = state.players.slice(0, 4);
   if (seated.length < 2) return state;
   const open = openingCount(seated.length);
-  const deck = makeDeck(state.useJokers);
+  const deck = makeDeck();
   const players = seated.map((p) => {
     const split = openingSplit(p.black ?? Math.floor(open / 2), p.white ?? open - Math.floor(open / 2), open);
     const dealtTiles = sortOpening([
@@ -333,7 +332,7 @@ export function dealCodaTable(state: CodaState): CodaState {
       out: false,
     });
   });
-  const wait = Boolean(state.useJokers);
+  const wait = players.some((p) => p.stash);
   const stashSlots: Partial<Record<string, number>> = {};
   for (const p of players) {
     if (p.stash) stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
@@ -1035,7 +1034,7 @@ function aiScan(state: CodaState): AiPick | null {
         if (tried.has(String(n))) continue;
         nums.push(n);
       }
-      const jokerOk = state.useJokers && !taken.has(`${tile.color}:joker`) && !tried.has("joker");
+      const jokerOk = !taken.has(`${tile.color}:joker`) && !tried.has("joker");
       const remaining = nums.length + (jokerOk ? 1 : 0);
       if (!remaining) continue;
       const value: CodaValue = nums.length ? nums[Math.floor((nums.length - 1) / 2)]! : "joker";

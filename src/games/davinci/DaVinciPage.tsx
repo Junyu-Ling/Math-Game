@@ -474,11 +474,10 @@ export function DaVinciPage() {
   const lobby = useLobby();
   const codaRoom = lobby.room?.game === "coda" ? lobby.room : null;
   const heldCoda = (!codaRoom && lobby.settlement?.game === "coda" ? lobby.settlement.view : null) as CodaState | null;
-  const [jokers, setJokers] = useState(true);
   useEffect(() => {
-    setPlayMeta({ useJokers: jokers });
+    setPlayMeta({ useJokers: true });
     return () => setPlayMeta({});
-  }, [jokers]);
+  }, []);
   const [blackN, setBlackN] = useState(2);
   const [whiteN, setWhiteN] = useState(2);
   const [seats, setSeats] = useState(2);
@@ -812,16 +811,6 @@ export function DaVinciPage() {
         </div>
         <div className="row-actions">
           <RulesButton game="coda" />
-          <button
-            className="btn btn-ghost"
-            type="button"
-            onClick={() => {
-              setJokers((v) => !v);
-              if (playing) resetTable();
-            }}
-          >
-            {jokers ? "JOKER ON" : "JOKER OFF"}
-          </button>
           <button className="btn btn-ghost" type="button" onClick={() => resetTable()}>
             RESET
           </button>
@@ -920,12 +909,12 @@ export function DaVinciPage() {
                   ) : null}
                   <MixedCpuBar
                     game="coda"
-                    meta={{ useJokers: jokers }}
+                    meta={{ useJokers: true }}
                     cpus={seats - 1}
                     onCpus={(n) => setTableSize(n + 1)}
                     onPractice={() => {
                       setYouId("you");
-                      setState(startCoda(jokers, blackN, whiteN, seats));
+                      setState(startCoda(true, blackN, whiteN, seats));
                     }}
                   />
                   <div className="row-actions" style={{ justifyContent: "center" }}>
@@ -1198,18 +1187,14 @@ export function DaVinciPage() {
                       </button>
                     );
                   })}
-                  {jokers ? (
-                    <button
-                      type="button"
-                      className={selectedTried.has("joker") ? "tried" : ""}
-                      disabled={!(state.phase === "guess" && myTurn && state.selected) || selectedTried.has("joker")}
-                      onClick={() => dispatch({ type: "guess", value: "joker" })}
-                    >
-                      —
-                    </button>
-                  ) : (
-                    <span className="pad-slot-reserve" aria-hidden />
-                  )}
+                  <button
+                    type="button"
+                    className={selectedTried.has("joker") ? "tried" : ""}
+                    disabled={!(state.phase === "guess" && myTurn && state.selected) || selectedTried.has("joker")}
+                    onClick={() => dispatch({ type: "guess", value: "joker" })}
+                  >
+                    -
+                  </button>
                 </div>
               </div>
               <div className="row-actions coda-continue">

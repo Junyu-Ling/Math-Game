@@ -22,15 +22,13 @@ var OPENING = 4;
 function openingCount(playerN) {
   return playerN >= 4 ? 3 : OPENING;
 }
-function makeDeck(useJokers) {
+function makeDeck() {
   const tiles = [];
   for (const color of ["black", "white"]) {
     for (let n = 0; n <= 11; n++) {
       tiles.push({ id: uid("t"), color, value: n, revealed: false });
     }
-    if (useJokers) {
-      tiles.push({ id: uid("t"), color, value: "joker", revealed: false });
-    }
+    tiles.push({ id: uid("t"), color, value: "joker", revealed: false });
   }
   return shuffle(tiles);
 }
@@ -183,7 +181,7 @@ function afterOpening(state) {
     log: [...state.log, { id: uid("l"), text: "Tiles locked. RPS \u2014 loser guesses first." }]
   };
 }
-function startCodaLobby(people, useJokers) {
+function startCodaLobby(people, _useJokers) {
   const seated = people.slice(0, 4);
   const open = openingCount(seated.length);
   const mix = defaultMix(open);
@@ -195,7 +193,7 @@ function startCodaLobby(people, useJokers) {
     phase: "lobby",
     drawn: null,
     selected: null,
-    useJokers,
+    useJokers: true,
     winnerId: null,
     arrangeId: 0,
     pending: null,
@@ -248,7 +246,7 @@ function dealCodaTable(state) {
   const seated = state.players.slice(0, 4);
   if (seated.length < 2) return state;
   const open = openingCount(seated.length);
-  const deck = makeDeck(state.useJokers);
+  const deck = makeDeck();
   const players = seated.map((p) => {
     const split = openingSplit(p.black ?? Math.floor(open / 2), p.white ?? open - Math.floor(open / 2), open);
     const dealtTiles = sortOpening([
@@ -262,7 +260,7 @@ function dealCodaTable(state) {
       out: false
     });
   });
-  const wait = Boolean(state.useJokers);
+  const wait = players.some((p) => p.stash);
   const stashSlots = {};
   for (const p of players) {
     if (p.stash) stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
@@ -885,7 +883,7 @@ function aiScan(state) {
         if (tried.has(String(n))) continue;
         nums.push(n);
       }
-      const jokerOk = state.useJokers && !taken.has(`${tile.color}:joker`) && !tried.has("joker");
+      const jokerOk = !taken.has(`${tile.color}:joker`) && !tried.has("joker");
       const remaining = nums.length + (jokerOk ? 1 : 0);
       if (!remaining) continue;
       const value = nums.length ? nums[Math.floor((nums.length - 1) / 2)] : "joker";
