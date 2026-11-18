@@ -483,7 +483,7 @@ export function SnakePage() {
   const world = Boolean(room && (room.id === SNAKE_WORLD_ID || (room.view as SnakeState | undefined)?.mode === "world"));
   const practice = Boolean(local && !room);
   const serverView = room?.view as SnakeState | undefined;
-  const youId = practice ? "you" : user?.id;
+  const youId = practice ? "you" : user?.id != null ? String(user.id) : undefined;
   // Must be React state (not liveRef) so the canvas mounts and paint effect can attach.
   const showing = Boolean(serverView || local);
 
@@ -512,13 +512,11 @@ export function SnakePage() {
     if (!room) return;
     const now = performance.now();
     if (action.type === "aim") {
-      if (
-        now - lastNetRef.current < 20 &&
-        lastAimSent.current != null &&
-        Math.abs(normDiff(lastAimSent.current, action.angle)) < 0.05
-      ) {
-        return;
-      }
+      const same =
+        lastAimSent.current != null && Math.abs(normDiff(lastAimSent.current, action.angle)) < 0.05;
+      // Same heading is already stored on the server. Resend occasionally so a dropped
+      // packet recovers, but not on every 33ms step — that queue blocked Enter world.
+      if (same && now - lastNetRef.current < 150) return;
       lastAimSent.current = action.angle;
       lastNetRef.current = now;
     }

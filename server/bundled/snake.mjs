@@ -193,8 +193,29 @@ function finishCountdown(state) {
 }
 function joinSnake(state, person) {
   const id = String(person.id);
-  if (state.players.some((p) => p.id === id)) return state;
-  const player = spawnPlayer(person, state.players.length);
+  const hue = cleanHue(person.hue);
+  const existing = state.players.find((p) => p.id === id);
+  if (existing) {
+    if (existing.alive) {
+      if (hue == null || hue === existing.hue) return { ...state, phase: "play" };
+      return {
+        ...state,
+        phase: "play",
+        players: state.players.map((p) => p.id === id ? { ...p, hue } : p)
+      };
+    }
+    const revived = respawnNow(
+      { ...existing, hue: hue ?? existing.hue, name: person.name || existing.name },
+      Math.max(0, state.players.findIndex((p) => p.id === id)),
+      Date.now()
+    );
+    return {
+      ...state,
+      phase: "play",
+      players: state.players.map((p) => p.id === id ? revived : p)
+    };
+  }
+  const player = spawnPlayer({ ...person, id, hue }, state.players.length);
   return {
     ...state,
     phase: "play",
@@ -226,15 +247,16 @@ function applySnakeAction(state, actorId, action) {
   const me = state.players.find((p) => p.id === actorId);
   if (!me || !me.alive && !me.respawnAt) return state;
   const seq = typeof action.n === "number" && Number.isFinite(action.n) ? action.n : void 0;
-  if (seq !== void 0 && me.an !== void 0 && seq <= me.an) return state;
   if (action.type === "boost") {
+    if (seq !== void 0 && me.bn !== void 0 && seq <= me.bn) return state;
     return {
       ...state,
       players: state.players.map(
-        (p) => p.id === actorId ? { ...p, boosting: Boolean(action.on) && p.alive, an: seq ?? p.an } : p
+        (p) => p.id === actorId ? { ...p, boosting: Boolean(action.on) && p.alive, bn: seq ?? p.bn } : p
       )
     };
   }
+  if (seq !== void 0 && me.an !== void 0 && seq <= me.an) return state;
   let angle = null;
   if (action.type === "aim" && Number.isFinite(action.angle)) angle = action.angle;
   else if (action.type === "dir") angle = aimFromDir(action.x, action.y);
@@ -270,7 +292,7 @@ function segmentHit(head, path, skip, radius) {
 }
 function respawnNow(p, index, now) {
   const fresh = spawnPlayer({ id: p.id, name: p.name, human: p.human }, index, now);
-  return { ...fresh, score: 0, energy: ENERGY_START, hue: p.hue, boosting: false, shieldUntil: now + SHIELD_MS, an: p.an };
+  return { ...fresh, score: 0, energy: ENERGY_START, hue: p.hue, boosting: false, shieldUntil: now + SHIELD_MS, an: p.an, bn: p.bn };
 }
 function scatterCorpse(path, hue) {
   if (!path.length) return [];
@@ -410,7 +432,6 @@ function lerpAngle(a, b, t) {
 function newNetMemo() {
   return { eaten: /* @__PURE__ */ new Map(), peers: /* @__PURE__ */ new Map(), revived: /* @__PURE__ */ new Set() };
 }
-var SELF_LEAD_MAX = 5.5;
 var EATEN_TTL_MS = 1800;
 function shiftPlayer(p, dx, dy) {
   return { ...p, x: p.x + dx, y: p.y + dy, path: p.path.map((c) => ({ x: c.x + dx, y: c.y + dy })) };
@@ -459,12 +480,32 @@ function reconcileSnake(server, local, youId, memo) {
     const dx = self.x - theirs.x;
     const dy = self.y - theirs.y;
     const err = Math.hypot(dx, dy);
-    const lead = mine.boosting ? SELF_LEAD_MAX * 1.8 : SELF_LEAD_MAX;
-    if (err > lead * 3) {
+    const spd = self.boosting ? SPEED * BOOST_MULT : SPEED;
+    const along = dx * Math.cos(self.angle) + dy * Math.sin(self.angle);
+    const px = dx - Math.cos(self.angle) * along;
+    const py = dy - Math.sin(self.angle) * along;
+    const perp = Math.hypot(px, py);
+    const lead = spd * (1e3 / TICK_MS);
+    if (err > lead * 2.5 || perp > 14) {
       self = { ...self, x: theirs.x, y: theirs.y, angle: theirs.angle, path: theirs.path.length ? theirs.path : self.path };
-    } else if (err > lead) {
-      const pull = (err - lead) * 0.25 / err;
-      self = shiftPlayer(self, -dx * pull, -dy * pull);
+    } else {
+      let cdx = 0;
+      let cdy = 0;
+      if (perp > 0.8) {
+        const pull = Math.min(0.5, (perp - 0.4) / perp);
+        cdx -= px * pull;
+        cdy -= py * pull;
+      }
+      if (along < -1.2) {
+        const step = Math.min(-along * 0.45, spd * 3);
+        cdx += Math.cos(self.angle) * step;
+        cdy += Math.sin(self.angle) * step;
+      } else if (along > lead) {
+        const extra = (along - lead) * 0.35;
+        cdx -= Math.cos(self.angle) * extra;
+        cdy -= Math.sin(self.angle) * extra;
+      }
+      if (cdx || cdy) self = shiftPlayer(self, cdx, cdy);
     }
   }
   const prevById = new Map(local.players.map((p) => [p.id, p]));

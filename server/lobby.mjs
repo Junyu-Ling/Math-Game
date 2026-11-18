@@ -1022,10 +1022,9 @@ async function applySnakeControls(room, humans) {
 async function applySnakeControl(user, action) {
   const id = String(user.id);
   if ((await getSeat(id)) !== SNAKE_WORLD_ID) throw new Error("Game not found");
-  // Advance the world to *now* with the previous steering first, so this aim takes effect from the
-  // moment it arrived (ticks otherwise only run when somebody polls, i.e. in bursts of ~RTT).
-  const rec = await attachMods(await getRoomRecord(SNAKE_WORLD_ID));
-  if (rec) await expireArrange(rec);
+  // Store the latest stick only. Ticking the world here took the room lock on every mouse
+  // sample, so Enter world waited behind a queue of aims and the snake stepped with the
+  // previous heading. The poll tick folds this key in before it steps.
   const n = Number(action.n);
   const seq = Number.isFinite(n) ? n : Date.now();
   if (action.type === "boost") {
@@ -1074,7 +1073,9 @@ async function expireArrangeCore(room, force = false) {
       const now = Date.now();
       let guard = 0;
       let nextAt = room.endsAt || now;
-      while (nextAt <= now + skewMs && guard++ < 24) {
+      // Catch up about 2s of real time per poll. A short cap left the server snake behind the
+      // one on screen, and the next snapshot dragged it backwards.
+      while (nextAt <= now + skewMs && guard++ < 60) {
         room.state = room.mods.snake.stepSnake(room.state, now);
         // Practice bots in a private room still get AI aims each tick.
         if (room.id !== SNAKE_WORLD_ID) {

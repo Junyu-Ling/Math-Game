@@ -62,8 +62,10 @@ export type SnakePlayer = {
   boosting: boolean;
   /** Invulnerable until this timestamp (ms). */
   shieldUntil: number | null;
-  /** Sequence number of the last control message applied (see SnakeAction.n). */
+  /** Sequence of the last aim applied. Separate from boost so a newer aim cannot drop the boost. */
   an?: number;
+  /** Sequence of the last boost applied. */
+  bn?: number;
 };
 
 /** Visual candy variety (0–7). Corpse drops keep snake hue; map candy gets its own. */
@@ -292,8 +294,31 @@ export function joinSnake(
   person: { id: string; name: string; human?: boolean; hue?: number },
 ): SnakeState {
   const id = String(person.id);
-  if (state.players.some((p) => p.id === id)) return state;
-  const player = spawnPlayer(person, state.players.length);
+  const hue = cleanHue(person.hue);
+  const existing = state.players.find((p) => p.id === id);
+  // Re-entering must actually put you back on the map. A dead snake with no respawn, or a
+  // no-op "already here", left Enter world looking like it did nothing.
+  if (existing) {
+    if (existing.alive) {
+      if (hue == null || hue === existing.hue) return { ...state, phase: "play" };
+      return {
+        ...state,
+        phase: "play",
+        players: state.players.map((p) => (p.id === id ? { ...p, hue } : p)),
+      };
+    }
+    const revived = respawnNow(
+      { ...existing, hue: hue ?? existing.hue, name: person.name || existing.name },
+      Math.max(0, state.players.findIndex((p) => p.id === id)),
+      Date.now(),
+    );
+    return {
+      ...state,
+      phase: "play",
+      players: state.players.map((p) => (p.id === id ? revived : p)),
+    };
+  }
+  const player = spawnPlayer({ ...person, id, hue }, state.players.length);
   return {
     ...state,
     phase: "play",
@@ -327,18 +352,20 @@ export function applySnakeAction(state: SnakeState, actorId: string, action: Sna
   if (action.type === "leave") return leaveSnake(state, actorId);
   const me = state.players.find((p) => p.id === actorId);
   if (!me || (!me.alive && !me.respawnAt)) return state;
-  // Out-of-order delivery (HTTP) must not resurrect an older aim/boost.
+  // Aim and boost each have their own sequence. They used to share one, so the aim that is sent
+  // every tick (higher n) made every stored boost look stale and the server snake never sped up.
   const seq = typeof action.n === "number" && Number.isFinite(action.n) ? action.n : undefined;
-  if (seq !== undefined && me.an !== undefined && seq <= me.an) return state;
 
   if (action.type === "boost") {
+    if (seq !== undefined && me.bn !== undefined && seq <= me.bn) return state;
     return {
       ...state,
       players: state.players.map((p) =>
-        p.id === actorId ? { ...p, boosting: Boolean(action.on) && p.alive, an: seq ?? p.an } : p,
+        p.id === actorId ? { ...p, boosting: Boolean(action.on) && p.alive, bn: seq ?? p.bn } : p,
       ),
     };
   }
+  if (seq !== undefined && me.an !== undefined && seq <= me.an) return state;
 
   let angle: number | null = null;
   if (action.type === "aim" && Number.isFinite(action.angle)) angle = action.angle;
@@ -379,7 +406,7 @@ function segmentHit(head: Point, path: Point[], skip: number, radius: number): b
 
 function respawnNow(p: SnakePlayer, index: number, now: number): SnakePlayer {
   const fresh = spawnPlayer({ id: p.id, name: p.name, human: p.human }, index, now);
-  return { ...fresh, score: 0, energy: ENERGY_START, hue: p.hue, boosting: false, shieldUntil: now + SHIELD_MS, an: p.an };
+  return { ...fresh, score: 0, energy: ENERGY_START, hue: p.hue, boosting: false, shieldUntil: now + SHIELD_MS, an: p.an, bn: p.bn };
 }
 
 /** Scatter edible remains along the dead snake's body. */
@@ -544,8 +571,6 @@ export function newNetMemo(): NetMemo {
   return { eaten: new Map(), peers: new Map(), revived: new Set() };
 }
 
-/** Local head may run this far ahead of the (latency-lagged) server pose before we pull it back. */
-const SELF_LEAD_MAX = 5.5;
 const EATEN_TTL_MS = 1800;
 
 function shiftPlayer(p: SnakePlayer, dx: number, dy: number): SnakePlayer {
@@ -611,16 +636,39 @@ export function reconcileSnake(
       alive: true,
       respawnAt: null,
     };
+    // The server pose is always a bit behind (it only steps when someone polls). Being ahead
+    // along your own heading is latency, not a miss — pulling that back made the snake fight
+    // the mouse. Only slide sideways, or snap when the two poses have really diverged.
     const dx = self.x - theirs.x;
     const dy = self.y - theirs.y;
     const err = Math.hypot(dx, dy);
-    const lead = mine.boosting ? SELF_LEAD_MAX * 1.8 : SELF_LEAD_MAX;
-    if (err > lead * 3) {
-      // Hopelessly out of step (tab was frozen, etc.) — resync once.
+    const spd = (self.boosting ? SPEED * BOOST_MULT : SPEED);
+    const along = dx * Math.cos(self.angle) + dy * Math.sin(self.angle);
+    const px = dx - Math.cos(self.angle) * along;
+    const py = dy - Math.sin(self.angle) * along;
+    const perp = Math.hypot(px, py);
+    const lead = spd * (1000 / TICK_MS);
+    if (err > lead * 2.5 || perp > 14) {
       self = { ...self, x: theirs.x, y: theirs.y, angle: theirs.angle, path: theirs.path.length ? theirs.path : self.path };
-    } else if (err > lead) {
-      const pull = ((err - lead) * 0.25) / err;
-      self = shiftPlayer(self, -dx * pull, -dy * pull);
+    } else {
+      let cdx = 0;
+      let cdy = 0;
+      if (perp > 0.8) {
+        const pull = Math.min(0.5, (perp - 0.4) / perp);
+        cdx -= px * pull;
+        cdy -= py * pull;
+      }
+      if (along < -1.2) {
+        // Server is ahead of us — step forward toward it, not further back.
+        const step = Math.min(-along * 0.45, spd * 3);
+        cdx += Math.cos(self.angle) * step;
+        cdy += Math.sin(self.angle) * step;
+      } else if (along > lead) {
+        const extra = (along - lead) * 0.35;
+        cdx -= Math.cos(self.angle) * extra;
+        cdy -= Math.sin(self.angle) * extra;
+      }
+      if (cdx || cdy) self = shiftPlayer(self, cdx, cdy);
     }
   }
 
