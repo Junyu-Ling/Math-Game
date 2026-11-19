@@ -946,7 +946,7 @@ const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * with different random picks — and the loser silently overwrites the winner: players then hold
  * different tables at the same seq (cards flash/teleport and never resync).
  */
-async function withRoomLock(roomId, fn) {
+async function withRoomLock(roomId, fn, opts = {}) {
   const id = String(roomId);
   const prev = roomChains.get(id) || Promise.resolve();
   let release = () => {};
@@ -965,8 +965,12 @@ async function withRoomLock(roomId, fn) {
         held = await kvSetNx(lockKey, token, 4);
         if (!held) await sleepMs(20);
       }
+      // The snake tick used to run anyway and save the room it had read before the join,
+      // which deleted the player and the next poll put them back at the spawn.
+      if (!held && opts.exclusive) return false;
     }
-    return await fn();
+    await fn();
+    return true;
   } finally {
     if (held) {
       try {
@@ -986,14 +990,15 @@ async function expireArrange(room, force = false) {
   // Every table, snake included, steps under the room lock. The unlocked snake tick used to lose
   // steps and aims to concurrent writers (the world ran at ~60% speed, so every client drifted
   // away from the server and "ate" food the server never gave it).
-  await withRoomLock(room.id, async () => {
+  const ran = await withRoomLock(room.id, async () => {
     const fresh = await attachMods(await getRoomRecord(room.id));
     if (!fresh) return;
     fresh.mods = room.mods || fresh.mods;
     if (Array.isArray(room.faces) && room.faces.length) fresh.faces = fresh.faces ?? room.faces;
     await expireArrangeCore(fresh, force);
     Object.assign(room, fresh);
-  });
+  }, { exclusive: room.game === "snake" });
+  if (ran === false) return;
 }
 
 /**
@@ -1943,7 +1948,9 @@ export async function joinSnakeWorld(user, hue) {
   await kvDel(`axiom:snakeboost:${userId}`);
   // Serialised with the world's tick: an unlocked join used to be overwritten by a concurrent step.
   let joined = null;
-  await withRoomLock(SNAKE_WORLD_ID, async () => {
+  let placed = false;
+  for (let attempt = 0; attempt < 4 && !placed; attempt++) {
+    placed = await withRoomLock(SNAKE_WORLD_ID, async () => {
     let rec = await attachMods(await getRoomRecord(SNAKE_WORLD_ID));
     if (!rec) {
       rec = {
@@ -1976,7 +1983,9 @@ export async function joinSnakeWorld(user, hue) {
     await saveRoom(rec);
     await wakeUsers(rec.seats);
     joined = publicRoom(rec, userId);
-  });
+  }, { exclusive: true });
+    if (!placed) await sleepMs(40);
+  }
   const snap = await snapshot(userId);
   // Prefer the seat we just wrote — a concurrent leave/forfeit poll must not blank the join reply.
   if (!snap.room && joined) return { ...snap, room: joined };

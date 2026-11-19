@@ -443,6 +443,7 @@ function reconcileSnake(server, local, youId, memo) {
     for (const p of server.players) if (p.id !== youId) memo.peers.set(p.id, p);
   }
   if (!local || !youId) return server;
+  if (local.mode !== server.mode) return server;
   const mine = local.players.find((p) => p.id === youId);
   const theirs = server.players.find((p) => p.id === youId);
   let foods = server.foods;
@@ -458,9 +459,18 @@ function reconcileSnake(server, local, youId, memo) {
     }
     if (memo.eaten.size) foods = server.foods.filter((f) => !memo.eaten.has(f.id));
   }
-  if (!mine || !theirs) return { ...server, foods, tick: Math.max(server.tick, local.tick) };
+  if (!theirs) {
+    return {
+      ...server,
+      foods,
+      tick: Math.max(server.tick, local.tick),
+      players: mine ? [...server.players.filter((p) => p.id !== youId), mine] : server.players
+    };
+  }
+  if (!mine) return { ...server, foods, tick: Math.max(server.tick, local.tick) };
   let self;
-  if (mine.alive !== theirs.alive || !theirs.alive) {
+  const newLife = Boolean(theirs.alive && !mine.alive);
+  if (!theirs.alive || newLife) {
     self = { ...theirs, aim: mine.aim, boosting: Boolean(mine.boosting && theirs.alive) };
   } else {
     self = {
@@ -479,34 +489,24 @@ function reconcileSnake(server, local, youId, memo) {
     };
     const dx = self.x - theirs.x;
     const dy = self.y - theirs.y;
-    const err = Math.hypot(dx, dy);
-    const spd = self.boosting ? SPEED * BOOST_MULT : SPEED;
     const along = dx * Math.cos(self.angle) + dy * Math.sin(self.angle);
     const px = dx - Math.cos(self.angle) * along;
     const py = dy - Math.sin(self.angle) * along;
     const perp = Math.hypot(px, py);
-    const lead = spd * (1e3 / TICK_MS);
-    if (err > lead * 2.5 || perp > 14) {
-      self = { ...self, x: theirs.x, y: theirs.y, angle: theirs.angle, path: theirs.path.length ? theirs.path : self.path };
-    } else {
-      let cdx = 0;
-      let cdy = 0;
-      if (perp > 0.8) {
-        const pull = Math.min(0.5, (perp - 0.4) / perp);
-        cdx -= px * pull;
-        cdy -= py * pull;
-      }
-      if (along < -1.2) {
-        const step = Math.min(-along * 0.45, spd * 3);
-        cdx += Math.cos(self.angle) * step;
-        cdy += Math.sin(self.angle) * step;
-      } else if (along > lead) {
-        const extra = (along - lead) * 0.35;
-        cdx -= Math.cos(self.angle) * extra;
-        cdy -= Math.sin(self.angle) * extra;
-      }
-      if (cdx || cdy) self = shiftPlayer(self, cdx, cdy);
+    let cdx = 0;
+    let cdy = 0;
+    if (perp > 0.8 && perp < 6) {
+      const pull = Math.min(0.35, (perp - 0.4) / perp);
+      cdx -= px * pull;
+      cdy -= py * pull;
     }
+    if (along < -1.2) {
+      const spd = self.boosting ? SPEED * BOOST_MULT : SPEED;
+      const step = Math.min(-along * 0.45, spd * 3);
+      cdx += Math.cos(self.angle) * step;
+      cdy += Math.sin(self.angle) * step;
+    }
+    if (cdx || cdy) self = shiftPlayer(self, cdx, cdy);
   }
   const prevById = new Map(local.players.map((p) => [p.id, p]));
   const players = server.players.map((p) => {

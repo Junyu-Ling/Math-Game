@@ -142,7 +142,7 @@ function pullOpeningJoker(player) {
 }
 function emptyCodaPlayer(p) {
   return {
-    id: p.id,
+    id: String(p.id),
     name: p.name,
     human: p.human !== false,
     tiles: [],
@@ -487,6 +487,7 @@ function rememberGuess(state, tileId, guess) {
   return { ...state.tried ?? {}, [tileId]: [...prev, guess] };
 }
 function insertInto(player, card, index) {
+  if (player.tiles.some((t) => t.id === card.id)) return player;
   const idx = index ?? insertIndices(player.tiles, card)[0] ?? player.tiles.length;
   const tiles = [...player.tiles];
   tiles.splice(idx, 0, card);
@@ -695,8 +696,8 @@ function lockOpeningDash(player, preferred) {
     return { ...player, stash: stash2 ?? null, queue: queue2 };
   }
   const slot = pickSlot(player.tiles, player.stash, preferred, !player.human);
-  const tiles = [...player.tiles];
-  tiles.splice(slot, 0, player.stash);
+  const tiles = player.tiles.some((t) => t.id === player.stash.id) ? player.tiles.slice() : [...player.tiles];
+  if (!player.tiles.some((t) => t.id === player.stash.id)) tiles.splice(slot, 0, player.stash);
   const [stash, ...queue] = player.queue ?? [];
   return { ...player, tiles, stash: stash ?? null, queue };
 }
@@ -950,23 +951,25 @@ function applyAction(state, actorId, action) {
 }
 function maskTile(tile) {
   if (tile.revealed) return tile;
-  return { ...tile, value: 0 };
+  return { id: tile.id, color: tile.color, value: 0, revealed: false, masked: true };
 }
 function viewerOwnsOpeningTile(state, viewerId, tile) {
   if (!tile) return false;
-  const owner = state.players.find((p) => p.id === viewerId);
+  const owner = state.players.find((p) => String(p.id) === String(viewerId));
   if (!owner) return false;
   if (owner.stash?.id === tile.id) return true;
   return (owner.queue ?? []).some((t) => t.id === tile.id);
 }
 function viewFor(state, viewerId) {
+  const vid = String(viewerId ?? "");
+  const mine = (id) => String(id ?? "") === vid;
   const me = currentPlayer(state);
   const openingArrange = state.phase === "arrange" && state.resume === "draw";
   const showDrawn = Boolean(
-    state.drawn && (state.drawn.revealed || (openingArrange ? viewerOwnsOpeningTile(state, viewerId, state.drawn) : me.id === viewerId))
+    state.drawn && (state.drawn.revealed || (openingArrange ? viewerOwnsOpeningTile(state, vid, state.drawn) : mine(me.id)))
   );
   const showPending = Boolean(
-    state.pending && (state.pending.revealed || (openingArrange ? viewerOwnsOpeningTile(state, viewerId, state.pending) : me.id === viewerId))
+    state.pending && (state.pending.revealed || (openingArrange ? viewerOwnsOpeningTile(state, vid, state.pending) : mine(me.id)))
   );
   return {
     ...state,
@@ -974,24 +977,26 @@ function viewFor(state, viewerId) {
       id: `hidden-deck-${i}`,
       color: "black",
       value: 0,
-      revealed: false
+      revealed: false,
+      masked: true
     })),
     leftByColor: {
       black: state.deck.filter((t) => t.color === "black").length,
       white: state.deck.filter((t) => t.color === "white").length
     },
-    rpsThrows: state.rpsReveal ? { [state.rpsReveal.aId]: state.rpsReveal.a, [state.rpsReveal.bId]: state.rpsReveal.b } : state.rpsThrows[viewerId] ? { [viewerId]: state.rpsThrows[viewerId] } : {},
+    rpsThrows: state.rpsReveal ? { [state.rpsReveal.aId]: state.rpsReveal.a, [state.rpsReveal.bId]: state.rpsReveal.b } : state.rpsThrows[vid] ? { [vid]: state.rpsThrows[vid] } : {},
     rpsReveal: state.rpsReveal,
-    stashSlots: state.stashSlots[viewerId] !== void 0 ? { [viewerId]: state.stashSlots[viewerId] } : {},
-    pendingSlot: me.id === viewerId ? state.pendingSlot : null,
-    humanDraft: me.id === viewerId ? state.humanDraft : null,
+    stashSlots: state.stashSlots[vid] !== void 0 ? { [vid]: state.stashSlots[vid] } : {},
+    pendingSlot: mine(me.id) ? state.pendingSlot : null,
+    humanDraft: mine(me.id) ? state.humanDraft : null,
     frozenRival: state.frozenRival ? state.frozenRival.map(maskTile) : null,
     players: state.players.map((p) => ({
       ...p,
+      id: String(p.id),
       // On showdown / over, every seat sees every code.
-      tiles: p.id === viewerId || state.phase === "over" ? p.tiles : p.tiles.map(maskTile),
-      stash: p.id === viewerId || state.phase === "over" ? p.stash : null,
-      queue: p.id === viewerId ? p.queue ?? [] : []
+      tiles: mine(p.id) || state.phase === "over" ? p.tiles : p.tiles.map(maskTile),
+      stash: mine(p.id) || state.phase === "over" ? p.stash : null,
+      queue: mine(p.id) ? p.queue ?? [] : []
     })),
     drawn: !state.drawn ? null : showDrawn ? state.drawn : openingArrange ? null : maskTile(state.drawn),
     pending: !state.pending ? null : showPending ? state.pending : openingArrange ? null : maskTile(state.pending),

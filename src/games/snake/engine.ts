@@ -597,6 +597,9 @@ export function reconcileSnake(
     for (const p of server.players) if (p.id !== youId) memo.peers.set(p.id, p);
   }
   if (!local || !youId) return server;
+  // A practice board must not be blended into the shared world — that fight is the
+  // snake jumping back to the practice spawn after Enter world.
+  if (local.mode !== server.mode) return server;
   const mine = local.players.find((p) => p.id === youId);
   const theirs = server.players.find((p) => p.id === youId);
 
@@ -615,11 +618,24 @@ export function reconcileSnake(
     if (memo.eaten.size) foods = server.foods.filter((f) => !memo.eaten.has(f.id));
   }
 
-  if (!mine || !theirs) return { ...server, foods, tick: Math.max(server.tick, local.tick) };
+  // A poll that has not caught the join yet must not wipe the snake we just spawned.
+  if (!theirs) {
+    return {
+      ...server,
+      foods,
+      tick: Math.max(server.tick, local.tick),
+      players: mine ? [...server.players.filter((p) => p.id !== youId), mine] : server.players,
+    };
+  }
+  if (!mine) return { ...server, foods, tick: Math.max(server.tick, local.tick) };
 
   // --- you
+  // Death and a fresh respawn come from the server. While both copies are alive, the local
+  // pose wins: the server only steps when someone polls, and snapping back to that older
+  // point is the "flash back to where I was" after Enter world.
   let self: SnakePlayer;
-  if (mine.alive !== theirs.alive || !theirs.alive) {
+  const newLife = Boolean(theirs.alive && !mine.alive);
+  if (!theirs.alive || newLife) {
     self = { ...theirs, aim: mine.aim, boosting: Boolean(mine.boosting && theirs.alive) };
   } else {
     self = {
@@ -636,40 +652,27 @@ export function reconcileSnake(
       alive: true,
       respawnAt: null,
     };
-    // The server pose is always a bit behind (it only steps when someone polls). Being ahead
-    // along your own heading is latency, not a miss — pulling that back made the snake fight
-    // the mouse. Only slide sideways, or snap when the two poses have really diverged.
     const dx = self.x - theirs.x;
     const dy = self.y - theirs.y;
-    const err = Math.hypot(dx, dy);
-    const spd = (self.boosting ? SPEED * BOOST_MULT : SPEED);
     const along = dx * Math.cos(self.angle) + dy * Math.sin(self.angle);
     const px = dx - Math.cos(self.angle) * along;
     const py = dy - Math.sin(self.angle) * along;
     const perp = Math.hypot(px, py);
-    const lead = spd * (1000 / TICK_MS);
-    if (err > lead * 2.5 || perp > 14) {
-      self = { ...self, x: theirs.x, y: theirs.y, angle: theirs.angle, path: theirs.path.length ? theirs.path : self.path };
-    } else {
-      let cdx = 0;
-      let cdy = 0;
-      if (perp > 0.8) {
-        const pull = Math.min(0.5, (perp - 0.4) / perp);
-        cdx -= px * pull;
-        cdy -= py * pull;
-      }
-      if (along < -1.2) {
-        // Server is ahead of us — step forward toward it, not further back.
-        const step = Math.min(-along * 0.45, spd * 3);
-        cdx += Math.cos(self.angle) * step;
-        cdy += Math.sin(self.angle) * step;
-      } else if (along > lead) {
-        const extra = (along - lead) * 0.35;
-        cdx -= Math.cos(self.angle) * extra;
-        cdy -= Math.sin(self.angle) * extra;
-      }
-      if (cdx || cdy) self = shiftPlayer(self, cdx, cdy);
+    let cdx = 0;
+    let cdy = 0;
+    // A small sideways drift is corrected. A large one is latency from a late aim, not a miss.
+    if (perp > 0.8 && perp < 6) {
+      const pull = Math.min(0.35, (perp - 0.4) / perp);
+      cdx -= px * pull;
+      cdy -= py * pull;
     }
+    if (along < -1.2) {
+      const spd = self.boosting ? SPEED * BOOST_MULT : SPEED;
+      const step = Math.min(-along * 0.45, spd * 3);
+      cdx += Math.cos(self.angle) * step;
+      cdy += Math.sin(self.angle) * step;
+    }
+    if (cdx || cdy) self = shiftPlayer(self, cdx, cdy);
   }
 
   // --- rivals: keep the displayed pose, refresh everything else

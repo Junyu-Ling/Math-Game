@@ -132,6 +132,14 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         } else if (expectRoomId.current && prev.room?.id === expectRoomId.current) {
           // Stale watch/sync with room:null racing a just-finished join — keep the seat.
           room = prev.room;
+        } else if (
+          prev.room?.game === "snake" &&
+          dismissedRoomId.current !== prev.room.id &&
+          !leavingRef.current
+        ) {
+          // A missed poll used to drop the seat and bounce the page back to Enter world,
+          // then the next poll put the snake on the map again. Hold the world until Leave.
+          room = prev.room;
         } else {
           room = null;
         }

@@ -1,7 +1,7 @@
 import type { CodaTile, CodaValue } from "../games/davinci/engine";
 
 type Props = {
-  tile: Pick<CodaTile, "color" | "value" | "revealed">;
+  tile: Pick<CodaTile, "color" | "value" | "revealed" | "masked">;
   hide: boolean;
   selected?: boolean;
   aimed?: boolean;
@@ -19,8 +19,9 @@ function triedLabel(value: CodaValue): string {
 }
 
 export function MahjongTile({ tile, hide, selected, aimed, flash, down, dim, mini, fresh, tried, onClick }: Props) {
-  const show = tile.revealed || !hide;
-  const num = tile.value === "joker" ? "-" : String(tile.value);
+  const secret = Boolean(tile.masked);
+  const show = !secret && (tile.revealed || !hide);
+  const num = tile.value === "joker" ? "—" : String(tile.value);
   const marks = !tile.revealed && tried && tried.length > 0 ? tried : [];
   const className = [
     "mj",

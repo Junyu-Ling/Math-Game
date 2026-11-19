@@ -8,6 +8,8 @@ export type CodaTile = {
   color: Color;
   value: CodaValue;
   revealed: boolean;
+  /** Hidden from this viewer. Value is not a real code — never paint it as 0. */
+  masked?: boolean;
 };
 
 export type CodaPlayer = {
@@ -205,7 +207,7 @@ function pullOpeningJoker(player: CodaPlayer): CodaPlayer {
 
 function emptyCodaPlayer(p: { id: string; name: string; human?: boolean }): CodaPlayer {
   return {
-    id: p.id,
+    id: String(p.id),
     name: p.name,
     human: p.human !== false,
     tiles: [],
@@ -588,6 +590,7 @@ function rememberGuess(state: CodaState, tileId: string, guess: CodaValue): Reco
 }
 
 function insertInto(player: CodaPlayer, card: CodaTile, index?: number): CodaPlayer {
+  if (player.tiles.some((t) => t.id === card.id)) return player;
   const idx = index ?? insertIndices(player.tiles, card)[0] ?? player.tiles.length;
   const tiles = [...player.tiles];
   tiles.splice(idx, 0, card);
@@ -819,8 +822,8 @@ function lockOpeningDash(player: CodaPlayer, preferred: number | null): CodaPlay
     return { ...player, stash: stash ?? null, queue };
   }
   const slot = pickSlot(player.tiles, player.stash, preferred, !player.human);
-  const tiles = [...player.tiles];
-  tiles.splice(slot, 0, player.stash);
+  const tiles = player.tiles.some((t) => t.id === player.stash!.id) ? player.tiles.slice() : [...player.tiles];
+  if (!player.tiles.some((t) => t.id === player.stash!.id)) tiles.splice(slot, 0, player.stash);
   const [stash, ...queue] = player.queue ?? [];
   return { ...player, tiles, stash: stash ?? null, queue };
 }
@@ -1125,29 +1128,33 @@ export function applyAction(state: CodaState, actorId: string, action: CodaActio
 
 function maskTile(tile: CodaTile): CodaTile {
   if (tile.revealed) return tile;
-  return { ...tile, value: 0 };
+  // A stand-in of 0 used to be drawn face-up whenever the viewer id missed, so every
+  // hidden tile — including the dash — looked like another 0.
+  return { id: tile.id, color: tile.color, value: 0, revealed: false, masked: true };
 }
 
 function viewerOwnsOpeningTile(state: CodaState, viewerId: string, tile: CodaTile | null): boolean {
   if (!tile) return false;
-  const owner = state.players.find((p) => p.id === viewerId);
+  const owner = state.players.find((p) => String(p.id) === String(viewerId));
   if (!owner) return false;
   if (owner.stash?.id === tile.id) return true;
   return (owner.queue ?? []).some((t) => t.id === tile.id);
 }
 
 export function viewFor(state: CodaState, viewerId: string): CodaState {
+  const vid = String(viewerId ?? "");
+  const mine = (id: string | number | null | undefined) => String(id ?? "") === vid;
   const me = currentPlayer(state);
   const openingArrange = state.phase === "arrange" && state.resume === "draw";
   const showDrawn = Boolean(
     state.drawn &&
       (state.drawn.revealed ||
-        (openingArrange ? viewerOwnsOpeningTile(state, viewerId, state.drawn) : me.id === viewerId)),
+        (openingArrange ? viewerOwnsOpeningTile(state, vid, state.drawn) : mine(me.id))),
   );
   const showPending = Boolean(
     state.pending &&
       (state.pending.revealed ||
-        (openingArrange ? viewerOwnsOpeningTile(state, viewerId, state.pending) : me.id === viewerId)),
+        (openingArrange ? viewerOwnsOpeningTile(state, vid, state.pending) : mine(me.id))),
   );
   return {
     ...state,
@@ -1156,6 +1163,7 @@ export function viewFor(state: CodaState, viewerId: string): CodaState {
       color: "black" as const,
       value: 0,
       revealed: false,
+      masked: true,
     })),
     leftByColor: {
       black: state.deck.filter((t) => t.color === "black").length,
@@ -1163,21 +1171,21 @@ export function viewFor(state: CodaState, viewerId: string): CodaState {
     },
     rpsThrows: state.rpsReveal
       ? { [state.rpsReveal.aId]: state.rpsReveal.a, [state.rpsReveal.bId]: state.rpsReveal.b }
-      : state.rpsThrows[viewerId]
-        ? { [viewerId]: state.rpsThrows[viewerId] }
+      : state.rpsThrows[vid]
+        ? { [vid]: state.rpsThrows[vid] }
         : {},
     rpsReveal: state.rpsReveal,
-    stashSlots:
-      state.stashSlots[viewerId] !== undefined ? { [viewerId]: state.stashSlots[viewerId] } : {},
-    pendingSlot: me.id === viewerId ? state.pendingSlot : null,
-    humanDraft: me.id === viewerId ? state.humanDraft : null,
+    stashSlots: state.stashSlots[vid] !== undefined ? { [vid]: state.stashSlots[vid] } : {},
+    pendingSlot: mine(me.id) ? state.pendingSlot : null,
+    humanDraft: mine(me.id) ? state.humanDraft : null,
     frozenRival: state.frozenRival ? state.frozenRival.map(maskTile) : null,
     players: state.players.map((p) => ({
       ...p,
+      id: String(p.id),
       // On showdown / over, every seat sees every code.
-      tiles: p.id === viewerId || state.phase === "over" ? p.tiles : p.tiles.map(maskTile),
-      stash: p.id === viewerId || state.phase === "over" ? p.stash : null,
-      queue: p.id === viewerId ? (p.queue ?? []) : [],
+      tiles: mine(p.id) || state.phase === "over" ? p.tiles : p.tiles.map(maskTile),
+      stash: mine(p.id) || state.phase === "over" ? p.stash : null,
+      queue: mine(p.id) ? (p.queue ?? []) : [],
     })),
     drawn: !state.drawn ? null : showDrawn ? state.drawn : openingArrange ? null : maskTile(state.drawn),
     pending: !state.pending ? null : showPending ? state.pending : openingArrange ? null : maskTile(state.pending),

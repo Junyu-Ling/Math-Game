@@ -506,7 +506,7 @@ export function DaVinciPage() {
     setWhiteN(next - black);
   }
   const you = state && (playing || waiting)
-    ? (youId ? state.players.find((p) => p.id === youId) : state.players[0]) ?? state.players[0]
+    ? (youId ? state.players.find((p) => String(p.id) === String(youId)) : state.players[0]) ?? state.players[0]
     : null;
   const others = playing && you ? state.players.filter((p) => p.id !== you.id) : [];
   const seated = you && state ? aroundYou(state.players, you.id) : { rival: null, left: null, right: null, partner: null };
@@ -762,14 +762,14 @@ export function DaVinciPage() {
 
   useLayoutEffect(() => {
     if (codaRoom || !heldCoda) return;
-    setYouId(user?.id ?? null);
+    setYouId(user?.id != null ? String(user.id) : null);
     setState(heldCoda);
   }, [codaRoom, heldCoda, user?.id]);
 
   useEffect(() => {
     if (!codaRoom) return;
     const view = codaRoom.view as CodaState;
-    setYouId(user?.id ?? null);
+    setYouId(user?.id != null ? String(user.id) : null);
     if (typeof codaRoom.serverNow === "number") {
       // Latency only ever makes (serverNow - local) too small, so the largest recent sample is the truest.
       const samples = clockSamplesRef.current;
@@ -797,7 +797,7 @@ export function DaVinciPage() {
         }
       }
       prevLog.current = view.log.length;
-      return overlayOptimistic(view, user?.id ?? null, optimisticRef.current);
+      return overlayOptimistic(view, user?.id != null ? String(user.id) : null, optimisticRef.current);
     });
     endsAtRef.current = codaRoom.endsAt;
   }, [codaRoom, user?.id]);
@@ -1027,9 +1027,9 @@ export function DaVinciPage() {
             <div className="hand-card">
               <div className="seat-label">{ownOpeningDash || (arranging && !opening) ? "To insert" : "Drawn tile"}</div>
               {showDrawn && drawnTile ? (
-                <MahjongTile tile={drawnTile} hide={!drawnTile.revealed && me?.id !== you.id} />
+                <MahjongTile tile={drawnTile} hide={!drawnTile.revealed && String(me?.id) !== String(you.id)} />
               ) : (
-                <MahjongTile tile={{ color: "black", value: 0, revealed: false }} hide dim />
+                <span className="mj stand face-down black dim" aria-hidden />
               )}
             </div>
           </div>
