@@ -390,7 +390,7 @@ function viewUno(state, viewerId) {
     ...state,
     deck: state.deck.map((_, i) => mask(`d${i}`)),
     players: state.players.map(
-      (p) => p.id === viewerId ? p : { ...p, hand: p.hand.map((_, i) => mask(`${p.id}-${i}`)) }
+      (p) => String(p.id) === String(viewerId) ? p : { ...p, hand: p.hand.map((_, i) => mask(`${p.id}-${i}`)) }
     )
   };
 }

@@ -116,9 +116,9 @@ export function EcardPage() {
   const held = (!room && lobby.settlement?.game === "ecard" ? lobby.settlement.view : null) as EState | null;
   const state = (room?.view as EState | undefined) ?? held ?? local;
   const practice = Boolean(local && !room && !held);
-  const youId = practice ? "you" : user?.id;
-  const me = state?.players.find((p) => p.id === youId);
-  const rival = state?.players.find((p) => p.id !== youId);
+  const youId = practice ? "you" : user?.id != null ? String(user.id) : undefined;
+  const me = state?.players.find((p) => String(p.id) === youId);
+  const rival = state?.players.find((p) => String(p.id) !== youId);
   const waiting = Boolean(state?.phase === "lobby");
   const myTurnPick = Boolean(state && me && state.phase === "pick" && !me.selectedId);
   const iChooseRole = Boolean(state && me && state.phase === "role" && state.roleChooserId === me.id);

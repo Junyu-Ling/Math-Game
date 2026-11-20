@@ -24,9 +24,9 @@ export function HoldemPage() {
   const held = (!room && lobby.settlement?.game === "holdem" ? lobby.settlement.view : null) as HoldemState | null;
   const state = (room?.view as HoldemState | undefined) ?? held ?? local;
   const practice = Boolean(local && !room && !held);
-  const youId = practice ? "you" : user?.id;
-  const me = state?.players.find((p) => p.id === youId);
-  const rival = state?.players.find((p) => p.id !== youId);
+  const youId = practice ? "you" : user?.id != null ? String(user.id) : undefined;
+  const me = state?.players.find((p) => String(p.id) === youId);
+  const rival = state?.players.find((p) => String(p.id) !== youId);
   const waiting = Boolean(state?.street === "lobby");
   const myTurn = Boolean(
     state && me && state.players[state.turn]?.id === me.id && state.street !== "showdown" && state.street !== "over" && state.street !== "lobby",

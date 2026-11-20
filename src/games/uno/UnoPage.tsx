@@ -25,7 +25,7 @@ import { forfeitText } from "../../lib/forfeit";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 function aroundYou<T extends { id: string }>(players: T[], youId: string) {
-  const i = Math.max(0, players.findIndex((p) => p.id === youId));
+  const i = Math.max(0, players.findIndex((p) => String(p.id) === youId));
   const n = players.length;
   const at = (d: number) => players[(i + d) % n] ?? null;
   if (n <= 2) return { rival: at(1), left: null as T | null, right: null as T | null, partner: null as T | null };
@@ -190,9 +190,9 @@ export function UnoPage() {
   const held = (!room && lobby.settlement?.game === "uno" ? lobby.settlement.view : null) as UnoState | null;
   const state = (room?.view as UnoState | undefined) ?? held ?? local;
   const practice = Boolean(local && !room && !held);
-  const youId = practice ? "you" : user?.id;
+  const youId = practice ? "you" : user?.id != null ? String(user.id) : undefined;
   const waiting = Boolean(state && state.phase === "lobby");
-  const me = state ? state.players.find((p) => p.id === youId) ?? (waiting ? state.players[0] : currentUno(state)) : null;
+  const me = state ? state.players.find((p) => String(p.id) === youId) ?? (waiting ? state.players[0] : currentUno(state)) : null;
   const cur = state && state.phase !== "lobby" ? currentUno(state) : null;
   const myTurn = Boolean(state && me && cur?.id === me.id && state.phase !== "over" && state.phase !== "lobby");
   const seated = state && me ? aroundYou(state.players, me.id) : null;

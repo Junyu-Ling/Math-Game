@@ -16,9 +16,9 @@ export function TttPage() {
   const held = (!room && lobby.settlement?.game === "ttt" ? lobby.settlement.view : null) as TttState | null;
   const state = (room?.view as TttState | undefined) ?? held ?? local;
   const practice = Boolean(local && !room && !held);
-  const youId = practice ? "you" : user?.id;
-  const me = state?.players.find((p) => p.id === youId);
-  const rival = state?.players.find((p) => p.id !== youId);
+  const youId = practice ? "you" : user?.id != null ? String(user.id) : undefined;
+  const me = state?.players.find((p) => String(p.id) === youId);
+  const rival = state?.players.find((p) => String(p.id) !== youId);
   const waiting = Boolean(state?.phase === "lobby");
   const myTurn = Boolean(state && me && state.players[state.turn]?.id === me.id && state.phase === "play");
 

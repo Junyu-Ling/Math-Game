@@ -76,7 +76,7 @@ function userFromJwt(token: string): User | null {
     const payload = JSON.parse(json) as User & { id?: string };
     if (!payload.id) return null;
     return {
-      id: payload.id,
+      id: String(payload.id),
       email: payload.email || "",
       chips: payload.chips ?? 1000,
       createdAt: payload.createdAt || new Date().toISOString(),

@@ -364,7 +364,7 @@ function viewHoldem(s, viewerId) {
   const show = v.street === "showdown" || v.street === "over";
   v.deck = [];
   for (const p of v.players) {
-    if (p.id !== viewerId && !show) {
+    if (String(p.id) !== String(viewerId) && !show) {
       p.hole = p.hole.map((c) => ({ id: c.id, rank: "A", suit: "S", hidden: true }));
     }
   }

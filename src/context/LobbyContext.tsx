@@ -81,9 +81,12 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   const dismissedRoomId = useRef<string | null>(null);
   /** Seat we just claimed — stale watch/sync with `room: null` must not wipe it. */
   const expectRoomId = useRef<string | null>(null);
+  /** One empty poll after Ready used to swap the board for the white deal card. Hold the table. */
+  const nullHoldUntil = useRef(0);
 
   function takeRoom(next: RoomSnap | null | undefined, prev: RoomSnap | null) {
     if (!next) return null;
+    if (typeof next !== "object") return prev;
     if (dismissedRoomId.current && next.id === dismissedRoomId.current) return null;
     const seq = next.seq ?? 0;
     if (seq && seq < roomSeq.current) return prev;
@@ -128,20 +131,25 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         let room: RoomSnap | null;
         if (next.room) {
           room = takeRoom(next.room, prev.room);
+          nullHoldUntil.current = 0;
           if (expectRoomId.current && next.room.id === expectRoomId.current) expectRoomId.current = null;
         } else if (expectRoomId.current && prev.room?.id === expectRoomId.current) {
           // Stale watch/sync with room:null racing a just-finished join — keep the seat.
           room = prev.room;
-        } else if (
-          prev.room?.game === "snake" &&
-          dismissedRoomId.current !== prev.room.id &&
-          !leavingRef.current
-        ) {
-          // A missed poll used to drop the seat and bounce the page back to Enter world,
-          // then the next poll put the snake on the map again. Hold the world until Leave.
-          room = prev.room;
+        } else if (prev.room && dismissedRoomId.current !== prev.room.id && !leavingRef.current) {
+          // A missed poll after both Ready used to drop the seat. The page then painted the
+          // white deal card for one round trip, and the next poll put the board back.
+          // Snake stays until Leave (a dropped world bounced back to Enter world).
+          // Other tables survive a short gap, then give up if the seat is really gone.
+          if (prev.room.game === "snake") {
+            room = prev.room;
+          } else {
+            if (!nullHoldUntil.current) nullHoldUntil.current = Date.now() + 2500;
+            room = Date.now() < nullHoldUntil.current ? prev.room : null;
+          }
         } else {
           room = null;
+          nullHoldUntil.current = 0;
         }
         if (room && dismissedRoomId.current && room.id === dismissedRoomId.current) room = null;
         if (!room) roomSeq.current = 0;
@@ -459,7 +467,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
           return;
         }
         const next = await lobbyApi.action(token, roomId, action);
-        if (!next.room) return;
+        if (!next.room || typeof next.room !== "object") return;
         setSnap((prev) => ({
           ...prev,
           room: takeRoom(next.room as RoomSnap, prev.room),

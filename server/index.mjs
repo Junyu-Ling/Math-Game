@@ -159,7 +159,7 @@ function signUser(user) {
 
 function publicUser(u) {
   return {
-    id: u.id,
+    id: u.id == null ? u.id : String(u.id),
     email: u.email,
     chips: u.chips,
     createdAt: u.createdAt,
@@ -440,7 +440,7 @@ app.post("/api/auth/email-login", async (req, res) => {
 });
 
 app.get("/api/me", auth, (req, res) => {
-  const user = readUsers().find((u) => u.id === req.user.id);
+  const user = readUsers().find((u) => String(u.id) === String(req.user.id));
   if (user) return res.json({ user: publicUser(user) });
   if (req.user?.githubId || req.user?.id) return res.json({ user: publicUser(req.user) });
   res.status(404).json({ error: "用户不存在" });
@@ -656,7 +656,7 @@ wss.on("connection", (ws, req) => {
     ws.close();
     return;
   }
-  const account = readUsers().find((u) => u.id === user.id) || (user.githubId || user.id ? user : null);
+  const account = readUsers().find((u) => String(u.id) === String(user.id)) || (user.githubId || user.id ? user : null);
   if (!account) {
     send(ws, { type: "error", error: "用户不存在" });
     ws.close();

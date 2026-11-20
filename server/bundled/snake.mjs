@@ -121,9 +121,25 @@ function turnRateFor(p) {
 function isShielded(p, now = Date.now()) {
   return Boolean(p.alive && p.shieldUntil != null && now < p.shieldUntil);
 }
-function spawnPlayer(person, index, now = Date.now()) {
-  const pt = randomPoint(12);
-  const angle = Math.random() * Math.PI * 2;
+function pointBeside(anchor) {
+  for (let i = 0; i < 8; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 14 + Math.random() * 6;
+    const pt2 = {
+      x: clamp(anchor.x + Math.cos(ang) * dist, 16, WORLD - 16),
+      y: clamp(anchor.y + Math.sin(ang) * dist, 16, WORLD - 16)
+    };
+    if (Math.hypot(pt2.x - anchor.x, pt2.y - anchor.y) >= 12) {
+      return { pt: pt2, angle: Math.atan2(pt2.y - anchor.y, pt2.x - anchor.x) };
+    }
+  }
+  const pt = { x: clamp(anchor.x + 16, 16, WORLD - 16), y: clamp(anchor.y, 16, WORLD - 16) };
+  return { pt, angle: Math.atan2(pt.y - anchor.y, pt.x - anchor.x) };
+}
+function spawnPlayer(person, index, now = Date.now(), anchor) {
+  const placed = anchor ? pointBeside(anchor) : null;
+  const pt = placed?.pt ?? randomPoint(12);
+  const angle = placed?.angle ?? Math.random() * Math.PI * 2;
   return {
     id: person.id,
     name: person.name,
@@ -194,7 +210,9 @@ function finishCountdown(state) {
 function joinSnake(state, person) {
   const id = String(person.id);
   const hue = cleanHue(person.hue);
-  const existing = state.players.find((p) => p.id === id);
+  const existing = state.players.find((p) => String(p.id) === id);
+  const buddy = state.players.find((p) => p.alive && String(p.id) !== id);
+  const anchor = buddy ? { x: buddy.x, y: buddy.y } : void 0;
   if (existing) {
     if (existing.alive) {
       if (hue == null || hue === existing.hue) return { ...state, phase: "play" };
@@ -206,8 +224,9 @@ function joinSnake(state, person) {
     }
     const revived = respawnNow(
       { ...existing, hue: hue ?? existing.hue, name: person.name || existing.name },
-      Math.max(0, state.players.findIndex((p) => p.id === id)),
-      Date.now()
+      Math.max(0, state.players.findIndex((p) => String(p.id) === id)),
+      Date.now(),
+      anchor
     );
     return {
       ...state,
@@ -215,7 +234,7 @@ function joinSnake(state, person) {
       players: state.players.map((p) => p.id === id ? revived : p)
     };
   }
-  const player = spawnPlayer({ ...person, id, hue }, state.players.length);
+  const player = spawnPlayer({ ...person, id, hue }, state.players.length, Date.now(), anchor);
   return {
     ...state,
     phase: "play",
@@ -238,13 +257,14 @@ function aimFromDir(x, y) {
   return Math.atan2(y, x);
 }
 function applySnakeAction(state, actorId, action) {
+  const id = String(actorId ?? "");
   if (action.type === "join") {
-    const existing = state.players.find((p) => p.id === actorId);
+    const existing = state.players.find((p) => String(p.id) === id);
     if (existing) return state;
-    return joinSnake(state, { id: actorId, name: actorId, human: true });
+    return joinSnake(state, { id, name: actorId, human: true });
   }
-  if (action.type === "leave") return leaveSnake(state, actorId);
-  const me = state.players.find((p) => p.id === actorId);
+  if (action.type === "leave") return leaveSnake(state, id);
+  const me = state.players.find((p) => String(p.id) === id);
   if (!me || !me.alive && !me.respawnAt) return state;
   const seq = typeof action.n === "number" && Number.isFinite(action.n) ? action.n : void 0;
   if (action.type === "boost") {
@@ -252,7 +272,7 @@ function applySnakeAction(state, actorId, action) {
     return {
       ...state,
       players: state.players.map(
-        (p) => p.id === actorId ? { ...p, boosting: Boolean(action.on) && p.alive, bn: seq ?? p.bn } : p
+        (p) => String(p.id) === id ? { ...p, boosting: Boolean(action.on) && p.alive, bn: seq ?? p.bn } : p
       )
     };
   }
@@ -265,7 +285,7 @@ function applySnakeAction(state, actorId, action) {
   return {
     ...state,
     players: state.players.map(
-      (p) => p.id === actorId ? {
+      (p) => String(p.id) === id ? {
         ...p,
         aim: angle,
         an: seq ?? p.an,
@@ -290,8 +310,8 @@ function segmentHit(head, path, skip, radius) {
   }
   return false;
 }
-function respawnNow(p, index, now) {
-  const fresh = spawnPlayer({ id: p.id, name: p.name, human: p.human }, index, now);
+function respawnNow(p, index, now, anchor) {
+  const fresh = spawnPlayer({ id: p.id, name: p.name, human: p.human }, index, now, anchor);
   return { ...fresh, score: 0, energy: ENERGY_START, hue: p.hue, boosting: false, shieldUntil: now + SHIELD_MS, an: p.an, bn: p.bn };
 }
 function scatterCorpse(path, hue) {
@@ -340,7 +360,10 @@ function stepSnake(state, now = Date.now()) {
   const tick = state.tick + 1;
   const players = state.players.map((p, index) => {
     if (!p.alive) {
-      if (p.respawnAt && now >= p.respawnAt) return respawnNow(p, index, now);
+      if (p.respawnAt && now >= p.respawnAt) {
+        const buddy = state.players.find((q) => q.alive && q.id !== p.id);
+        return respawnNow(p, index, now, buddy ? { x: buddy.x, y: buddy.y } : void 0);
+      }
       return { ...p, boosting: false };
     }
     let energy = p.energy;
@@ -584,14 +607,15 @@ function stepSelfPredict(state, youId, now = Date.now(), memo) {
 var VIEW_CULL = 100;
 var r2d = (n) => Math.round(n * 100) / 100;
 function viewSnake(state, viewerId) {
-  const me = state.players.find((p) => p.id === viewerId);
+  const vid = String(viewerId ?? "");
+  const me = state.players.find((p) => String(p.id) === vid);
   const focus = me ? { x: me.x, y: me.y } : { x: WORLD / 2, y: WORLD / 2 };
   const r2 = VIEW_CULL * VIEW_CULL;
   return {
     ...state,
     foods: state.foods.filter((f) => dist2(f, focus) <= r2).map((f) => f.hue == null ? { id: f.id, x: r2d(f.x), y: r2d(f.y) } : { id: f.id, x: r2d(f.x), y: r2d(f.y), hue: f.hue }),
     players: state.players.map((p) => {
-      if (p.id === viewerId) return p;
+      if (String(p.id) === vid) return p;
       if (dist2({ x: p.x, y: p.y }, focus) > r2 && !p.path.some((c) => dist2(c, focus) <= r2)) {
         return { ...p, path: [], aim: p.angle };
       }

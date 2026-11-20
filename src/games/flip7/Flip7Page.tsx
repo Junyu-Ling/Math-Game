@@ -29,7 +29,7 @@ import { forfeitText } from "../../lib/forfeit";
 import { CPU_THINK_MS, wait } from "../../lib/shuffle";
 
 function aroundYou<T extends { id: string }>(players: T[], youId: string) {
-  const i = Math.max(0, players.findIndex((p) => p.id === youId));
+  const i = Math.max(0, players.findIndex((p) => String(p.id) === youId));
   const n = players.length;
   const at = (d: number) => players[(i + d) % n] ?? null;
   if (n <= 1) return { rival: null as T | null, left: null as T | null, right: null as T | null, partner: null as T | null, extras: [] as T[] };
@@ -42,7 +42,7 @@ function aroundYou<T extends { id: string }>(players: T[], youId: string) {
 
 /** Opponents on an ellipse; bottom ~80° arc reserved for you. Angles: 0 = top, clockwise. */
 function ringOpponents<T extends { id: string }>(players: T[], youId: string) {
-  const i = Math.max(0, players.findIndex((p) => p.id === youId));
+  const i = Math.max(0, players.findIndex((p) => String(p.id) === youId));
   const others: T[] = [];
   for (let d = 1; d < players.length; d++) others.push(players[(i + d) % players.length]!);
   const startDeg = -145;
@@ -129,9 +129,9 @@ export function Flip7Page() {
   const held = (!room && lobby.settlement?.game === "flip7" ? lobby.settlement.view : null) as FlipState | null;
   const state = (room?.view as FlipState | undefined) ?? held ?? local;
   const practice = Boolean(local && !room && !held);
-  const youId = practice ? "you" : user?.id;
+  const youId = practice ? "you" : user?.id != null ? String(user.id) : undefined;
   const waiting = Boolean(state && state.phase === "lobby");
-  const me = state ? state.players.find((p) => p.id === youId) ?? (waiting ? state.players[0] : currentFlip(state)) : null;
+  const me = state ? state.players.find((p) => String(p.id) === youId) ?? (waiting ? state.players[0] : currentFlip(state)) : null;
   const playerN = state?.players.length ?? 0;
   const useRing = Boolean(state && me && !waiting && playerN >= 5);
   const seated = state && me && !useRing ? aroundYou(state.players, me.id) : null;

@@ -969,8 +969,11 @@ async function withRoomLock(roomId, fn, opts = {}) {
       // which deleted the player and the next poll put them back at the spawn.
       if (!held && opts.exclusive) return false;
     }
-    await fn();
-    return true;
+    // Callers that only care about the lock (the snake tick) get `true`.
+    // Table actions must get the room back — returning `true` made the client
+    // drop the seat and paint the white deal card until the next poll.
+    const value = await fn();
+    return value === undefined ? true : value;
   } finally {
     if (held) {
       try {
