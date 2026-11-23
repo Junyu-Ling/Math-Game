@@ -200,8 +200,11 @@ async function kvSetNx(key, value, ttlSec) {
     try {
       const ok = ttlSec ? await r.set(key, raw, "EX", ttlSec, "NX") : await r.set(key, raw, "NX");
       return ok === "OK";
-    } catch {
-      /* memory */
+    } catch (err) {
+      // A failed lock must not succeed in this process's memory. Two instances would
+      // both rewrite the room and the later save would throw the other player's move away.
+      noteRedisError(err);
+      throw new Error("Lobby store unavailable");
     }
   }
   if (memGet(key) != null) return false;
@@ -290,22 +293,24 @@ export async function waitWake(userId, timeoutMs) {
   const id = String(userId);
   const r = client();
   ensureSub();
-  if (r) {
-    try {
-      const queued = await r.lpop(`axiom:wakeq:${id}`);
-      if (queued) return true;
-    } catch {
-      /* fall through */
-    }
-  }
-  const hit = await waitLocal(id, timeoutMs);
-  if (hit) return true;
-  if (r) {
+  const deadline = Date.now() + Math.max(0, timeoutMs);
+  // Pub/sub only reaches the instance that holds the socket. On the hosted API that is
+  // rarely the watcher, so a rival's move used to sit unseen until this wait ended (up to 8s).
+  // Checking the wake list a few times a second keeps that gap under half a second.
+  const pull = async () => {
+    if (!r) return false;
     try {
       return Boolean(await r.lpop(`axiom:wakeq:${id}`));
     } catch {
       return false;
     }
+  };
+  if (await pull()) return true;
+  while (Date.now() < deadline) {
+    const slice = Math.min(400, deadline - Date.now());
+    if (slice < 30) break;
+    if (await waitLocal(id, slice)) return true;
+    if (await pull()) return true;
   }
   return false;
 }
@@ -482,6 +487,20 @@ async function readJson(key) {
     return JSON.parse(raw);
   } catch {
     return null;
+  }
+}
+
+/** Presence used to decide a forfeit. A Redis error must throw, not look like "this player is gone". */
+async function readJsonLive(key) {
+  const r = client();
+  if (!r) return readJson(key);
+  try {
+    const raw = await r.get(key);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (err) {
+    noteRedisError(err);
+    throw new Error("Lobby store unavailable");
   }
 }
 
@@ -1905,7 +1924,13 @@ async function forfeitIfAbsent(rec, exceptId) {
   const humans = humanSeatIds(rec.seats);
   for (const id of humans) {
     if (id === exceptId) continue;
-    const presence = await readJson(`axiom:p:${id}`);
+    let presence = null;
+    try {
+      presence = await readJsonLive(`axiom:p:${id}`);
+    } catch {
+      // A store blip is not a player leaving. Ending the hand here used to drop a live match.
+      continue;
+    }
     // The presence record lives for minutes. A missing one means that whole window
     // passed; a record younger than MATCH_ABSENT_MS means they are still at the table.
     // (A 20s lapse used to delete the record and forfeit the hand on the spot.)

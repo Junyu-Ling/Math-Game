@@ -605,20 +605,27 @@ app.patch("/api/me/chips", auth, (req, res) => {
 });
 
 app.get("/api/lobby", auth, async (req, res) => {
-  const href = String(req.query.href || "");
-  if (String(req.query.watch || "") === "1") {
-    return res.json(
-      await watchLobby(
-        req.user,
-        Number(req.query.seq || 0),
-        Number(req.query.invites ?? -1),
-        href,
-        8000,
-        Number(req.query.queue || -1),
-      ),
-    );
+  try {
+    const href = String(req.query.href || "");
+    if (String(req.query.watch || "") === "1") {
+      return res.json(
+        await watchLobby(
+          req.user,
+          Number(req.query.seq || 0),
+          Number(req.query.invites ?? -1),
+          href,
+          8000,
+          Number(req.query.queue || -1),
+        ),
+      );
+    }
+    res.json(await heartbeat(req.user, href, String(req.query.light || "") === "1"));
+  } catch (err) {
+    if (err?.message === "Lobby store unavailable") {
+      return res.status(503).json({ error: "Lobby store unavailable" });
+    }
+    res.status(400).json({ error: err.message || "失败" });
   }
-  res.json(await heartbeat(req.user, href, String(req.query.light || "") === "1"));
 });
 
 app.post("/api/lobby", auth, async (req, res) => {
@@ -657,6 +664,9 @@ app.post("/api/lobby", auth, async (req, res) => {
     }
     res.status(400).json({ error: "未知操作" });
   } catch (err) {
+    if (err?.message === "Lobby store unavailable") {
+      return res.status(503).json({ error: "Lobby store unavailable" });
+    }
     res.status(400).json({ error: err.message || "失败" });
   }
 });

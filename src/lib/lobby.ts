@@ -52,9 +52,21 @@ export type LobbySnap = {
   queue?: QueueSnap | null;
 };
 
-async function call(token: string, path: string, init: RequestInit = {}): Promise<LobbySnap & Record<string, unknown>> {
+function callSignal(ms: number, parent?: AbortSignal | null): AbortSignal {
+  const timeout = typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(ms) : null;
+  if (timeout && parent && typeof AbortSignal.any === "function") return AbortSignal.any([parent, timeout]);
+  if (timeout && !parent) return timeout;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  parent?.addEventListener("abort", () => ctrl.abort(), { once: true });
+  ctrl.signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+  return ctrl.signal;
+}
+
+async function call(token: string, path: string, init: RequestInit = {}, ms = 12000): Promise<LobbySnap & Record<string, unknown>> {
   const res = await fetch(`${apiBase}${path}`, {
     ...init,
+    signal: init.signal ? callSignal(ms, init.signal) : callSignal(ms),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
@@ -122,7 +134,8 @@ export const lobbyApi = {
   },
   watch(token: string, seq: number, invites: number, href = "", queue = 0, signal?: AbortSignal) {
     const q = `watch=1&seq=${encodeURIComponent(String(seq))}&invites=${encodeURIComponent(String(invites))}&href=${encodeURIComponent(href)}&queue=${encodeURIComponent(String(queue))}`;
-    return call(token, `/api/lobby?${q}`, { signal });
+    // The server holds a watch for up to 8s. Give it room to answer, then drop a hung request.
+    return call(token, `/api/lobby?${q}`, { signal }, 14000);
   },
   invite(token: string, toId: string, game: string, meta: Record<string, unknown> = {}) {
     return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "invite", toId, game, meta }) });

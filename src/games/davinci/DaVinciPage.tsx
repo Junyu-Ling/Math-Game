@@ -227,7 +227,7 @@ function Row({
       if (vertical) {
         const avail = sideHeight();
         const natural = row.offsetHeight;
-        if (avail !== null && natural > 0) scale = Math.max(0.3, Math.min(1, (avail - padY) / natural));
+        if (avail !== null && natural > 0) scale = Math.max(0.72, Math.min(1, (avail - padY) / natural));
       } else {
         const avail = fit.clientWidth - padX;
         const natural = row.offsetWidth;
@@ -265,6 +265,16 @@ function Row({
   );
 }
 
+function OrderCue({ dir }: { dir: "right" | "down" }) {
+  return (
+    <span className={`order-cue order-cue-${dir}`} aria-hidden>
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
 function OppSeat({
   player,
   className,
@@ -290,6 +300,7 @@ function OppSeat({
   lockSize?: boolean;
   guesses?: CodaValue[][];
 }) {
+  const order = className === "seat-left" || className === "seat-right" ? "down" : "right";
   return (
     <div className={`seat ${className} ${opening ? "veiled" : ""}`}>
       <div className="seat-plaque">
@@ -297,6 +308,7 @@ function OppSeat({
         <span>{player.out ? (tiles.length > 0 && tiles.every((t) => t.revealed) ? "OUT" : "LEFT") : opening ? "Arrange" : turn ? "Turn" : "Wait"}</span>
       </div>
       <div className="tiles-wrap">
+        <OrderCue dir={order} />
         {opening ? (
           <div className="arrange-veil" aria-hidden>
             <strong>Arranging</strong>
@@ -1061,6 +1073,7 @@ export function DaVinciPage() {
               </span>
             </div>
             <div className="tiles-wrap">
+              <OrderCue dir="right" />
               <Row
                 tiles={humanRow}
                 hide={false}

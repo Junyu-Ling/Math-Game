@@ -360,6 +360,10 @@ export async function handle(req, res, path) {
         send(res, 401, { error: "Not signed in" });
         return;
       }
+      if (err?.message === "Lobby store unavailable") {
+        send(res, 503, { error: "Lobby store unavailable" });
+        return;
+      }
       send(res, 400, { error: String(err.message || "Failed") });
     }
     return;

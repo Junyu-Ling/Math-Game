@@ -188,7 +188,8 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         }
         // Keep the player list fresh everywhere (table lobby, queue, idle) — it used to freeze
         // while seated, so friends who came online later never appeared to invite.
-        const rosterEvery = snapRef.current.room?.game === "snake" ? 30000 : 8000;
+        // A full roster scan in the middle of a hand was the slow tick. Keep the seat on the light watch.
+        const rosterEvery = snapRef.current.room ? 25000 : 8000;
         const needRoster = Date.now() - lastFull > rosterEvery;
         const next = needRoster
           ? await lobbyApi.sync(token, window.location.pathname, false)
@@ -221,7 +222,13 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
           if (!stop) timer = window.setTimeout(tick, 800);
           return;
         }
-        setError(ex instanceof Error ? ex.message : "Lobby sync failed");
+        const message = ex instanceof Error ? ex.message : "Lobby sync failed";
+        // A timed-out or dropped poll is a retry, not a broken table. Leave the seat on screen.
+        if (/Request failed \(50[234]\)|Lobby store unavailable|Failed to fetch|NetworkError|Load failed/i.test(message)) {
+          if (!stop) timer = window.setTimeout(tick, 400);
+          return;
+        }
+        setError(message);
         if (!stop) timer = window.setTimeout(tick, 200);
       }
     };
