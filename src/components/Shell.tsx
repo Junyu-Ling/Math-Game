@@ -72,6 +72,63 @@ function NavInvite() {
   );
 }
 
+function NetStatus() {
+  const { net, reconnect, dismissReconnect, returnToTable, declineReturn, askReconnect } = useLobby();
+  const label =
+    net.quality === "down" ? "已断开" : net.rtt == null ? "检测中" : `${net.rtt} ms`;
+  const word = net.quality === "good" ? "良好" : net.quality === "fair" ? "一般" : net.quality === "slow" ? "较慢" : "已断开";
+  const openAsk = net.paused && !net.prompt;
+  return (
+    <>
+      <button
+        className={`net-pill ${net.quality}${openAsk ? " ask" : ""}`}
+        type="button"
+        title={openAsk ? "连接已暂停，点击重新连接" : `网络${word}`}
+        onClick={() => {
+          if (openAsk) askReconnect();
+        }}
+      >
+        <i className="net-dot" />
+        <span>{label}</span>
+        {net.quality === "down" ? null : <span className="net-word">{openAsk ? "重连" : word}</span>}
+      </button>
+      {net.prompt ? (
+        <div className="net-modal" role="dialog" aria-modal="true">
+          <div className="net-card">
+            {net.prompt === "reconnect" ? (
+              <>
+                <h2>网络已断开</h2>
+                <p>牌局还留在桌上。要重新连接吗？</p>
+                <div className="net-actions">
+                  <button className="btn btn-go" type="button" disabled={net.reconnecting} onClick={() => void reconnect()}>
+                    {net.reconnecting ? "正在重连…" : "重连"}
+                  </button>
+                  <button className="btn btn-ghost" type="button" onClick={dismissReconnect}>
+                    稍后
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2>已经重新连接</h2>
+                <p>要回到这局{net.tableLabel ? `「${net.tableLabel}」` : ""}吗？回去以后从刚才的进度继续。</p>
+                <div className="net-actions">
+                  <button className="btn btn-go" type="button" onClick={returnToTable}>
+                    回到牌局
+                  </button>
+                  <button className="btn btn-ghost" type="button" onClick={declineReturn}>
+                    先不回去
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function NavMatch() {
   const { queue } = useLobby();
   if (!queue) return null;
@@ -113,6 +170,7 @@ export function Shell({ children }: { children: ReactNode }) {
           ) : (
             <NavLink to="/login">Log in</NavLink>
           )}
+          <NetStatus />
         </nav>
       </header>
       <InviteToasts />

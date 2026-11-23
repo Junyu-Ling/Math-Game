@@ -38,6 +38,14 @@ export async function fetchHealth(): Promise<HealthInfo> {
   return (await res.json()) as HealthInfo;
 }
 
+/** Round-trip to the API, in milliseconds. Throws when the network or the server is down. */
+export async function pingServer(ms = 4000): Promise<number> {
+  const started = performance.now();
+  const res = await fetch(`${apiBase}/api/health`, { cache: "no-store", signal: AbortSignal.timeout(ms) });
+  if (!res.ok) throw new Error("down");
+  return Math.round(performance.now() - started);
+}
+
 function headers(token?: string): HeadersInit {
   const h: Record<string, string> = { "Content-Type": "application/json" };
   if (token) h.Authorization = `Bearer ${token}`;

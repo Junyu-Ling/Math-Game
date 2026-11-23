@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AuthInvalid, authApi } from "../lib/api";
+import { AuthInvalid, authApi, pingServer } from "../lib/api";
 import { useAuth } from "./AuthContext";
-import { GAME_PATH, lobbyApi, type Invite, type LobbySnap, type OnlinePlayer, type QueueSnap, type RoomSnap, type Settlement } from "../lib/lobby";
+import { GAME_LABEL, GAME_PATH, lobbyApi, type Invite, type LobbySnap, type OnlinePlayer, type QueueSnap, type RoomSnap, type Settlement } from "../lib/lobby";
 
 type LobbyCtx = {
   online: OnlinePlayer[];
@@ -27,6 +27,22 @@ type LobbyCtx = {
   /** Last result kept on screen after the seat is cleared. */
   settlement: Settlement | null;
   clearSettlement: () => void;
+  /** Live round-trip to the server, and the reconnect / return prompts. */
+  net: NetLink;
+  reconnect: () => Promise<void>;
+  dismissReconnect: () => void;
+  returnToTable: () => void;
+  declineReturn: () => void;
+  askReconnect: () => void;
+};
+
+export type NetLink = {
+  rtt: number | null;
+  quality: "good" | "fair" | "slow" | "down";
+  prompt: "reconnect" | "return" | null;
+  paused: boolean;
+  reconnecting: boolean;
+  tableLabel: string | null;
 };
 
 const Ctx = createContext<LobbyCtx | null>(null);
@@ -69,6 +85,14 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   const [snap, setSnap] = useState<LobbySnap>({ online: [], invites: [], room: null, store: "memory", queue: null });
   const [settlement, setSettlement] = useState<Settlement | null>(null);
   const [error, setError] = useState("");
+  const [net, setNet] = useState<NetLink>({
+    rtt: null,
+    quality: "good",
+    prompt: null,
+    paused: false,
+    reconnecting: false,
+    tableLabel: null,
+  });
   const [inviteUntilByTo, setInviteUntilByTo] = useState<Record<string, number>>({});
   const [now, setNow] = useState(() => Date.now());
   const roomGame = useRef<string | null>(null);
@@ -84,6 +108,17 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   const expectRoomId = useRef<string | null>(null);
   /** One empty poll after Ready used to swap the board for the white deal card. Hold the table. */
   const nullHoldUntil = useRef(0);
+  /** Pause the lobby poll while the player decides whether to reconnect. */
+  const holdWatch = useRef(false);
+  /** Don't jump back onto a table until they say they want to. */
+  const holdNav = useRef(false);
+  /** They stepped away after a reconnect. The seat stays; leaving the page must not forfeit it. */
+  const parkedRoom = useRef<string | null>(null);
+  const wakeWatch = useRef<() => void>(() => {});
+  /** Bumped when a reconnect starts, so an in-flight ping cannot put the prompt back. */
+  const pingGen = useRef(0);
+  const pingFails = useRef(0);
+  const applySnapRef = useRef<(next: LobbySnap) => void>(() => {});
 
   function takeRoom(next: RoomSnap | null | undefined, prev: RoomSnap | null) {
     if (!next) return null;
@@ -166,7 +201,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       const incoming = next.room && !(dismissedRoomId.current && next.room.id === dismissedRoomId.current) ? next.room : null;
       // The shared snake world is entered only by opening /play/snake. A leftover seat there must
       // never yank you off another game's page (every game card used to land on the snake map).
-      if (incoming?.game && incoming.game !== "snake" && incoming.game !== roomGame.current) {
+      if (incoming?.game && incoming.game !== "snake" && incoming.game !== roomGame.current && !holdNav.current) {
         const path = GAME_PATH[incoming.game];
         if (path && window.location.pathname !== path) nav(path);
       }
@@ -177,6 +212,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     };
     let lastFull = 0;
     const tick = async () => {
+      if (holdWatch.current) return;
       try {
         abort?.abort();
         abort = new AbortController();
@@ -232,6 +268,10 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         if (!stop) timer = window.setTimeout(tick, 200);
       }
     };
+    applySnapRef.current = applySnap;
+    wakeWatch.current = () => {
+      if (!stop) void tick();
+    };
     void tick();
     return () => {
       stop = true;
@@ -283,6 +323,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     if (!path || loc.pathname === path || leavingRef.current) return;
     // A newer seat (match/invite) already replaced this one — do not leave the new table.
     if (expectRoomId.current && expectRoomId.current !== room!.id) return;
+    if (holdNav.current || parkedRoom.current === room!.id) return;
     leavingRef.current = true;
     const id = room!.id;
     dismissedRoomId.current = id;
@@ -312,19 +353,73 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   }, [loc.pathname, token, snap.room]);
 
   useEffect(() => {
-    if (!token) return;
-    const onHide = (ev: PageTransitionEvent) => {
-      if (ev.persisted) return;
-      const room = snapRef.current.room;
-      if (!isLiveMatch(room)) return;
-      dismissedRoomId.current = room!.id;
-      lobbyApi.leaveKeepalive(token, room!.id);
-      roomSeq.current = 0;
-      setSnap((prev) => ({ ...prev, room: null, queue: null }));
-      roomGame.current = null;
+    const room = snap.room;
+    if (room && GAME_PATH[room.game] === loc.pathname && parkedRoom.current === room.id) {
+      parkedRoom.current = null;
+    }
+  }, [loc.pathname, snap.room]);
+
+  useEffect(() => {
+    if (!token) {
+      setNet((prev) => ({ ...prev, prompt: null, paused: false, reconnecting: false }));
+      holdWatch.current = false;
+    }
+    let stop = false;
+    const mark = (rtt: number | null, down: boolean) => {
+      const dropped = down && pingFails.current >= 2;
+      const ask = Boolean(token) && dropped;
+      setNet((prev) => {
+        const quality: NetLink["quality"] = dropped
+          ? "down"
+          : rtt == null
+            ? prev.quality
+            : rtt < 120
+              ? "good"
+              : rtt < 280
+                ? "fair"
+                : "slow";
+        return {
+          ...prev,
+          rtt: dropped ? null : rtt == null ? prev.rtt : rtt,
+          quality,
+          prompt: ask ? (prev.prompt === "return" ? "return" : "reconnect") : prev.prompt,
+          paused: ask ? true : prev.paused,
+        };
+      });
+      if (ask) holdWatch.current = true;
     };
-    window.addEventListener("pagehide", onHide);
-    return () => window.removeEventListener("pagehide", onHide);
+    const ping = async () => {
+      if (stop) return;
+      const gen = pingGen.current;
+      if (!navigator.onLine) {
+        if (gen !== pingGen.current) return;
+        pingFails.current = 2;
+        mark(null, true);
+        return;
+      }
+      try {
+        const rtt = await pingServer();
+        if (stop || gen !== pingGen.current) return;
+        pingFails.current = 0;
+        mark(rtt, false);
+      } catch {
+        if (stop || gen !== pingGen.current) return;
+        pingFails.current += 1;
+        mark(null, true);
+      }
+    };
+    void ping();
+    const id = window.setInterval(() => void ping(), 2000);
+    const onOff = () => {
+      pingFails.current = 2;
+      mark(null, true);
+    };
+    window.addEventListener("offline", onOff);
+    return () => {
+      stop = true;
+      window.clearInterval(id);
+      window.removeEventListener("offline", onOff);
+    };
   }, [token]);
 
   async function unseat(): Promise<"forfeit" | "left" | "idle"> {
@@ -385,6 +480,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         setSettlement(null);
       },
       error,
+      net,
       store: snap.store || "",
       inviteCooldownMs(toId) {
         return Math.max(0, (inviteUntilByTo[String(toId)] || 0) - now);
@@ -523,8 +619,60 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         setSettlement(null);
         nav("/");
       },
+      async reconnect() {
+        if (!token) return;
+        pingGen.current += 1;
+        pingFails.current = 0;
+        setNet((prev) => ({ ...prev, reconnecting: true, prompt: "reconnect" }));
+        try {
+          const next = await lobbyApi.sync(token, window.location.pathname, false);
+          const room = next.room && !isGameOver(next.room) ? next.room : null;
+          holdNav.current = Boolean(room);
+          holdWatch.current = false;
+          applySnapRef.current(next);
+          setNet((prev) => ({
+            ...prev,
+            reconnecting: false,
+            paused: false,
+            prompt: room ? "return" : null,
+            tableLabel: room ? GAME_LABEL[room.game] || room.game : null,
+          }));
+          wakeWatch.current();
+        } catch {
+          holdWatch.current = true;
+          setNet((prev) => ({
+            ...prev,
+            reconnecting: false,
+            paused: true,
+            quality: "down",
+            rtt: null,
+            prompt: "reconnect",
+          }));
+        }
+      },
+      dismissReconnect() {
+        setNet((prev) => ({ ...prev, prompt: null }));
+      },
+      returnToTable() {
+        holdNav.current = false;
+        parkedRoom.current = null;
+        const room = snapRef.current.room;
+        setNet((prev) => ({ ...prev, prompt: null, tableLabel: null }));
+        const path = room ? GAME_PATH[room.game] : "";
+        if (path) nav(path);
+      },
+      declineReturn() {
+        const room = snapRef.current.room;
+        if (room) parkedRoom.current = room.id;
+        holdNav.current = false;
+        setNet((prev) => ({ ...prev, prompt: null }));
+        nav("/");
+      },
+      askReconnect() {
+        setNet((prev) => ({ ...prev, prompt: "reconnect" }));
+      },
     }),
-    [snap, settlement, error, token, nav, inviteUntilByTo, now],
+    [snap, settlement, error, net, token, nav, inviteUntilByTo, now],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
