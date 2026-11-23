@@ -457,6 +457,57 @@ type Optimistic =
 
 const OPTIMISTIC_MS = 2500;
 
+/** A dash already sitting between two tiles must stay there. A late snapshot used to lock it as the first tile. */
+function keepPlacedDashes(prev: CodaState, view: CodaState, youId: string | null): CodaState {
+  if (!youId || prev.phase !== "arrange" || prev.resume !== "draw") return view;
+  const minePrev = prev.players.find((p) => String(p.id) === youId);
+  const mineView = view.players.find((p) => String(p.id) === youId);
+  if (!minePrev || !mineView) return view;
+  const placed = minePrev.tiles.filter((t) => t.value === "joker");
+  if (!placed.length) return view;
+  if (view.phase === "arrange" && view.arrangeId === prev.arrangeId) {
+    const held = new Set<string>();
+    if (mineView.stash) held.add(mineView.stash.id);
+    for (const tile of mineView.queue ?? []) held.add(tile.id);
+    if (!placed.some((tile) => held.has(tile.id))) return view;
+    return {
+      ...view,
+      players: view.players.map((p) =>
+        String(p.id) === youId
+          ? { ...p, tiles: minePrev.tiles, stash: minePrev.stash, queue: minePrev.queue ?? [] }
+          : p,
+      ),
+    };
+  }
+  if (view.phase === "arrange") return view;
+  let tiles = mineView.tiles.slice();
+  let changed = false;
+  for (const dash of placed) {
+    const was = minePrev.tiles.findIndex((t) => t.id === dash.id);
+    const now = tiles.findIndex((t) => t.id === dash.id);
+    if (was < 0 || now < 0) continue;
+    const leftId = minePrev.tiles[was - 1]?.id ?? null;
+    const rightId = minePrev.tiles[was + 1]?.id ?? null;
+    if ((tiles[now - 1]?.id ?? null) === leftId && (tiles[now + 1]?.id ?? null) === rightId) continue;
+    const item = tiles[now]!;
+    tiles = tiles.filter((t) => t.id !== item.id);
+    if (leftId) {
+      const at = tiles.findIndex((t) => t.id === leftId);
+      if (at >= 0) tiles.splice(at + 1, 0, item);
+      else tiles.splice(Math.min(was, tiles.length), 0, item);
+    } else if (rightId) {
+      const at = tiles.findIndex((t) => t.id === rightId);
+      tiles.splice(at >= 0 ? at : 0, 0, item);
+    } else tiles.splice(Math.min(was, tiles.length), 0, item);
+    changed = true;
+  }
+  if (!changed) return view;
+  return {
+    ...view,
+    players: view.players.map((p) => (String(p.id) === youId ? { ...p, tiles } : p)),
+  };
+}
+
 /** Re-apply the player's own not-yet-confirmed taps on top of a (possibly older) server snapshot. */
 function overlayOptimistic(view: CodaState, youId: string | null, pending: Optimistic[]): CodaState {
   if (!youId || pending.length === 0) return view;
@@ -538,7 +589,7 @@ export function DaVinciPage() {
   const insertOpts = myInsert ? insertIndices(humanRow, myInsert) : [];
   const autoSlot = myInsert
     ? opening
-      ? (you && state?.stashSlots[you.id] !== undefined ? state.stashSlots[you.id]! : (insertOpts[0] ?? 0))
+      ? (you && state?.stashSlots[you.id] !== undefined ? state.stashSlots[you.id]! : null)
       : (state?.pendingSlot ?? insertOpts[0] ?? 0)
     : null;
   const arrangeGaps = arranging && myInsert ? insertOpts : [];
@@ -790,7 +841,9 @@ export function DaVinciPage() {
       clockOffsetRef.current = Math.max(...samples);
     }
     const nowMs = Date.now();
-    optimisticRef.current = optimisticRef.current.filter((o) => nowMs - o.at <= OPTIMISTIC_MS);
+    optimisticRef.current = optimisticRef.current.filter(
+      (o) => nowMs - o.at <= (o.kind === "slot" ? ARRANGE_MS + 3000 : OPTIMISTIC_MS),
+    );
     setState((prev) => {
       if (
         prev &&
@@ -809,7 +862,9 @@ export function DaVinciPage() {
         }
       }
       prevLog.current = view.log.length;
-      return overlayOptimistic(view, user?.id != null ? String(user.id) : null, optimisticRef.current);
+      const youKey = user?.id != null ? String(user.id) : null;
+      const held = prev ? keepPlacedDashes(prev, view, youKey) : view;
+      return overlayOptimistic(held, youKey, optimisticRef.current);
     });
     endsAtRef.current = codaRoom.endsAt;
   }, [codaRoom, user?.id]);

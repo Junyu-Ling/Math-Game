@@ -41,10 +41,48 @@ function takeByColor(deck, color, n) {
   }
   return out;
 }
-function pickSlot(tiles, card, preferred, random) {
+function gapWidth(tiles, index) {
+  let left = -1;
+  for (let i = index - 1; i >= 0; i--) {
+    const tile = tiles[i];
+    if (tile && tile.value !== "joker") {
+      left = rank(tile);
+      break;
+    }
+  }
+  let right = 24;
+  for (let i = index; i < tiles.length; i++) {
+    const tile = tiles[i];
+    if (tile && tile.value !== "joker") {
+      right = rank(tile);
+      break;
+    }
+  }
+  return right - left - 1;
+}
+function bestDashIndex(tiles) {
+  const last = tiles.length;
+  let best = 0;
+  const tied = [];
+  for (let index = 0; index <= last; index++) {
+    let score = gapWidth(tiles, index);
+    if (tiles[index - 1]?.value === "joker") score -= 6;
+    if (tiles[index]?.value === "joker") score -= 6;
+    if (!tied.length || score > best) {
+      best = score;
+      tied.length = 0;
+      tied.push(index);
+    } else if (score === best) tied.push(index);
+  }
+  return tied[Math.floor(Math.random() * tied.length)] ?? 0;
+}
+function pickSlot(tiles, card, preferred, _random) {
   const opts = insertIndices(tiles, card);
   if (preferred !== null && opts.includes(preferred)) return preferred;
-  if (random && opts.length > 1) return opts[Math.floor(Math.random() * opts.length)];
+  if (card.value === "joker") {
+    const slot = bestDashIndex(tiles);
+    return opts.includes(slot) ? slot : opts[0] ?? tiles.length;
+  }
   return opts[0] ?? tiles.length;
 }
 function rank(tile) {
@@ -262,9 +300,6 @@ function dealCodaTable(state) {
   });
   const wait = players.some((p) => p.stash);
   const stashSlots = {};
-  for (const p of players) {
-    if (p.stash) stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
-  }
   const firstStash = players.find((p) => p.stash);
   const other = players.find((p) => p.id !== firstStash?.id) ?? players[1];
   const dealt = {
@@ -281,7 +316,7 @@ function dealCodaTable(state) {
     stashSlots,
     arrangeId: wait ? state.arrangeId + 1 : 0,
     pending: wait ? firstStash?.stash ?? null : null,
-    pendingSlot: wait && firstStash?.stash ? stashSlots[firstStash.id] ?? 0 : null,
+    pendingSlot: null,
     humanDraft: wait && firstStash ? firstStash.tiles.map((t) => ({ ...t })) : null,
     frozenRival: wait && other ? other.tiles.map((t) => ({ ...t })) : null,
     resume: wait ? "draw" : null,
@@ -641,11 +676,6 @@ function insertOpeningDash(state, actor, index) {
   );
   const stashSlots = { ...state.stashSlots };
   delete stashSlots[actor.id];
-  for (const p of players) {
-    if (p.stash && stashSlots[p.id] === void 0) {
-      stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
-    }
-  }
   const first = players.find((p) => p.stash);
   const left = openingDashLeft(players.find((p) => p.id === actor.id));
   return {
@@ -653,7 +683,7 @@ function insertOpeningDash(state, actor, index) {
     players,
     stashSlots,
     pending: first?.stash ?? null,
-    pendingSlot: first ? stashSlots[first.id] ?? 0 : null,
+    pendingSlot: first && stashSlots[first.id] !== void 0 ? stashSlots[first.id] : null,
     drawn: first?.stash ?? null,
     log: [
       ...state.log,

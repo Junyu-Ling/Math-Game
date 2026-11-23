@@ -92,10 +92,52 @@ function takeByColor(deck: CodaTile[], color: Color, n: number): CodaTile[] {
   return out;
 }
 
-function pickSlot(tiles: CodaTile[], card: CodaTile, preferred: number | null, random: boolean): number {
+/** How many hidden numbers could still sit in this gap. Wider gaps hide a dash longer. */
+function gapWidth(tiles: CodaTile[], index: number): number {
+  let left = -1;
+  for (let i = index - 1; i >= 0; i--) {
+    const tile = tiles[i];
+    if (tile && tile.value !== "joker") {
+      left = rank(tile);
+      break;
+    }
+  }
+  let right = 24;
+  for (let i = index; i < tiles.length; i++) {
+    const tile = tiles[i];
+    if (tile && tile.value !== "joker") {
+      right = rank(tile);
+      break;
+    }
+  }
+  return right - left - 1;
+}
+
+/** A dash at the front is the first thing everyone checks. Prefer the widest gap, and don't stack two dashes. */
+function bestDashIndex(tiles: CodaTile[]): number {
+  const last = tiles.length;
+  let best = 0;
+  const tied: number[] = [];
+  for (let index = 0; index <= last; index++) {
+    let score = gapWidth(tiles, index);
+    if (tiles[index - 1]?.value === "joker") score -= 6;
+    if (tiles[index]?.value === "joker") score -= 6;
+    if (!tied.length || score > best) {
+      best = score;
+      tied.length = 0;
+      tied.push(index);
+    } else if (score === best) tied.push(index);
+  }
+  return tied[Math.floor(Math.random() * tied.length)] ?? 0;
+}
+
+function pickSlot(tiles: CodaTile[], card: CodaTile, preferred: number | null, _random: boolean): number {
   const opts = insertIndices(tiles, card);
   if (preferred !== null && opts.includes(preferred)) return preferred;
-  if (random && opts.length > 1) return opts[Math.floor(Math.random() * opts.length)]!;
+  if (card.value === "joker") {
+    const slot = bestDashIndex(tiles);
+    return opts.includes(slot) ? slot : (opts[0] ?? tiles.length);
+  }
   return opts[0] ?? tiles.length;
 }
 
@@ -335,10 +377,8 @@ export function dealCodaTable(state: CodaState): CodaState {
     });
   });
   const wait = players.some((p) => p.stash);
+  // No preset slot. Index 0 used to be filled in here, so every unplaced dash locked as the first tile.
   const stashSlots: Partial<Record<string, number>> = {};
-  for (const p of players) {
-    if (p.stash) stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
-  }
   const firstStash = players.find((p) => p.stash);
   const other = players.find((p) => p.id !== firstStash?.id) ?? players[1];
   const dealt: CodaState = {
@@ -355,7 +395,7 @@ export function dealCodaTable(state: CodaState): CodaState {
     stashSlots,
     arrangeId: wait ? state.arrangeId + 1 : 0,
     pending: wait ? (firstStash?.stash ?? null) : null,
-    pendingSlot: wait && firstStash?.stash ? (stashSlots[firstStash.id] ?? 0) : null,
+    pendingSlot: null,
     humanDraft: wait && firstStash ? firstStash.tiles.map((t) => ({ ...t })) : null,
     frozenRival: wait && other ? other.tiles.map((t) => ({ ...t })) : null,
     resume: wait ? "draw" : null,
@@ -760,11 +800,6 @@ function insertOpeningDash(state: CodaState, actor: CodaPlayer, index: number): 
   );
   const stashSlots: Partial<Record<string, number>> = { ...state.stashSlots };
   delete stashSlots[actor.id];
-  for (const p of players) {
-    if (p.stash && stashSlots[p.id] === undefined) {
-      stashSlots[p.id] = insertIndices(p.tiles, p.stash)[0] ?? 0;
-    }
-  }
   const first = players.find((p) => p.stash);
   const left = openingDashLeft(players.find((p) => p.id === actor.id)!);
   return {
@@ -772,7 +807,7 @@ function insertOpeningDash(state: CodaState, actor: CodaPlayer, index: number): 
     players,
     stashSlots,
     pending: first?.stash ?? null,
-    pendingSlot: first ? (stashSlots[first.id] ?? 0) : null,
+    pendingSlot: first && stashSlots[first.id] !== undefined ? stashSlots[first.id]! : null,
     drawn: first?.stash ?? null,
     log: [
       ...state.log,
