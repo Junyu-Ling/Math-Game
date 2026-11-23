@@ -625,3 +625,91 @@
   gap: 4px;
   align-items: center;
 }
+
+/* Every live table fills the space under the header. The page itself does not scroll. */
+.shell > main:has(.page-wide) {
+  overflow: hidden;
+}
+
+.page-wide {
+  overflow: hidden;
+}
+
+.page-wide .game-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  align-items: stretch;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.page-wide .game-layout > .table {
+  align-self: stretch;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.page-wide .table.table-snake {
+  justify-content: flex-start;
+}
+
+.page-wide .table.table-snake .snake-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-wide .snake-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: min(100%, 960px);
+  margin: 8px auto 0;
+  display: flex;
+}
+
+.page-wide .snake-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.page-wide .table.table-gomoku {
+  container-type: size;
+}
+
+.page-wide .gomoku-board {
+  --cell: min(36px, max(16px, calc((100cqh - 148px) / 16.1)));
+}
+
+.page-wide .table.table-bj {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.page-wide .table.table-ttt {
+  container-type: size;
+  justify-content: center;
+  align-items: center;
+}
+
+.page-wide .ttt-board {
+  flex: none;
+  width: min(calc(100cqw - 32px), calc(100cqh - 170px));
+  height: min(calc(100cqw - 32px), calc(100cqh - 170px));
+  margin: 0 auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+}
+
+.page-wide .table.table-flip.flip-ring {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.page-wide .table.table-flip.flip-ring > .flip-ring-arena {
+  min-height: 0;
+  height: 100%;
+}

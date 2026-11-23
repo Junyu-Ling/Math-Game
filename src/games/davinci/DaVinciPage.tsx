@@ -206,18 +206,13 @@ function Row({
       if (fit.style.height) fit.style.height = "";
       if (fit.style.alignItems) fit.style.alignItems = "";
     };
-    /** Height the side columns may use: the table is viewport-sized and the other seats keep their rows. */
+    /** Side hands shrink to the column the table actually gave them, so the page never has to scroll. */
     const sideHeight = (): number | null => {
-      if (!table || getComputedStyle(table).maxHeight === "none") return null;
-      const ts = getComputedStyle(table);
-      let avail = table.clientHeight - parseFloat(ts.paddingTop) - parseFloat(ts.paddingBottom);
-      for (const el of table.querySelectorAll<HTMLElement>(":scope > .seat-you, :scope > .seat-rival, :scope > .seat-partner")) {
-        avail -= el.offsetHeight;
-      }
-      const seat = fit.closest<HTMLElement>(".seat");
-      const plaque = seat?.querySelector<HTMLElement>(".seat-plaque");
-      if (plaque) avail -= plaque.offsetHeight + 12;
-      return avail > 60 ? avail : null;
+      const seat = fit.closest<HTMLElement>(".seat-left, .seat-right");
+      if (!seat) return null;
+      const plaque = seat.querySelector<HTMLElement>(".seat-plaque");
+      const avail = seat.clientHeight - (plaque ? plaque.offsetHeight + 8 : 0);
+      return avail > 40 ? avail : null;
     };
     const apply = () => {
       const cs = getComputedStyle(fit);
@@ -227,7 +222,7 @@ function Row({
       if (vertical) {
         const avail = sideHeight();
         const natural = row.offsetHeight;
-        if (avail !== null && natural > 0) scale = Math.max(0.72, Math.min(1, (avail - padY) / natural));
+        if (avail !== null && natural > 0) scale = Math.max(0.34, Math.min(1, (avail - padY) / natural));
       } else {
         const avail = fit.clientWidth - padX;
         const natural = row.offsetWidth;
@@ -248,10 +243,9 @@ function Row({
     const ro = new ResizeObserver(apply);
     ro.observe(fit);
     ro.observe(row);
-    if (table) {
-      ro.observe(table);
-      for (const el of table.querySelectorAll(":scope > .seat-you, :scope > .seat-rival, :scope > .seat-partner")) ro.observe(el);
-    }
+    const seat = fit.closest<HTMLElement>(".seat");
+    if (seat) ro.observe(seat);
+    if (table) ro.observe(table);
     return () => ro.disconnect();
   }, [vertical, tiles.length, gapSet.size]);
   return (

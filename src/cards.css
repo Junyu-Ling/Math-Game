@@ -626,16 +626,26 @@
 }
 
 .table-coda.coda-multi {
-  grid-template-columns: minmax(156px, 24%) minmax(0, 1fr) minmax(156px, 24%);
-  grid-template-rows: auto minmax(300px, auto) auto;
-  align-items: center;
-  height: auto;
-  min-height: 640px;
-  max-height: none;
-  overflow: visible;
+  grid-template-columns: minmax(132px, 22%) minmax(0, 1fr) minmax(132px, 22%);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-items: stretch;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
 }
 
-.table-coda.coda-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: visible; min-height: 148px; }
+.table-coda.coda-multi > .seat-partner {
+  grid-column: 2;
+  grid-row: 1;
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
 .table-coda.coda-multi > .seat-left { grid-column: 1; grid-row: 2; }
 .table-coda.coda-multi > .center-well { grid-column: 2; grid-row: 2; }
 .table-coda.coda-multi > .seat-right { grid-column: 3; grid-row: 2; }
@@ -643,35 +653,48 @@
   grid-column: 1 / -1;
   grid-row: 3;
   display: grid;
-  grid-template-columns: minmax(148px, 24%) minmax(0, 1fr) minmax(148px, 24%);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(120px, 22%) minmax(0, 1fr) minmax(120px, 22%);
+  grid-template-rows: auto;
   align-items: center;
   justify-items: center;
 }
 .table-coda.coda-multi > .seat-you .seat-plaque {
-  grid-column: 2;
+  grid-column: 1;
   grid-row: 1;
-  justify-self: start;
+  justify-self: end;
   align-self: center;
 }
 .table-coda.coda-multi > .seat-you .tiles-wrap {
-  grid-column: 1 / -1;
-  grid-row: 2;
+  grid-column: 2;
+  grid-row: 1;
 }
 .table-coda.coda-multi .seat-left,
 .table-coda.coda-multi .seat-right {
   min-height: 0;
-  overflow: visible;
-  align-self: center;
-  height: auto;
+  max-height: 100%;
+  overflow: hidden;
+  align-self: stretch;
+  height: 100%;
+}
+.table-coda.coda-multi .tiles-wrap {
+  --tile-w: 70px;
+  --tile-h: 104px;
+  min-height: 0;
+}
+.table-coda.coda-multi .tiles-fit {
+  padding: 2px 4px 4px;
+}
+.table-coda.coda-multi .mj {
+  margin: 2px 5px 2px 0;
 }
 .table-coda.coda-multi .seat-left .tiles-wrap,
 .table-coda.coda-multi .seat-right .tiles-wrap {
+  flex: 1 1 auto;
   height: auto;
   min-height: 0;
   width: 100%;
-  overflow: visible;
-  padding: 8px 0;
+  overflow: hidden;
+  padding: 4px 0;
 }
 .table-coda.coda-multi .seat-left .tiles-wrap { padding-right: 26px; }
 .table-coda.coda-multi .seat-right .tiles-wrap { padding-left: 26px; }
@@ -1826,13 +1849,13 @@
 }
 
 .table-uno.uno-multi {
-  grid-template-columns: minmax(148px, 22%) minmax(0, 1fr) minmax(148px, 22%);
-  grid-template-rows: auto minmax(180px, auto) auto;
-  height: auto;
-  min-height: 640px;
-  max-height: none;
-  overflow: visible;
-  align-items: center;
+  grid-template-columns: minmax(132px, 22%) minmax(0, 1fr) minmax(132px, 22%);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  align-items: stretch;
 }
 
 .table-uno.uno-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: visible; min-height: 168px; }
@@ -1842,13 +1865,13 @@
 .table-uno.uno-multi > .seat-you { grid-column: 1 / -1; grid-row: 3; }
 
 .table-hg.hg-multi {
-  grid-template-columns: minmax(148px, 22%) minmax(0, 1fr) minmax(148px, 22%);
-  grid-template-rows: auto minmax(180px, auto) auto;
-  height: auto;
-  min-height: 640px;
-  max-height: none;
-  overflow: visible;
-  align-items: center;
+  grid-template-columns: minmax(132px, 22%) minmax(0, 1fr) minmax(132px, 22%);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  align-items: stretch;
 }
 
 .table-hg.hg-multi > .seat-partner { grid-column: 2; grid-row: 1; overflow: visible; min-height: 168px; }

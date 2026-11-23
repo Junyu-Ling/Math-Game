@@ -751,39 +751,16 @@ button:disabled {
 }
 
 .page-wide.coda-page {
-  overflow: auto;
+  overflow: hidden;
 }
 
-.page-wide .table.table-coda {
+.page-wide .table.table-coda,
+.page-wide .table.table-coda.coda-multi {
+  align-self: stretch;
   height: 100%;
   min-height: 0;
   max-height: 100%;
-  overflow: visible;
-}
-
-/* 3 and 4 seats keep their side tiles at full size. A viewport-locked table
-   cut the bottom hand off, so these tables grow and the page scrolls. */
-.page-wide .table.table-coda.coda-multi {
-  align-self: start;
-  height: auto;
-  min-height: 0;
-  max-height: none;
-  overflow: visible;
-}
-
-.page-wide.coda-page:has(.table-coda.coda-multi) {
-  flex: none;
-  height: auto;
-  overflow: visible;
-}
-
-.page-wide.coda-page:has(.table-coda.coda-multi) .game-layout {
-  flex: none;
-  height: auto;
-  min-height: 0;
-  overflow: visible;
-  align-items: start;
-  grid-template-rows: auto;
+  overflow: hidden;
 }
 
 .hero {
