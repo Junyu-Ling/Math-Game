@@ -2,7 +2,15 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export function Account() {
-  const { user, live } = useAuth();
+  const { user, live, loading } = useAuth();
+  if (loading && !user) {
+    return (
+      <div className="page">
+        <p className="kicker">Account</p>
+        <h1>…</h1>
+      </div>
+    );
+  }
   if (!user) {
     return (
       <div className="page">

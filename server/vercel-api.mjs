@@ -42,7 +42,7 @@ const users = new Map();
 
 function publicUser(u) {
   return {
-    id: u.id,
+    id: u.id == null ? u.id : String(u.id),
     email: u.email,
     chips: u.chips ?? 1000,
     createdAt: u.createdAt,
@@ -56,7 +56,37 @@ function publicUser(u) {
 }
 
 function signUser(user) {
-  return jwt.sign(publicUser(user), JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign(publicUser(user), JWT_SECRET, { expiresIn: "30d" });
+}
+
+function authFailure(err) {
+  return err?.name === "JsonWebTokenError" || err?.name === "TokenExpiredError" || err?.name === "NotBeforeError";
+}
+
+function orTimeout(promise, ms, message) {
+  let timer;
+  let settled = false;
+  return new Promise((resolve, reject) => {
+    timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(Object.assign(new Error(message), { status: 503 }));
+    }, ms);
+    promise.then(
+      (value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
 }
 
 async function upsertGithubUser(identity) {
@@ -326,8 +356,11 @@ export async function handle(req, res, path) {
       }
       send(res, 400, { error: "Unknown operation" });
     } catch (err) {
-      const msg = String(err.message || "Failed");
-      send(res, /jwt|token|Not signed in|未登录/i.test(msg) ? 401 : 400, { error: /jwt|token/i.test(msg) ? "Not signed in" : msg });
+      if (authFailure(err)) {
+        send(res, 401, { error: "Not signed in" });
+        return;
+      }
+      send(res, 400, { error: String(err.message || "Failed") });
     }
     return;
   }
@@ -345,7 +378,7 @@ export async function handle(req, res, path) {
         send(res, 400, { error: "Password must be at least 6 characters" });
         return;
       }
-      if (await findAccountByEmail(email)) {
+      if (await orTimeout(findAccountByEmail(email), 4000, "Sign-in is taking too long. Try again.")) {
         send(res, 400, { error: "That email is already registered" });
         return;
       }
@@ -409,7 +442,7 @@ export async function handle(req, res, path) {
       const body = await readBody(req);
       const email = String(body.email || "").trim().toLowerCase();
       const password = String(body.password || "");
-      const user = await findAccountByEmail(email);
+      const user = await orTimeout(findAccountByEmail(email), 4000, "Sign-in is taking too long. Try again.");
       if (!user) {
         send(res, 400, { error: "Wrong email or password" });
         return;
@@ -445,7 +478,7 @@ export async function handle(req, res, path) {
         send(res, 400, { error: "Invalid email" });
         return;
       }
-      send(res, 200, await requestEmailCode(email));
+      send(res, 200, await orTimeout(requestEmailCode(email), 4000, "Sign-in is taking too long. Try again."));
     } catch (err) {
       send(res, err.status || 400, { error: String(err.message || "Could not send code") });
     }
@@ -461,8 +494,8 @@ export async function handle(req, res, path) {
         send(res, 400, { error: "Invalid email" });
         return;
       }
-      await consumeEmailCode(email, code);
-      const user = await accountForEmailCode(email);
+      await orTimeout(consumeEmailCode(email, code), 4000, "Sign-in is taking too long. Try again.");
+      const user = await orTimeout(accountForEmailCode(email), 4000, "Sign-in is taking too long. Try again.");
       users.set(user.id, user);
       send(res, 200, { token: signUser(user), user: publicUser(user) });
     } catch (err) {
@@ -474,13 +507,26 @@ export async function handle(req, res, path) {
   if (path === "me") {
     const h = req.headers.authorization || "";
     const token = h.startsWith("Bearer ") ? h.slice(7) : "";
+    let payload;
     try {
-      const payload = jwt.verify(token, JWT_SECRET);
-      const stored = users.get(payload.id) || (await findAccountById(payload.id));
-      send(res, 200, { user: publicUser(stored || payload) });
+      payload = jwt.verify(token, JWT_SECRET);
     } catch {
       send(res, 401, { error: "Not signed in" });
+      return;
     }
+    // The account row is optional. A slow Redis lookup must not turn a valid token into "Not signed in".
+    const id = String(payload.id);
+    let stored = users.get(id) || users.get(payload.id) || null;
+    if (!stored) {
+      stored = await Promise.race([
+        findAccountById(id).catch(() => null),
+        new Promise((resolve) => setTimeout(() => resolve(null), 1200)),
+      ]);
+    }
+    const user = publicUser(stored || { ...payload, id });
+    const exp = Number(payload.exp || 0) * 1000;
+    const refresh = !exp || exp - Date.now() < 14 * 24 * 3600 * 1000;
+    send(res, 200, refresh ? { user, token: signUser(user) } : { user });
     return;
   }
 

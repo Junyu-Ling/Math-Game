@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { AuthInvalid, authApi } from "../lib/api";
 import { useAuth } from "./AuthContext";
 import { GAME_PATH, lobbyApi, type Invite, type LobbySnap, type OnlinePlayer, type QueueSnap, type RoomSnap, type Settlement } from "../lib/lobby";
 
@@ -62,7 +63,7 @@ function isLiveMatch(room: RoomSnap | null | undefined) {
 }
 
 export function LobbyProvider({ children }: { children: ReactNode }) {
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
   const nav = useNavigate();
   const loc = useLocation();
   const [snap, setSnap] = useState<LobbySnap>({ online: [], invites: [], room: null, store: "memory", queue: null });
@@ -205,7 +206,21 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         if (!stop) timer = window.setTimeout(tick, document.hidden && inRoom ? 4000 : 0);
       } catch (ex) {
         if (stop) return;
-        if (ex instanceof Error && ex.name === "AbortError") return;
+        if (ex instanceof Error && (ex.name === "AbortError" || ex.name === "TimeoutError")) {
+          if (!stop && ex.name === "TimeoutError") timer = window.setTimeout(tick, 400);
+          return;
+        }
+        // A blip used to surface as "Not signed in" and look like the session had died.
+        if (ex instanceof Error && ex.message === "Not signed in") {
+          try {
+            await authApi.me(token);
+            if (!stop) setError("");
+          } catch (err) {
+            if (!stop && err instanceof AuthInvalid) logout();
+          }
+          if (!stop) timer = window.setTimeout(tick, 800);
+          return;
+        }
         setError(ex instanceof Error ? ex.message : "Lobby sync failed");
         if (!stop) timer = window.setTimeout(tick, 200);
       }
@@ -216,7 +231,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       abort?.abort();
       window.clearTimeout(timer);
     };
-  }, [token, user, nav]);
+  }, [token, logout, nav]);
 
   // Match already decided: show that result, drop the seat immediately. No extra wait.
   useEffect(() => {

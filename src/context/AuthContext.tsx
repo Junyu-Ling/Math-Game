@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { authApi, type User } from "../lib/api";
+import { AuthInvalid, authApi, type User } from "../lib/api";
 
 type AuthState = {
   user: User | null;
@@ -21,25 +21,42 @@ type AuthState = {
 const Ctx = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const stored = authApi.getStored();
+  const [user, setUser] = useState<User | null>(stored?.user ?? null);
+  const [token, setToken] = useState<string | null>(stored?.token ?? null);
+  const [loading, setLoading] = useState(Boolean(stored));
 
   useEffect(() => {
-    const stored = authApi.getStored();
-    if (!stored) {
+    const snap = authApi.getStored();
+    if (!snap) {
       setLoading(false);
       return;
     }
+    let cancel = false;
     authApi
-      .me(stored.token)
+      .me(snap.token)
       .then((u) => {
+        if (cancel) return;
+        const nextToken = authApi.getStored()?.token || snap.token;
         setUser(u);
-        setToken(stored.token);
-        authApi.persist({ token: stored.token, user: u });
+        setToken(nextToken);
+        authApi.persist({ token: nextToken, user: u });
       })
-      .catch(() => authApi.clear())
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (cancel) return;
+        // Only a dead token logs the player out. A slow or failed refresh keeps the saved session.
+        if (!(err instanceof AuthInvalid)) return;
+        if (authApi.getStored()?.token !== snap.token) return;
+        authApi.clear();
+        setUser(null);
+        setToken(null);
+      })
+      .finally(() => {
+        if (!cancel) setLoading(false);
+      });
+    return () => {
+      cancel = true;
+    };
   }, []);
 
   const value = useMemo<AuthState>(

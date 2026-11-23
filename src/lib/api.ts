@@ -44,10 +44,38 @@ function headers(token?: string): HeadersInit {
   return h;
 }
 
-async function request<T>(path: string, init: RequestInit): Promise<T> {
-  const res = await fetch(`${apiBase}${path}`, init);
+export class AuthInvalid extends Error {
+  status = 401;
+  constructor() {
+    super("Not signed in");
+    this.name = "AuthInvalid";
+  }
+}
+
+class HttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}
+
+function requestSignal(ms: number, parent?: AbortSignal | null): AbortSignal {
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" && !parent) {
+    return AbortSignal.timeout(ms);
+  }
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  parent?.addEventListener("abort", () => ctrl.abort(), { once: true });
+  ctrl.signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+  return ctrl.signal;
+}
+
+async function request<T>(path: string, init: RequestInit, ms = 12000): Promise<T> {
+  const res = await fetch(`${apiBase}${path}`, { ...init, signal: init.signal || requestSignal(ms) });
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  if (!res.ok) throw new HttpError(res.status, data.error || `Request failed (${res.status})`);
   return data;
 }
 
@@ -67,29 +95,41 @@ function mockToken(email: string) {
   return `mock.${btoa(unescape(encodeURIComponent(email)))}.${Date.now()}`;
 }
 
-function userFromJwt(token: string): User | null {
+function jwtPayload(token: string): (User & { exp?: number }) | null {
   try {
     const part = token.split(".")[1];
     if (!part) return null;
     const pad = part.replace(/-/g, "+").replace(/_/g, "/");
     const json = atob(pad.padEnd(Math.ceil(pad.length / 4) * 4, "="));
-    const payload = JSON.parse(json) as User & { id?: string };
-    if (!payload.id) return null;
-    return {
-      id: String(payload.id),
-      email: payload.email || "",
-      chips: payload.chips ?? 1000,
-      createdAt: payload.createdAt || new Date().toISOString(),
-      provider: payload.provider,
-      login: payload.login,
-      name: payload.name,
-      avatar: payload.avatar,
-      githubId: payload.githubId,
-      googleId: payload.googleId,
-    };
+    return JSON.parse(json) as User & { exp?: number };
   } catch {
     return null;
   }
+}
+
+function userFromJwt(token: string): User | null {
+  const payload = jwtPayload(token);
+  if (!payload?.id) return null;
+  return {
+    id: String(payload.id),
+    email: payload.email || "",
+    chips: payload.chips ?? 1000,
+    createdAt: payload.createdAt || new Date().toISOString(),
+    provider: payload.provider,
+    login: payload.login,
+    name: payload.name,
+    avatar: payload.avatar,
+    githubId: payload.githubId,
+    googleId: payload.googleId,
+  };
+}
+
+/** A token we can still trust locally. Expired or garbage tokens are not. */
+function jwtUsable(token: string): boolean {
+  const payload = jwtPayload(token);
+  if (!payload?.id) return false;
+  if (payload.exp && payload.exp * 1000 < Date.now() - 30_000) return false;
+  return true;
 }
 
 export const authApi = {
@@ -97,13 +137,19 @@ export const authApi = {
 
   getStored(): AuthPayload | null {
     const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return null;
+    let user: User | null = null;
     const raw = localStorage.getItem(USER_KEY);
-    if (!token || !raw) return null;
-    try {
-      return { token, user: JSON.parse(raw) as User };
-    } catch {
-      return null;
+    if (raw) {
+      try {
+        user = JSON.parse(raw) as User;
+      } catch {
+        user = null;
+      }
     }
+    if (!user?.id) user = userFromJwt(token);
+    if (!user?.id || !jwtUsable(token)) return null;
+    return { token, user: { ...user, id: String(user.id) } };
   },
 
   persist(payload: AuthPayload) {
@@ -224,15 +270,21 @@ export const authApi = {
   async me(token: string): Promise<User> {
     if (liveApi) {
       try {
-        const data = await request<{ user: User }>("/api/me", {
+        const data = await request<{ user: User; token?: string }>("/api/me", {
           method: "GET",
           headers: headers(token),
         });
-        return data.user;
-      } catch {
-        const fromJwt = userFromJwt(token);
-        if (fromJwt) return fromJwt;
-        throw new Error("Not signed in");
+        const user = data.user?.id ? { ...data.user, id: String(data.user.id) } : userFromJwt(token);
+        if (!user?.id) throw new AuthInvalid();
+        if (data.token && data.token !== token) this.persist({ token: data.token, user });
+        return user;
+      } catch (err) {
+        // A slow or dropped /api/me used to wipe the session. Keep it unless the token itself is dead.
+        const rejected = err instanceof HttpError && err.status === 401;
+        const cached = userFromJwt(token);
+        if (cached && jwtUsable(token)) return cached;
+        if (rejected || !jwtUsable(token)) throw new AuthInvalid();
+        throw err;
       }
     }
     const stored = this.getStored();

@@ -86,7 +86,7 @@ function NavMatch() {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, logout, loading } = useAuth();
   return (
     <div className="shell">
       <header className="topbar">
@@ -108,6 +108,8 @@ export function Shell({ children }: { children: ReactNode }) {
                 Log out
               </button>
             </>
+          ) : loading ? (
+            <span className="nav-user">…</span>
           ) : (
             <NavLink to="/login">Log in</NavLink>
           )}

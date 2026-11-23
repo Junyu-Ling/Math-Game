@@ -32,6 +32,7 @@ import {
   leaveRoom,
   lobbyStoreKind,
   findAccountByEmail,
+  findAccountById,
   rememberPlayer,
   respondInvite,
   saveAccount,
@@ -154,7 +155,7 @@ function writeUsers(users) {
 }
 
 function signUser(user) {
-  return jwt.sign(publicUser(user), JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign(publicUser(user), JWT_SECRET, { expiresIn: "30d" });
 }
 
 function publicUser(u) {
@@ -372,7 +373,7 @@ app.post("/api/auth/verify", async (req, res) => {
   writeUsers(users);
   await cacheDel(`verify:${email}`);
   await saveAccount(user);
-  const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: "7d" });
+  const token = signUser(user);
   res.json({ token, user: publicUser(user) });
 });
 
@@ -394,7 +395,7 @@ app.post("/api/auth/login", async (req, res) => {
     return res.status(400).json({ error: "邮箱或密码错误" });
   }
   await rememberPlayer(user);
-  const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: "7d" });
+  const token = signUser(user);
   res.json({ token, user: publicUser(user) });
 });
 
@@ -432,18 +433,35 @@ app.post("/api/auth/email-login", async (req, res) => {
       users.push(passwordHash ? { ...rest, passwordHash } : rest);
     }
     writeUsers(users);
-    const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: "7d" });
-    res.json({ token, user: publicUser(users[idx >= 0 ? idx : users.length - 1]) });
+    const signed = users[idx >= 0 ? idx : users.length - 1];
+    const token = signUser(signed);
+    res.json({ token, user: publicUser(signed) });
   } catch (err) {
     res.status(err.status || 400).json({ error: err.message || "登录失败" });
   }
 });
 
-app.get("/api/me", auth, (req, res) => {
-  const user = readUsers().find((u) => String(u.id) === String(req.user.id));
-  if (user) return res.json({ user: publicUser(user) });
-  if (req.user?.githubId || req.user?.id) return res.json({ user: publicUser(req.user) });
-  res.status(404).json({ error: "用户不存在" });
+app.get("/api/me", auth, async (req, res) => {
+  let stored = null;
+  try {
+    stored = readUsers().find((u) => String(u.id) === String(req.user.id)) || null;
+  } catch {
+    stored = null;
+  }
+  if (!stored) {
+    try {
+      stored = await Promise.race([
+        findAccountById(String(req.user.id)).catch(() => null),
+        new Promise((resolve) => setTimeout(() => resolve(null), 1200)),
+      ]);
+    } catch {
+      stored = null;
+    }
+  }
+  const user = publicUser(stored || req.user);
+  const exp = Number(req.user.exp || 0) * 1000;
+  const refresh = !exp || exp - Date.now() < 14 * 24 * 3600 * 1000;
+  res.json(refresh ? { user, token: signUser(user) } : { user });
 });
 
 function dropDemoUsers() {
