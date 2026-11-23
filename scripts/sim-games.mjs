@@ -91,6 +91,25 @@ function playUntil(start, step, cap, name) {
     "coda opening finish drains without a second arrange",
     locked.phase !== "arrange" && locked.players.every((p) => !p.stash && (p.queue?.length ?? 0) === 0),
   );
+  // The right-hand dash can reach the server before the left-hand one. Anchors, not the raw index, decide the seat.
+  const lateRight = coda.applyAction(open, "you", {
+    type: "slot",
+    index: 4,
+    tileId: "d2",
+    leftId: "n2",
+    rightId: null,
+  });
+  const thenLeft = coda.applyAction(lateRight, "you", {
+    type: "slot",
+    index: 0,
+    tileId: "d1",
+    leftId: null,
+    rightId: "n1",
+  });
+  const order = thenLeft.players[0].tiles.map((t) => t.id).join(",");
+  ok("coda opening dashes keep left and right when the right one arrives first", order === "d1,n1,n2,d2");
+  const stayed = coda.finishArrange(thenLeft).players[0].tiles.map((t) => t.id).join(",");
+  ok("coda opening lock does not slide both dashes to the left", stayed === "d1,n1,n2,d2");
 }
 
 {

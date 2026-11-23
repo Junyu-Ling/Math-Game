@@ -446,7 +446,16 @@ function rpsCaption(
 }
 
 type Optimistic =
-  | { kind: "slot"; at: number; arrangeId: number; tileId: string; index: number; opening: boolean }
+  | {
+      kind: "slot";
+      at: number;
+      arrangeId: number;
+      tileId: string;
+      index: number;
+      opening: boolean;
+      leftId: string | null;
+      rightId: string | null;
+    }
   | { kind: "select"; at: number; playerId: string; index: number; logLen: number };
 
 const OPTIMISTIC_MS = 2500;
@@ -512,10 +521,9 @@ function overlayOptimistic(view: CodaState, youId: string | null, pending: Optim
     if (o.kind === "slot") {
       if (v.phase !== "arrange" || o.arrangeId !== v.arrangeId) continue;
       if (o.opening) {
-        const mine = v.players.find((p) => p.id === youId);
-        if (mine?.stash?.id === o.tileId) v = setPendingSlot(v, o.index, youId);
+        v = setPendingSlot(v, o.index, youId, o.tileId, o.leftId, o.rightId);
       } else if (v.pending?.id === o.tileId && v.pendingSlot !== o.index) {
-        v = setPendingSlot(v, o.index, youId);
+        v = setPendingSlot(v, o.index, youId, o.tileId, o.leftId, o.rightId);
       }
     } else if (v.phase === "guess" && v.log.length === o.logLen && currentPlayer(v).id === youId) {
       if (v.selected?.playerId !== o.playerId || v.selected.index !== o.index) {
@@ -600,11 +608,13 @@ export function DaVinciPage() {
             kind: "slot",
             at: Date.now(),
             arrangeId: state.arrangeId,
-            tileId: tile.id,
+            tileId: action.tileId ?? tile.id,
             index: action.index,
             opening: openingNow,
+            leftId: action.leftId ?? null,
+            rightId: action.rightId ?? null,
           });
-          setState((s) => (s ? setPendingSlot(s, action.index, you.id) : s));
+          setState((s) => (s ? setPendingSlot(s, action.index, you.id, action.tileId, action.leftId, action.rightId) : s));
         }
       } else if (action.type === "select" && state && myTurn && state.phase === "guess") {
         optimisticRef.current.push({
@@ -633,7 +643,9 @@ export function DaVinciPage() {
       setFlash({ kind: "miss", playerId: you.id, index: action.index });
       setState((s) => (s ? payPenalty(s, action.index) : s));
     }
-    else if (action.type === "slot") setState((s) => (s ? setPendingSlot(s, action.index, you?.id) : s));
+    else if (action.type === "slot") {
+      setState((s) => (s ? setPendingSlot(s, action.index, you?.id, action.tileId, action.leftId, action.rightId) : s));
+    }
     else if (action.type === "rps") setState((s) => (s ? playRps(s, action.throw, you?.id) : s));
     else if (action.type === "pick" || action.type === "ready") {
       setState((s) => (s && you ? applyAction(s, you.id, action) : s));
@@ -1145,7 +1157,13 @@ export function DaVinciPage() {
                 }}
                 onGap={(i) => {
                   if (!arranging || !myInsert) return;
-                  dispatch({ type: "slot", index: i });
+                  dispatch({
+                    type: "slot",
+                    index: i,
+                    tileId: myInsert.id,
+                    leftId: humanRow[i - 1]?.id ?? null,
+                    rightId: humanRow[i]?.id ?? null,
+                  });
                 }}
               />
             </div>

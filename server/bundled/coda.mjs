@@ -66,8 +66,7 @@ function bestDashIndex(tiles) {
   const tied = [];
   for (let index = 0; index <= last; index++) {
     let score = gapWidth(tiles, index);
-    if (tiles[index - 1]?.value === "joker") score -= 6;
-    if (tiles[index]?.value === "joker") score -= 6;
+    if (tiles[index - 1]?.value === "joker" || tiles[index]?.value === "joker") score -= 100;
     if (!tied.length || score > best) {
       best = score;
       tied.length = 0;
@@ -664,15 +663,47 @@ function stay(state) {
 function openingDashLeft(player) {
   return (player.stash ? 1 : 0) + (player.queue?.length ?? 0);
 }
-function insertOpeningDash(state, actor, index) {
-  if (!actor.stash) return state;
-  const allowed = insertIndices(actor.tiles, actor.stash);
-  if (!allowed.includes(index)) return state;
-  const tiles = [...actor.tiles];
-  tiles.splice(index, 0, actor.stash);
-  const [nextStash, ...queue] = actor.queue ?? [];
+function dashDest(tiles, tileId, leftId, rightId, fallback) {
+  const row = tiles.filter((t) => t.id !== tileId);
+  if (leftId && leftId !== tileId) {
+    const at = row.findIndex((t) => t.id === leftId);
+    if (at >= 0) return at + 1;
+  }
+  if (rightId && rightId !== tileId) {
+    const at = row.findIndex((t) => t.id === rightId);
+    if (at >= 0) return at;
+  }
+  return Math.max(0, Math.min(Math.floor(fallback) || 0, row.length));
+}
+function pullNamedDash(actor, tileId) {
+  if (tileId) {
+    const sitting = actor.tiles.find((t) => t.id === tileId);
+    if (sitting) return { player: actor, tile: sitting };
+    if (actor.stash?.id === tileId) return { player: { ...actor, stash: null }, tile: actor.stash };
+    const queued = (actor.queue ?? []).find((t) => t.id === tileId);
+    if (queued) {
+      const queue = (actor.queue ?? []).filter((t) => t.id !== tileId);
+      const pending = actor.stash ? [actor.stash, ...queue] : queue;
+      return { player: { ...actor, stash: null, queue: pending }, tile: queued };
+    }
+    return null;
+  }
+  if (!actor.stash) return null;
+  return { player: { ...actor, stash: null }, tile: actor.stash };
+}
+function insertOpeningDash(state, actor, index, tileId, leftId, rightId) {
+  const picked = pullNamedDash(actor, tileId);
+  if (!picked) return state;
+  const at = dashDest(picked.player.tiles, picked.tile.id, leftId, rightId, index);
+  const tiles = picked.player.tiles.filter((t) => t.id !== picked.tile.id);
+  tiles.splice(at, 0, picked.tile);
+  if (tiles.every((t, i) => t.id === actor.tiles[i]?.id)) return state;
+  const inHand = actor.tiles.some((t) => t.id === picked.tile.id);
+  const pending = picked.player.queue ?? [];
+  const nextStash = inHand ? actor.stash : pending[0] ?? null;
+  const queue = inHand ? actor.queue ?? [] : pending.slice(1);
   const players = state.players.map(
-    (p) => p.id === actor.id ? { ...p, tiles, stash: nextStash ?? null, queue } : p
+    (p) => p.id === actor.id ? { ...picked.player, tiles, stash: nextStash, queue } : p
   );
   const stashSlots = { ...state.stashSlots };
   delete stashSlots[actor.id];
@@ -702,12 +733,12 @@ function drainOpeningDashes(player, preferred) {
   }
   return { ...cur, stash: null, queue: [] };
 }
-function setPendingSlot(state, index, actorId) {
+function setPendingSlot(state, index, actorId, tileId, leftId, rightId) {
   if (state.phase !== "arrange") return state;
   const actor = actorId ? state.players.find((p) => p.id === actorId) : currentPlayer(state);
   if (!actor) return state;
-  if (actor.stash && state.resume === "draw") {
-    return insertOpeningDash(state, actor, index);
+  if (state.resume === "draw" && (actor.stash || (actor.queue ?? []).some((t) => t.id === tileId) || actor.tiles.some((t) => t.id === tileId))) {
+    return insertOpeningDash(state, actor, index, tileId, leftId, rightId);
   }
   if (!state.pending || actor.id !== currentPlayer(state).id) return state;
   const row = state.humanDraft ?? actor.tiles;
@@ -972,7 +1003,7 @@ function applyAction(state, actorId, action) {
     case "penalty":
       return isActorTurn(state, actorId) ? payPenalty(state, action.index) : state;
     case "slot":
-      return setPendingSlot(state, action.index, actorId);
+      return setPendingSlot(state, action.index, actorId, action.tileId, action.leftId, action.rightId);
     case "rps":
       return playRps(state, action.throw, actorId);
     default:
