@@ -75,49 +75,51 @@ function NavInvite() {
 function NetStatus() {
   const { net, reconnect, dismissReconnect, returnToTable, declineReturn, askReconnect } = useLobby();
   const label =
-    net.quality === "down" ? "已断开" : net.rtt == null ? "检测中" : `${net.rtt} ms`;
-  const word = net.quality === "good" ? "良好" : net.quality === "fair" ? "一般" : net.quality === "slow" ? "较慢" : "已断开";
+    net.quality === "down" ? "Offline" : net.rtt == null ? "Checking" : `${net.rtt} ms`;
+  const word = net.quality === "good" ? "Good" : net.quality === "fair" ? "Fair" : net.quality === "slow" ? "Slow" : "Offline";
   const openAsk = net.paused && !net.prompt;
   return (
     <>
       <button
         className={`net-pill ${net.quality}${openAsk ? " ask" : ""}`}
         type="button"
-        title={openAsk ? "连接已暂停，点击重新连接" : `网络${word}`}
+        title={openAsk ? "Connection paused. Click to reconnect." : `Network ${word}`}
         onClick={() => {
           if (openAsk) askReconnect();
         }}
       >
         <i className="net-dot" />
         <span>{label}</span>
-        {net.quality === "down" ? null : <span className="net-word">{openAsk ? "重连" : word}</span>}
+        {net.quality === "down" ? null : <span className="net-word">{openAsk ? "Reconnect" : word}</span>}
       </button>
       {net.prompt ? (
         <div className="net-modal" role="dialog" aria-modal="true">
           <div className="net-card">
             {net.prompt === "reconnect" ? (
               <>
-                <h2>网络已断开</h2>
-                <p>牌局还留在桌上。要重新连接吗？</p>
+                <h2>Connection lost</h2>
+                <p>Your seat is still at the table. Reconnect?</p>
                 <div className="net-actions">
                   <button className="btn btn-go" type="button" disabled={net.reconnecting} onClick={() => void reconnect()}>
-                    {net.reconnecting ? "正在重连…" : "重连"}
+                    {net.reconnecting ? "Reconnecting…" : "Reconnect"}
                   </button>
                   <button className="btn btn-ghost" type="button" onClick={dismissReconnect}>
-                    稍后
+                    Not now
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <h2>已经重新连接</h2>
-                <p>要回到这局{net.tableLabel ? `「${net.tableLabel}」` : ""}吗？回去以后从刚才的进度继续。</p>
+                <h2>Connected again</h2>
+                <p>
+                  Return to this {net.tableLabel || "table"}? Play continues from where you left off.
+                </p>
                 <div className="net-actions">
                   <button className="btn btn-go" type="button" onClick={returnToTable}>
-                    回到牌局
+                    Return
                   </button>
                   <button className="btn btn-ghost" type="button" onClick={declineReturn}>
-                    先不回去
+                    Not yet
                   </button>
                 </div>
               </>
