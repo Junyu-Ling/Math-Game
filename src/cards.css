@@ -139,8 +139,25 @@
   border-radius: 1px;
 }
 
+/* The dash is a bar, not a glyph. A condensed em dash was clipped by the tile face and disappeared. */
+.coda-num-dash {
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.coda-dash {
+  display: block;
+  width: 58%;
+  height: 8px;
+  background: currentColor;
+  border-radius: 2px;
+}
+
 .mj.mini .coda-num b { font-size: 22px; }
 .mj.mini .coda-rule { height: 2px; margin-top: 3px; }
+.mj.mini .coda-dash { height: 4px; }
 
 .mj.face-down.white .coda-face {
   background:

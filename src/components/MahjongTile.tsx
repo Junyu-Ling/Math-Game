@@ -44,10 +44,16 @@ export function MahjongTile({ tile, hide, selected, aimed, flash, down, dim, min
       <span className="coda-flip">
         <span className="coda-face">
           {show ? (
-            <span className="coda-num">
-              <b>{num}</b>
-              {tile.value === "joker" ? null : <i className="coda-rule" />}
-            </span>
+            tile.value === "joker" ? (
+              <span className="coda-num coda-num-dash">
+                <i className="coda-dash" />
+              </span>
+            ) : (
+              <span className="coda-num">
+                <b>{num}</b>
+                <i className="coda-rule" />
+              </span>
+            )
           ) : (
             <span className="coda-blank" />
           )}

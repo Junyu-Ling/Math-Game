@@ -1027,7 +1027,10 @@ export function DaVinciPage() {
             <div className="hand-card">
               <div className="seat-label">{ownOpeningDash || (arranging && !opening) ? "To insert" : "Drawn tile"}</div>
               {showDrawn && drawnTile ? (
-                <MahjongTile tile={drawnTile} hide={!drawnTile.revealed && String(me?.id) !== String(you.id)} />
+                <MahjongTile
+                  tile={drawnTile}
+                  hide={!ownOpeningDash && !drawnTile.revealed && String(me?.id) !== String(you.id)}
+                />
               ) : (
                 <span className="mj stand face-down black dim" aria-hidden />
               )}
