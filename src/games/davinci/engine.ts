@@ -376,16 +376,16 @@ export function dealCodaTable(state: CodaState): CodaState {
       out: false,
     });
   });
-  const wait = players.some((p) => p.stash);
-  // No preset slot. Index 0 used to be filled in here, so every unplaced dash locked as the first tile.
+  // Always wait 5s. Skipping it when nobody holds a dash would tell the table that no dash was dealt.
   const stashSlots: Partial<Record<string, number>> = {};
   const firstStash = players.find((p) => p.stash);
   const other = players.find((p) => p.id !== firstStash?.id) ?? players[1];
-  const dealt: CodaState = {
+  return {
     ...state,
     players,
     deck: shuffle(deck),
     turn: 0,
+    phase: "arrange",
     selected: null,
     winnerId: null,
     tried: {},
@@ -393,27 +393,18 @@ export function dealCodaTable(state: CodaState): CodaState {
     rpsThrows: {},
     rpsReveal: null,
     stashSlots,
-    arrangeId: wait ? state.arrangeId + 1 : 0,
-    pending: wait ? (firstStash?.stash ?? null) : null,
+    arrangeId: state.arrangeId + 1,
+    pending: firstStash?.stash ?? null,
     pendingSlot: null,
-    humanDraft: wait && firstStash ? firstStash.tiles.map((t) => ({ ...t })) : null,
-    frozenRival: wait && other ? other.tiles.map((t) => ({ ...t })) : null,
-    resume: wait ? "draw" : null,
-    drawn: wait ? (firstStash?.stash ?? null) : null,
+    humanDraft: firstStash ? firstStash.tiles.map((t) => ({ ...t })) : null,
+    frozenRival: other ? other.tiles.map((t) => ({ ...t })) : null,
+    resume: "draw",
+    drawn: firstStash?.stash ?? null,
     log: [
       ...state.log,
-      {
-        id: uid("l"),
-        text: wait
-          ? "Opening arrange."
-          : players.length === 2
-            ? "Opening 4 in hand. RPS — loser guesses first."
-            : "Opening 4 in hand. First draw is random.",
-      },
+      { id: uid("l"), text: "Opening. 5 seconds before the first draw." },
     ],
   };
-  if (wait) return { ...dealt, phase: "arrange" };
-  return afterOpening({ ...dealt, phase: "draw" });
 }
 
 export function startCodaMatch(
@@ -783,10 +774,6 @@ export function stay(state: CodaState): CodaState {
   );
 }
 
-function openingDashLeft(player: CodaPlayer): number {
-  return (player.stash ? 1 : 0) + (player.queue?.length ?? 0);
-}
-
 /** Where a dash belongs, from the tiles the player actually clicked between. An index alone breaks when the other dash has not landed yet. */
 function dashDest(tiles: CodaTile[], tileId: string, leftId: string | null | undefined, rightId: string | null | undefined, fallback: number): number {
   const row = tiles.filter((t) => t.id !== tileId);
@@ -843,7 +830,6 @@ function insertOpeningDash(
   const stashSlots: Partial<Record<string, number>> = { ...state.stashSlots };
   delete stashSlots[actor.id];
   const first = players.find((p) => p.stash);
-  const left = openingDashLeft(players.find((p) => p.id === actor.id)!);
   return {
     ...state,
     players,
@@ -851,16 +837,6 @@ function insertOpeningDash(
     pending: first?.stash ?? null,
     pendingSlot: first && stashSlots[first.id] !== undefined ? stashSlots[first.id]! : null,
     drawn: first?.stash ?? null,
-    log: [
-      ...state.log,
-      {
-        id: uid("l"),
-        text:
-          left > 0
-            ? `${actor.name} inserts a dash. ${left} more to place in this 5s.`
-            : `${actor.name} inserts a dash.`,
-      },
-    ],
   };
 }
 

@@ -297,15 +297,15 @@ function dealCodaTable(state) {
       out: false
     });
   });
-  const wait = players.some((p) => p.stash);
   const stashSlots = {};
   const firstStash = players.find((p) => p.stash);
   const other = players.find((p) => p.id !== firstStash?.id) ?? players[1];
-  const dealt = {
+  return {
     ...state,
     players,
     deck: shuffle(deck),
     turn: 0,
+    phase: "arrange",
     selected: null,
     winnerId: null,
     tried: {},
@@ -313,23 +313,18 @@ function dealCodaTable(state) {
     rpsThrows: {},
     rpsReveal: null,
     stashSlots,
-    arrangeId: wait ? state.arrangeId + 1 : 0,
-    pending: wait ? firstStash?.stash ?? null : null,
+    arrangeId: state.arrangeId + 1,
+    pending: firstStash?.stash ?? null,
     pendingSlot: null,
-    humanDraft: wait && firstStash ? firstStash.tiles.map((t) => ({ ...t })) : null,
-    frozenRival: wait && other ? other.tiles.map((t) => ({ ...t })) : null,
-    resume: wait ? "draw" : null,
-    drawn: wait ? firstStash?.stash ?? null : null,
+    humanDraft: firstStash ? firstStash.tiles.map((t) => ({ ...t })) : null,
+    frozenRival: other ? other.tiles.map((t) => ({ ...t })) : null,
+    resume: "draw",
+    drawn: firstStash?.stash ?? null,
     log: [
       ...state.log,
-      {
-        id: uid("l"),
-        text: wait ? "Opening arrange." : players.length === 2 ? "Opening 4 in hand. RPS \u2014 loser guesses first." : "Opening 4 in hand. First draw is random."
-      }
+      { id: uid("l"), text: "Opening. 5 seconds before the first draw." }
     ]
   };
-  if (wait) return { ...dealt, phase: "arrange" };
-  return afterOpening({ ...dealt, phase: "draw" });
 }
 function startCodaMatch(useJokers, a, b) {
   let lobby = startCodaLobby([a, b], useJokers);
@@ -660,9 +655,6 @@ function stay(state) {
     "next"
   );
 }
-function openingDashLeft(player) {
-  return (player.stash ? 1 : 0) + (player.queue?.length ?? 0);
-}
 function dashDest(tiles, tileId, leftId, rightId, fallback) {
   const row = tiles.filter((t) => t.id !== tileId);
   if (leftId && leftId !== tileId) {
@@ -708,21 +700,13 @@ function insertOpeningDash(state, actor, index, tileId, leftId, rightId) {
   const stashSlots = { ...state.stashSlots };
   delete stashSlots[actor.id];
   const first = players.find((p) => p.stash);
-  const left = openingDashLeft(players.find((p) => p.id === actor.id));
   return {
     ...state,
     players,
     stashSlots,
     pending: first?.stash ?? null,
     pendingSlot: first && stashSlots[first.id] !== void 0 ? stashSlots[first.id] : null,
-    drawn: first?.stash ?? null,
-    log: [
-      ...state.log,
-      {
-        id: uid("l"),
-        text: left > 0 ? `${actor.name} inserts a dash. ${left} more to place in this 5s.` : `${actor.name} inserts a dash.`
-      }
-    ]
+    drawn: first?.stash ?? null
   };
 }
 function drainOpeningDashes(player, preferred) {

@@ -520,6 +520,24 @@ export function lessonCoda(state: CodaState | null, youId: string | null): Lesso
     };
   }
   const actor = state.players[state.turn];
+  if (state.phase === "arrange" && state.resume === "draw") {
+    const dash = you.stash;
+    if (!dash) {
+      return wait(
+        "Wait out the opening",
+        "The table always takes 5 seconds here, whether or not anyone was dealt a dash. Your numbers are already in order. The other rows stay covered until the clock ends.",
+        "The wait used to appear only when a dash was dealt. It runs either way now, so the clock itself gives nothing away.",
+      );
+    }
+    const gaps = insertIndices(you.tiles, dash);
+    const gap = gaps[Math.floor(gaps.length / 2)] ?? gaps[0] ?? 0;
+    return {
+      title: "Place the dash",
+      body: "You drew a dash. It does not sort itself. Tap a gap and it stays between those neighbors. You have the same 5 seconds everyone else is waiting.",
+      veteran: "A wide gap hides it longer. A dash on the end is the first thing other players test.",
+      aim: `gap-${gap}`,
+    };
+  }
   if (state.phase === "arrange") {
     const card = state.pending;
     const mine = actor?.id === you.id;

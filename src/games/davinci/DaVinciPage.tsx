@@ -79,7 +79,7 @@ function statusText(
           ? `Opening arrange ${remain.toFixed(1)}s. Insert both dashes one by one before the clock ends — tap a gap for each.`
           : `Opening arrange ${remain.toFixed(1)}s. Tap a gap to insert your dash now. Leftovers lock when the 5s ends.`;
       }
-      return `Opening arrange ${remain.toFixed(1)}s. Rivals insert their dashes one by one in this same 5s.`;
+      return `Opening ${remain.toFixed(1)}s. The table always waits before the first draw. Your numbers are already in order.`;
     }
     return `Arrange ${remain.toFixed(1)}s. Insert the tile in order (small to large). The clock always runs the full 5 seconds.`;
   }
