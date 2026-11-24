@@ -881,9 +881,19 @@ function lockOpeningDash(player: CodaPlayer, preferred: number | null): CodaPlay
     const [stash, ...queue] = player.queue ?? [];
     return { ...player, stash: stash ?? null, queue };
   }
-  const slot = pickSlot(player.tiles, player.stash, preferred, !player.human);
-  const tiles = player.tiles.some((t) => t.id === player.stash!.id) ? player.tiles.slice() : [...player.tiles];
-  if (!player.tiles.some((t) => t.id === player.stash!.id)) tiles.splice(slot, 0, player.stash);
+  const tiles = player.tiles.slice();
+  if (!tiles.some((t) => t.id === player.stash!.id)) {
+    const opts = insertIndices(tiles, player.stash);
+    const chosen = preferred !== null && opts.includes(preferred) ? preferred : null;
+    // A player's dash stays in the gap they tapped. Nothing picks a widest or leftmost gap for them.
+    const slot =
+      chosen !== null
+        ? chosen
+        : player.human
+          ? opts[Math.floor(Math.random() * opts.length)] ?? tiles.length
+          : pickSlot(tiles, player.stash, null, true);
+    tiles.splice(slot, 0, player.stash);
+  }
   const [stash, ...queue] = player.queue ?? [];
   return { ...player, tiles, stash: stash ?? null, queue };
 }

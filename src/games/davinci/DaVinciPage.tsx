@@ -76,8 +76,8 @@ function statusText(
     if (state.resume === "draw") {
       if (ownDash) {
         return dashLeft > 1
-          ? `Opening arrange ${remain.toFixed(1)}s. Insert both dashes one by one before the clock ends — tap a gap for each.`
-          : `Opening arrange ${remain.toFixed(1)}s. Tap a gap to insert your dash now. Leftovers lock when the 5s ends.`;
+          ? `Opening arrange ${remain.toFixed(1)}s. Tap a gap for each dash. Each one stays in the gap you tap.`
+          : `Opening arrange ${remain.toFixed(1)}s. Tap a gap. Your dash stays in the gap you tap.`;
       }
       return `Opening ${remain.toFixed(1)}s. The table always waits before the first draw. Your numbers are already in order.`;
     }
