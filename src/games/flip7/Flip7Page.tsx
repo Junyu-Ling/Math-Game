@@ -9,6 +9,7 @@ import {
   cardLabel,
   liveTotal,
   startFlip7,
+  startFlip7Practice,
   startFlip7Solo,
   type FlipAction,
   type FlipDraw,
@@ -20,6 +21,8 @@ import {
 import { DeckStack, FlipFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
 import { ClickPop, RulesButton } from "../../components/GameRules";
+import { lessonFlip } from "../../components/ruleLessons";
+import { mark, useRule, useRuleLesson, useRulePractice } from "../../components/RuleSession";
 import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { LobbyDecor } from "../../components/LobbyDecor";
@@ -138,6 +141,10 @@ export function Flip7Page() {
   const ring = state && me && useRing ? ringOpponents(state.players, me.id) : null;
   const cur = state && state.phase !== "lobby" ? currentFlip(state) : null;
   const myTurn = Boolean(state && me && cur?.id === me.id && state.phase !== "over" && state.phase !== "lobby");
+  const teaching = useRule().game === "flip7";
+  const lesson = teaching ? lessonFlip(state) : null;
+  useRuleLesson("flip7", lesson);
+  useRulePractice("flip7", Boolean(room), () => setLocal(startFlip7Practice()));
 
   const burst = state?.burst ?? null;
   const [fx, setFx] = useState<{ id: string; boom: boolean; spin: boolean } | null>(null);
@@ -295,7 +302,7 @@ export function Flip7Page() {
       <div className="target-slot">
         {myTurn && state.phase === "target" && !savePlaying
           ? activePlayers(state).map((p) => (
-              <button key={p.id} className="btn" type="button" onClick={() => act({ type: "target", targetId: p.id })}>
+              <button key={p.id} className={mark(teaching, lesson?.aim, `target-${p.id}`, "btn")} type="button" onClick={() => act({ type: "target", targetId: p.id })}>
                 {p.id === me.id ? `Use on yourself` : `Use on ${p.name}`}
               </button>
             ))
@@ -317,7 +324,7 @@ export function Flip7Page() {
       />
       <div className="row-actions">
         <button
-          className="btn btn-go"
+          className={mark(teaching, lesson?.aim, "hit", "btn btn-go")}
           type="button"
           disabled={!myTurn || state?.phase !== "action" || savePlaying || me.pendingFlip3 > 0}
           onClick={() => act({ type: "hit" })}
@@ -325,7 +332,7 @@ export function Flip7Page() {
           HIT
         </button>
         <button
-          className="btn btn-gold"
+          className={mark(teaching, lesson?.aim, "stay", "btn btn-gold")}
           type="button"
           disabled={!myTurn || state?.phase !== "action" || savePlaying || me.pendingFlip3 > 0}
           onClick={() => act({ type: "stay" })}

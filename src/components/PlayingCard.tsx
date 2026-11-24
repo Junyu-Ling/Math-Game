@@ -547,11 +547,11 @@ export function UnoFace({
   );
 }
 
-export function UnoColorPick({ onPick }: { onPick: (c: UnoColor) => void }) {
+export function UnoColorPick({ onPick, hot }: { onPick: (c: UnoColor) => void; hot?: string | null }) {
   return (
     <div className="uno-colors">
       {(["red", "yellow", "green", "blue"] as const).map((c) => (
-        <button key={c} className={`uno-dot ${c}`} type="button" onClick={() => onPick(c)} aria-label={c} />
+        <button key={c} className={`uno-dot ${c}${hot === c ? " coach-hot" : ""}`} type="button" onClick={() => onPick(c)} aria-label={c} />
       ))}
     </div>
   );

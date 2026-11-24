@@ -1,6 +1,8 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { aiC4, applyC4Action, COLS, dropRow, ROWS, startC4Practice, type C4Action, type C4State } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
+import { lessonC4 } from "../../components/ruleLessons";
+import { mark, useRule, useRuleLesson, useRulePractice } from "../../components/RuleSession";
 import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
@@ -21,6 +23,10 @@ export function C4Page() {
   const rival = state?.players.find((p) => String(p.id) !== youId);
   const waiting = Boolean(state?.phase === "lobby");
   const myTurn = Boolean(state && me && state.players[state.turn]?.id === me.id && state.phase === "play");
+  const teaching = useRule().game === "c4";
+  const lesson = teaching ? lessonC4(state) : null;
+  useRuleLesson("c4", lesson);
+  useRulePractice("c4", Boolean(room), () => setLocal(startC4Practice()));
 
   useEffect(() => {
     if (room) setLocal(null);
@@ -146,7 +152,7 @@ export function C4Page() {
                         <button
                           key={`${col}-${row}`}
                           type="button"
-                          className={`c4-cell${v ? " filled" : ""}${onWin ? " win" : ""}${last ? " last" : ""}`}
+                          className={mark(teaching, lesson?.aim, `c4-${col}-${row}`, `c4-cell${v ? " filled" : ""}${onWin ? " win" : ""}${last ? " last" : ""}`)}
                           disabled={!canDrop}
                           aria-label={`Column ${col + 1}`}
                           onClick={() => {

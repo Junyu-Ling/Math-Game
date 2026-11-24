@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { CodaGuide } from "./CodaGuide";
-import { createPortal } from "react-dom";
+import { useRule } from "./RuleSession";
 import { MahjongTile } from "./MahjongTile";
 import { FlipFace, PokerFace, UnoFace } from "./PlayingCard";
 import { cardArt, cardLabel } from "../games/ecard/engine";
@@ -456,8 +455,6 @@ export function GameRules({ game }: { game: string }) {
   if (game === "holdem") return <HoldemRules />;
   if (game === "coda") {
     return (
-      <>
-      <CodaGuide />
       <RuleSheet
         lead="2–4 players. Pick a black and white opening mix, then the tiles go down in order. Guess a hidden tile."
         rows={[
@@ -500,7 +497,6 @@ export function GameRules({ game }: { game: string }) {
           "When the deck is empty, skip the draw and keep guessing.",
         ]}
       />
-      </>
     );
   }
   if (game === "flip7") {
@@ -1077,40 +1073,12 @@ export function ClickPop({
   );
 }
 
-export function RulesButton({ game, children }: { game: string; children?: ReactNode }) {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
-
+export function RulesButton({ game }: { game: string; children?: ReactNode }) {
+  const rule = useRule();
+  const open = rule.game === game;
   return (
-    <>
-      <button className="btn btn-ghost" type="button" onClick={() => setOpen(true)}>
-        Rule
-      </button>
-      {open
-        ? createPortal(
-            <div className="rules-screen" role="dialog" aria-label="Rule">
-              <div className="rules-screen-bar">
-                <h2>Rule</h2>
-                <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>
-                  Close
-                </button>
-              </div>
-              <div className="rules-screen-body">
-                {children}
-                <GameRules game={game} />
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-    </>
+    <button className={`btn ${open ? "" : "btn-ghost"}`} type="button" onClick={() => rule.open(game)}>
+      Rule
+    </button>
   );
 }

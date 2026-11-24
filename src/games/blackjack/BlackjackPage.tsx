@@ -10,6 +10,8 @@ import {
 import { PokerFace } from "../../components/PlayingCard";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { RulesButton } from "../../components/GameRules";
+import { lessonBj } from "../../components/ruleLessons";
+import { mark, useRule, useRuleLesson, useRulePractice } from "../../components/RuleSession";
 import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
@@ -29,6 +31,10 @@ export function BlackjackPage() {
   const rival = state?.players.find((p) => String(p.id) !== youId);
   const waiting = Boolean(state?.phase === "lobby");
   const myTurn = Boolean(state && me && state.players[state.turn]?.id === me.id && state.phase === "play");
+  const teaching = useRule().game === "bj";
+  const lesson = teaching ? lessonBj(state) : null;
+  useRuleLesson("bj", lesson);
+  useRulePractice("bj", Boolean(room), () => setLocal(startBjPractice()));
 
   useEffect(() => {
     if (room) setLocal(null);
@@ -151,10 +157,10 @@ export function BlackjackPage() {
                   ))}
                 </div>
                 <div className="row-actions">
-                  <button className="btn btn-go" type="button" disabled={!myTurn} onClick={() => act({ type: "hit" })}>
+                  <button className={mark(teaching, lesson?.aim, "hit", "btn btn-go")} type="button" disabled={!myTurn} onClick={() => act({ type: "hit" })}>
                     HIT
                   </button>
-                  <button className="btn btn-gold" type="button" disabled={!myTurn} onClick={() => act({ type: "stand" })}>
+                  <button className={mark(teaching, lesson?.aim, "stand", "btn btn-gold")} type="button" disabled={!myTurn} onClick={() => act({ type: "stand" })}>
                     STAND
                   </button>
                 </div>

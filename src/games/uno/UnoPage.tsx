@@ -16,6 +16,8 @@ import {
 import { DeckStack, UnoColorPick, UnoFace } from "../../components/PlayingCard";
 import { FitCards, SideCard } from "../../components/FitCards";
 import { RulesButton } from "../../components/GameRules";
+import { lessonUno } from "../../components/ruleLessons";
+import { mark, useRule, useRuleLesson, useRulePractice } from "../../components/RuleSession";
 import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { LobbyDecor } from "../../components/LobbyDecor";
@@ -76,6 +78,7 @@ function UnoSeat({
   playable,
   onPlay,
   onRing,
+  hotId,
 }: {
   player: UnoPlayer;
   className: string;
@@ -86,6 +89,7 @@ function UnoSeat({
   playable?: (id: string) => boolean;
   onPlay?: (id: string) => void;
   onRing?: () => void;
+  hotId?: string | null;
 }) {
   const armed = needsUnoCall(player);
   return (
@@ -110,7 +114,8 @@ function UnoSeat({
                 onClick={mine && onPlay ? () => onPlay(c.id) : undefined}
               />
             );
-            return vertical ? <SideCard key={c.id}>{face}</SideCard> : face;
+            const marked = hotId === c.id ? <span className="coach-hot">{face}</span> : face;
+            return vertical ? <SideCard key={c.id}>{marked}</SideCard> : marked;
           })}
         </FitCards>
       </div>
@@ -200,6 +205,11 @@ export function UnoPage() {
   const shoutArmed = Boolean(me && state && state.phase === "play" && needsUnoCall(me));
   const drewPlayable = Boolean(myTurn && state?.phase === "play" && state.justDrawnId);
   const canDraw = Boolean(myTurn && state?.phase === "play" && !state.justDrawnId);
+  const teaching = useRule().game === "uno";
+  const lesson = teaching ? lessonUno(state) : null;
+  useRuleLesson("uno", lesson);
+  useRulePractice("uno", Boolean(room), () => setLocal(startUnoPractice()));
+  const hotCard = lesson?.aim?.startsWith("card-") ? lesson.aim.slice(5) : null;
 
   useEffect(() => {
     if (room) setLocal(null);
@@ -334,12 +344,14 @@ export function UnoPage() {
               <div className="center-well">
                 <div className="center-cards">
                   <DirMark dir={state.dir} color={state.color} />
-                  <DeckStack
-                    count={state.deck.length}
-                    label="Draw"
-                    onClick={canDraw ? () => act({ type: "draw" }) : undefined}
-                    disabled={!canDraw}
-                  />
+                  <span className={mark(teaching, lesson?.aim, "draw", "")}>
+                    <DeckStack
+                      count={state.deck.length}
+                      label="Draw"
+                      onClick={canDraw ? () => act({ type: "draw" }) : undefined}
+                      disabled={!canDraw}
+                    />
+                  </span>
                   {top ? <UnoFace card={top} /> : <div className="card-ghost" aria-hidden />}
                 </div>
                 {state.pendingDraw > 0 ? <div className="uno-plus-flag">+{state.pendingDraw}</div> : null}
@@ -347,11 +359,13 @@ export function UnoPage() {
                 <div className="uno-center-actions">
                   <div className={`uno-color-chip ${state.color}`}>{state.color.toUpperCase()}</div>
                   {drewPlayable ? (
-                    <button className="btn btn-ghost" type="button" onClick={() => act({ type: "keep" })}>
+                    <button className={mark(teaching, lesson?.aim, "keep", "btn btn-ghost")} type="button" onClick={() => act({ type: "keep" })}>
                       KEEP
                     </button>
                   ) : null}
-                  {myTurn && state.phase === "color" ? <UnoColorPick onPick={(color) => act({ type: "color", color })} /> : null}
+                  {myTurn && state.phase === "color" ? (
+                    <UnoColorPick hot={lesson?.aim?.startsWith("color-") ? lesson.aim.slice(6) : null} onPick={(color) => act({ type: "color", color })} />
+                  ) : null}
                 </div>
                 <div className="status-line">
                   {state.phase === "over"
@@ -400,6 +414,7 @@ export function UnoPage() {
                 }}
                 onPlay={(cardId) => act({ type: "play", cardId })}
                 onRing={() => act({ type: "uno" })}
+                hotId={hotCard}
               />
             </>
           )}

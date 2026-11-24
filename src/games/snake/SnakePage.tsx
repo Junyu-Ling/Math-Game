@@ -24,6 +24,8 @@ import {
   type SnakeState,
 } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
+import { lessonSnake } from "../../components/ruleLessons";
+import { mark, useRule, useRuleLesson, useRulePractice } from "../../components/RuleSession";
 import { useAuth } from "../../context/AuthContext";
 import { useLobby } from "../../context/LobbyContext";
 
@@ -486,6 +488,14 @@ export function SnakePage() {
   const youId = practice ? "you" : user?.id != null ? String(user.id) : undefined;
   // Must be React state (not liveRef) so the canvas mounts and paint effect can attach.
   const showing = Boolean(serverView || local);
+  const teaching = useRule().game === "snake";
+  const lesson = teaching ? lessonSnake(local ?? serverView ?? null) : null;
+  useRuleLesson("snake", lesson);
+  useRulePractice("snake", Boolean(room), () => {
+    const s = startSnakePractice(2, myHue);
+    liveRef.current = s;
+    setLocal(s);
+  });
 
   useEffect(() => {
     if (room) {
@@ -863,7 +873,7 @@ export function SnakePage() {
               <div className="snake-stage">
                 <canvas
                   ref={canvasRef}
-                  className="snake-canvas"
+                  className={mark(teaching, lesson?.aim, "steer", "snake-canvas")}
                   aria-label="Snake arena"
                   onPointerMove={(e) => {
                     if (e.buttons || e.pointerType === "touch") aimFromPointer(e.clientX, e.clientY);
@@ -903,7 +913,7 @@ export function SnakePage() {
                 </div>
                 <button
                   type="button"
-                  className={`snake-energy-track${hud?.boosting ? " on" : ""}${(hud?.energy ?? meLive?.energy ?? 0) <= 0 ? " empty" : ""}`}
+                  className={mark(teaching, lesson?.aim, "boost", `snake-energy-track${hud?.boosting ? " on" : ""}${(hud?.energy ?? meLive?.energy ?? 0) <= 0 ? " empty" : ""}`)}
                   disabled={(hud?.energy ?? meLive?.energy ?? 0) <= 0 && !hud?.boosting}
                   onPointerDown={(e) => {
                     e.preventDefault();

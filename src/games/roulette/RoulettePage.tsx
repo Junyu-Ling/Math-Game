@@ -19,6 +19,8 @@ import {
   type RouletteState,
 } from "./engine";
 import { RulesButton } from "../../components/GameRules";
+import { lessonRoulette } from "../../components/ruleLessons";
+import { mark, useRule, useRuleLesson, useRulePractice } from "../../components/RuleSession";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 
@@ -67,6 +69,11 @@ export function RoulettePage() {
     setState(resetStack(state, chips));
   }
 
+  const teaching = useRule().game === "roulette";
+  const ruleNonce = useRule().nonce;
+  const lesson = teaching ? lessonRoulette(state, ruleNonce) : null;
+  useRuleLesson("roulette", lesson);
+  useRulePractice("roulette", false, () => setState(startRoulette(user?.chips ?? 1000)));
   const bet = state.bets[0] ?? null;
   const coverSet = new Set(bet ? coveredNumbers(bet) : []);
 
@@ -173,7 +180,7 @@ export function RoulettePage() {
               <div className="roulette-felt" role="grid" aria-label="Betting board">
                 <button
                   type="button"
-                  className={`rb-zero tone-green${coverSet.has(0) ? " on" : ""}`}
+                  className={mark(teaching, lesson?.aim, "n-0", `rb-zero tone-green${coverSet.has(0) ? " on" : ""}`)}
                   disabled={state.phase !== "bet"}
                   onClick={() => onNumber(0)}
                 >
@@ -186,7 +193,7 @@ export function RoulettePage() {
                         <button
                           key={n}
                           type="button"
-                          className={`rb-num tone-${pocketColor(n)}${coverSet.has(n) ? " on" : ""}`}
+                          className={mark(teaching, lesson?.aim, `n-${n}`, `rb-num tone-${pocketColor(n)}${coverSet.has(n) ? " on" : ""}`)}
                           disabled={state.phase !== "bet"}
                           onClick={() => onNumber(n)}
                         >
@@ -214,7 +221,7 @@ export function RoulettePage() {
                     <button
                       key={d}
                       type="button"
-                      className={`rb-out${bet?.kind === "dozen" && bet.index === d ? " on" : ""}`}
+                      className={mark(teaching, lesson?.aim, `dozen-${d}`, `rb-out${bet?.kind === "dozen" && bet.index === d ? " on" : ""}`)}
                       disabled={state.phase !== "bet"}
                       onClick={() => outside("dozen", d)}
                     >
@@ -241,7 +248,7 @@ export function RoulettePage() {
                   </button>
                   <button
                     type="button"
-                    className={`rb-out tone-red${bet?.kind === "red" ? " on" : ""}`}
+                    className={mark(teaching, lesson?.aim, "out-red", `rb-out tone-red${bet?.kind === "red" ? " on" : ""}`)}
                     disabled={state.phase !== "bet"}
                     onClick={() => outside("red")}
                   >
@@ -293,13 +300,13 @@ export function RoulettePage() {
                     <button className="btn btn-ghost" type="button" onClick={() => setState((s) => clearBets(s))}>
                       Clear
                     </button>
-                    <button className="btn" type="button" onClick={spin} disabled={!state.bets.length}>
+                    <button className={mark(teaching, lesson?.aim, "spin", "btn")} type="button" onClick={spin} disabled={!state.bets.length}>
                       Spin
                     </button>
                   </>
                 ) : null}
                 {state.phase === "result" ? (
-                  <button className="btn" type="button" onClick={() => setState((s) => nextRound(s))}>
+                  <button className={mark(teaching, lesson?.aim, "next", "btn")} type="button" onClick={() => setState((s) => nextRound(s))}>
                     Next round
                   </button>
                 ) : null}

@@ -10,6 +10,8 @@ import {
 import { PokerFace } from "../../components/PlayingCard";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { RulesButton } from "../../components/GameRules";
+import { lessonHoldem } from "../../components/ruleLessons";
+import { mark, useRule, useRuleLesson, useRulePractice } from "../../components/RuleSession";
 import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
@@ -38,6 +40,10 @@ export function HoldemPage() {
   const canRaise = Boolean(bounds?.canRaise);
   const canFullRaise = Boolean(bounds?.canFullRaise);
   const openingBet = Boolean(state && state.currentBet === 0);
+  const teaching = useRule().game === "holdem";
+  const lesson = teaching ? lessonHoldem(state) : null;
+  useRuleLesson("holdem", lesson);
+  useRulePractice("holdem", Boolean(room), () => setLocal(startHoldemPractice()));
   const [raiseTo, setRaiseTo] = useState(0);
   const raiseAmount =
     bounds && raiseMax > 0 ? Math.min(raiseMax, Math.max(raiseMin, raiseTo || raiseMin)) : raiseMin;
@@ -209,7 +215,7 @@ export function HoldemPage() {
                 <div className="holdem-nl">
                   {state.street === "over" ? null : state.street === "showdown" ? (
                     <div className="row-actions">
-                      <button className="btn" type="button" onClick={() => act({ type: "next" })}>
+                      <button className={mark(teaching, lesson?.aim, "next", "btn")} type="button" onClick={() => act({ type: "next" })}>
                         Next hand
                       </button>
                     </div>
@@ -260,21 +266,21 @@ export function HoldemPage() {
                         </div>
                       ) : null}
                       <div className="row-actions">
-                        <button className="btn btn-ghost" type="button" disabled={!myTurn} onClick={() => act({ type: "fold" })}>
+                        <button className={mark(teaching, lesson?.aim, "fold", "btn btn-ghost")} type="button" disabled={!myTurn} onClick={() => act({ type: "fold" })}>
                           Fold
                         </button>
                         {toCall > 0 ? (
-                          <button className="btn" type="button" disabled={!myTurn} onClick={() => act({ type: "call" })}>
+                          <button className={mark(teaching, lesson?.aim, "call", "btn")} type="button" disabled={!myTurn} onClick={() => act({ type: "call" })}>
                             Call {toCall}
                           </button>
                         ) : (
-                          <button className="btn" type="button" disabled={!myTurn} onClick={() => act({ type: "check" })}>
+                          <button className={mark(teaching, lesson?.aim, "check", "btn")} type="button" disabled={!myTurn} onClick={() => act({ type: "check" })}>
                             Check
                           </button>
                         )}
                         {canRaise && canFullRaise ? (
                           <button
-                            className="btn"
+                            className={mark(teaching, lesson?.aim, "raise", "btn")}
                             type="button"
                             disabled={!myTurn}
                             onClick={() =>
@@ -286,7 +292,7 @@ export function HoldemPage() {
                             {openingBet ? `Bet ${raiseAmount}` : `Raise to ${raiseAmount}`}
                           </button>
                         ) : null}
-                        <button className="btn btn-ghost" type="button" disabled={!myTurn || me.chips <= 0} onClick={() => act({ type: "allin" })}>
+                        <button className={mark(teaching, lesson?.aim, "allin", "btn btn-ghost")} type="button" disabled={!myTurn || me.chips <= 0} onClick={() => act({ type: "allin" })}>
                           All in
                         </button>
                       </div>

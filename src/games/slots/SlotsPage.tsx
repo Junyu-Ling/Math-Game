@@ -13,6 +13,8 @@ import {
   type SymbolId,
 } from "./engine";
 import { RulesButton } from "../../components/GameRules";
+import { lessonSlots } from "../../components/ruleLessons";
+import { mark, useRule, useRuleLesson, useRulePractice } from "../../components/RuleSession";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
 
@@ -53,6 +55,10 @@ export function SlotsPage() {
   const { user, setChips } = useAuth();
   const [state, setState] = useState<SlotsState>(() => startSlots(user?.chips ?? 1000));
   const [stopped, setStopped] = useState(REEL_COUNT);
+  const teaching = useRule().game === "slots";
+  const lesson = teaching ? lessonSlots(state) : null;
+  useRuleLesson("slots", lesson);
+  useRulePractice("slots", false, () => setState(startSlots(user?.chips ?? 1000)));
 
   useEffect(() => {
     if (state.phase !== "spinning") {
@@ -161,7 +167,7 @@ export function SlotsPage() {
                 <button
                   key={b}
                   type="button"
-                  className={`btn${state.bet === b ? "" : " btn-ghost"}`}
+                  className={mark(teaching, lesson?.aim, `bet-${b}`, `btn${state.bet === b ? "" : " btn-ghost"}`)}
                   disabled={state.phase === "spinning"}
                   onClick={() => setState((s) => setBet(s, b))}
                 >
@@ -172,7 +178,7 @@ export function SlotsPage() {
 
             <div className="row-actions" style={{ justifyContent: "center" }}>
               <button
-                className="btn"
+                className={mark(teaching, lesson?.aim, "spin", "btn")}
                 type="button"
                 disabled={state.phase === "spinning" || state.chips < state.bet}
                 onClick={spin}

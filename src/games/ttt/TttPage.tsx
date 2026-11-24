@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { aiTtt, applyTttAction, SIZE, startTttPractice, type TttAction, type TttState } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
+import { lessonTtt } from "../../components/ruleLessons";
+import { mark, useRule, useRuleLesson, useRulePractice } from "../../components/RuleSession";
 import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
@@ -21,6 +23,10 @@ export function TttPage() {
   const rival = state?.players.find((p) => String(p.id) !== youId);
   const waiting = Boolean(state?.phase === "lobby");
   const myTurn = Boolean(state && me && state.players[state.turn]?.id === me.id && state.phase === "play");
+  const teaching = useRule().game === "ttt";
+  const lesson = teaching ? lessonTtt(state) : null;
+  useRuleLesson("ttt", lesson);
+  useRulePractice("ttt", Boolean(room), () => setLocal(startTttPractice()));
 
   useEffect(() => {
     if (room) setLocal(null);
@@ -140,7 +146,7 @@ export function TttPage() {
                     <button
                       key={i}
                       type="button"
-                      className={`ttt-cell${v ? " filled" : ""}${onWin ? " win" : ""}${state.last === i ? " last" : ""}`}
+                      className={mark(teaching, lesson?.aim, `cell-${i}`, `ttt-cell${v ? " filled" : ""}${onWin ? " win" : ""}${state.last === i ? " last" : ""}`)}
                       disabled={Boolean(v) || state.phase !== "play"}
                       onClick={() => {
                         if (!myTurn) return;

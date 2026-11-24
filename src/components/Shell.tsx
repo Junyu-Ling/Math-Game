@@ -8,6 +8,8 @@ import { Avatar } from "./Avatar";
 import { InvitePanel } from "./InvitePanel";
 import { InviteToasts } from "./InviteToasts";
 import { RotateGate } from "./RotateGate";
+import { GameRules } from "./GameRules";
+import { RuleDock } from "./RuleSession";
 
 const GAME_BY_PATH: Record<string, string> = {
   "/play/davinci": "coda",
@@ -178,6 +180,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <InviteToasts />
       <RotateGate />
       <main>{children}</main>
+      <RuleDock notes={(game) => <GameRules game={game} />} />
     </div>
   );
 }

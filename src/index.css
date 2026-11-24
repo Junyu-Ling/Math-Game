@@ -502,6 +502,76 @@ button:disabled {
   }
 }
 
+.rule-dock {
+  position: fixed;
+  z-index: 70;
+  right: 16px;
+  bottom: 16px;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(46vh, 420px);
+  overflow: auto;
+  padding: 14px 16px 16px;
+  background: rgba(255, 252, 247, 0.96);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+}
+
+.rule-dock h2 {
+  margin: 4px 0 8px;
+  font-size: 1.35rem;
+}
+
+.rule-dock p {
+  margin: 0;
+}
+
+.rule-dock-top,
+.rule-dock-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rule-dock-actions {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+
+.rule-dock-vet {
+  margin-top: 8px !important;
+  color: var(--muted);
+}
+
+.rule-dock-notes {
+  margin-top: 12px;
+}
+
+.rule-dock-notes summary {
+  cursor: pointer;
+}
+
+.coach-hot {
+  position: relative;
+  z-index: 3;
+  outline: 2px solid #111;
+  outline-offset: 2px;
+}
+
+.coach-hot::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -14px;
+  margin-left: -7px;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 10px solid #111;
+  animation: guide-bob 0.9s ease-in-out infinite;
+  pointer-events: none;
+}
+
 .rules-panel h3 {
   margin: 0 0 8px;
 }

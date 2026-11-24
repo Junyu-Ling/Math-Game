@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { LobbyProvider } from "./context/LobbyContext";
+import { RuleProvider } from "./components/RuleSession";
 import { Shell } from "./components/Shell";
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
@@ -39,6 +40,7 @@ export function App() {
     <AuthProvider>
       <BrowserRouter>
         <LobbyProvider>
+        <RuleProvider>
         <Shell>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -66,6 +68,7 @@ export function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Shell>
+        </RuleProvider>
         </LobbyProvider>
       </BrowserRouter>
     </AuthProvider>

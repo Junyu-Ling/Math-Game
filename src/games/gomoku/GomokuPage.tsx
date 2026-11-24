@@ -12,6 +12,8 @@ import {
   type RpsThrow,
 } from "./engine";
 import { ClickPop, RulesButton } from "../../components/GameRules";
+import { lessonGomoku } from "../../components/ruleLessons";
+import { mark, useRule, useRuleLesson, useRulePractice } from "../../components/RuleSession";
 import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
@@ -133,6 +135,10 @@ export function GomokuPage() {
   const rival = state?.players.find((p) => String(p.id) !== youId);
   const waiting = Boolean(state?.phase === "lobby");
   const myTurn = Boolean(state && me && state.players[state.turn]?.id === me.id && state.phase === "play");
+  const teaching = useRule().game === "gomoku";
+  const lesson = teaching ? lessonGomoku(state) : null;
+  useRuleLesson("gomoku", lesson);
+  useRulePractice("gomoku", Boolean(room), () => setLocal(startGomokuPractice()));
 
   useEffect(() => {
     if (room) setLocal(null);
@@ -333,7 +339,7 @@ export function GomokuPage() {
                   <button
                     key={c.id}
                     type="button"
-                    className={`rps-pick${myRpsThrow === c.id ? " on" : ""}`}
+                    className={mark(teaching, lesson?.aim, `rps-${c.id}`, `rps-pick${myRpsThrow === c.id ? " on" : ""}`)}
                     disabled={rpsLocked}
                     onClick={() => act({ type: "rps", throw: c.id })}
                   >
@@ -385,7 +391,7 @@ export function GomokuPage() {
                       <button
                         key={`${r}-${c}`}
                         type="button"
-                        className={`gomoku-cell${hoshi ? " star" : ""}${v ? " filled" : ""}${last ? " last" : ""}${foulCell ? " foul" : ""}${onWin ? " win" : ""}${!myTurn && state.phase === "play" && !v ? " waiting" : ""}`}
+                        className={mark(teaching, lesson?.aim, `g-${r}-${c}`, `gomoku-cell${hoshi ? " star" : ""}${v ? " filled" : ""}${last ? " last" : ""}${foulCell ? " foul" : ""}${onWin ? " win" : ""}${!myTurn && state.phase === "play" && !v ? " waiting" : ""}`)}
                         disabled={Boolean(v) || state.phase !== "play"}
                         onClick={() => {
                           if (!myTurn) return;

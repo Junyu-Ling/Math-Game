@@ -18,6 +18,8 @@ import {
 } from "./engine";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { ClickPop, RulesButton } from "../../components/GameRules";
+import { lessonEcard } from "../../components/ruleLessons";
+import { mark, useRule, useRuleLesson, useRulePractice } from "../../components/RuleSession";
 import { MixedCpuBar, seatTag, TableReadyControls } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
 import { useAuth } from "../../context/AuthContext";
@@ -122,6 +124,10 @@ export function EcardPage() {
   const waiting = Boolean(state?.phase === "lobby");
   const myTurnPick = Boolean(state && me && state.phase === "pick" && !me.selectedId);
   const iChooseRole = Boolean(state && me && state.phase === "role" && state.roleChooserId === me.id);
+  const teaching = useRule().game === "ecard";
+  const lesson = teaching ? lessonEcard(state) : null;
+  useRuleLesson("ecard", lesson);
+  useRulePractice("ecard", Boolean(room), () => setLocal(startEcardPractice()));
 
   useEffect(() => {
     if (room) setLocal(null);
@@ -361,7 +367,7 @@ export function EcardPage() {
                 {RPS_CHOICES.map((c) => (
                   <button
                     key={c.id}
-                    className={`rps-pick${myRpsThrow === c.id ? " on" : ""}`}
+                    className={mark(teaching, lesson?.aim, `rps-${c.id}`, `rps-pick${myRpsThrow === c.id ? " on" : ""}`)}
                     type="button"
                     disabled={rpsLocked}
                     onClick={() => act({ type: "rps", throw: c.id })}
@@ -384,7 +390,7 @@ export function EcardPage() {
               <div className="ecard-role-row">
                 <button
                   type="button"
-                  className="ecard-role-btn"
+                  className={mark(teaching, lesson?.aim, "role-emperor", "ecard-role-btn")}
                   disabled={!iChooseRole}
                   onClick={() => pickRole("emperor")}
                 >
@@ -393,7 +399,7 @@ export function EcardPage() {
                 </button>
                 <button
                   type="button"
-                  className="ecard-role-btn"
+                  className={mark(teaching, lesson?.aim, "role-slave", "ecard-role-btn")}
                   disabled={!iChooseRole}
                   onClick={() => pickRole("slave")}
                 >
@@ -466,7 +472,7 @@ export function EcardPage() {
                   <button
                     key={c.id}
                     type="button"
-                    className={`ecard-pick${me.selectedId === c.id ? " on" : ""}`}
+                    className={mark(teaching, lesson?.aim, `card-${c.id}`, `ecard-pick${me.selectedId === c.id ? " on" : ""}`)}
                     disabled={state.phase !== "pick" || me.locked}
                     onClick={() => playCard(c)}
                   >
@@ -477,7 +483,7 @@ export function EcardPage() {
               <div className="row-actions" style={{ justifyContent: "center" }}>
                 {state.phase === "pick" ? (
                   <button
-                    className="btn btn-go"
+                    className={mark(teaching, lesson?.aim, "lock", "btn btn-go")}
                     type="button"
                     disabled={!me.selectedId || me.locked}
                     onClick={() => act({ type: "lock" })}
@@ -486,7 +492,7 @@ export function EcardPage() {
                   </button>
                 ) : null}
                 {state.phase === "reveal" ? (
-                  <button className="btn" type="button" onClick={() => act({ type: "next" })}>
+                  <button className={mark(teaching, lesson?.aim, "next", "btn")} type="button" onClick={() => act({ type: "next" })}>
                     CONTINUE
                   </button>
                 ) : null}

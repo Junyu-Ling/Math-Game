@@ -38,6 +38,8 @@ import { useLobby } from "../../context/LobbyContext";
 import { forfeitText } from "../../lib/forfeit";
 import { setPlayMeta } from "../../lib/playMeta";
 import { RulesButton } from "../../components/GameRules";
+import { lessonCoda } from "../../components/ruleLessons";
+import { mark, useRule, useRuleLesson, useRulePractice } from "../../components/RuleSession";
 import { LobbyDecor } from "../../components/LobbyDecor";
 import { MixedCpuBar, seatTag } from "../../components/MixedCpuBar";
 import { SeatTalk } from "../../components/TableTalk";
@@ -123,6 +125,8 @@ function Row({
   lockSize: _lockSize,
   markHidden,
   guesses,
+  hotGap,
+  hotTile,
 }: {
   tiles: CodaTile[];
   hide: boolean;
@@ -140,6 +144,8 @@ function Row({
   lockSize?: boolean;
   markHidden?: boolean;
   guesses?: CodaValue[][];
+  hotGap?: number | null;
+  hotTile?: number | null;
 }) {
   const gapSet = new Set(gaps ?? []);
   const cells: { key: string; node: ReactNode }[] = [];
@@ -151,7 +157,7 @@ function Row({
         key: `g-${i}`,
         node: (
           <button
-            className={`gap on ${chosen ? "ghost" : ""}`}
+            className={`gap on ${chosen ? "ghost" : ""}${hotGap === i ? " coach-hot" : ""}`}
             type="button"
             onClick={() => onGap?.(i)}
             aria-label="Insert slot"
@@ -179,9 +185,10 @@ function Row({
           onClick={onTile ? () => onTile(i) : undefined}
         />
       );
+      const shown = hotTile === i ? <span className="coach-hot">{face}</span> : face;
       cells.push({
         key: tile.id,
-        node: vertical ? <span className="side-tile">{face}</span> : face,
+        node: vertical ? <span className="side-tile">{shown}</span> : shown,
       });
     }
   }
@@ -281,6 +288,7 @@ function OppSeat({
   onTile,
   lockSize,
   guesses,
+  hotTile,
 }: {
   player: { id: string; name: string; out: boolean };
   className: string;
@@ -293,6 +301,7 @@ function OppSeat({
   onTile: (i: number) => void;
   lockSize?: boolean;
   guesses?: CodaValue[][];
+  hotTile?: number | null;
 }) {
   const order = className === "seat-left" || className === "seat-right" ? "down" : "right";
   return (
@@ -322,6 +331,7 @@ function OppSeat({
           lockSize={lockSize}
           guesses={guesses}
           onTile={onTile}
+          hotTile={hotTile}
         />
       </div>
     </div>
@@ -595,6 +605,23 @@ export function DaVinciPage() {
       : (state?.pendingSlot ?? insertOpts[0] ?? 0)
     : null;
   const arrangeGaps = arranging && myInsert ? insertOpts : [];
+  const teaching = useRule().game === "coda";
+  const lesson = teaching ? lessonCoda(state, you?.id ?? youId) : null;
+  useRuleLesson("coda", lesson);
+  useRulePractice("coda", Boolean(codaRoom), () => {
+    const open = openingCount(seats);
+    const black = Math.floor(Math.random() * (open + 1));
+    setBlackN(black);
+    setWhiteN(open - black);
+    setYouId("you");
+    setFlash(null);
+    setState(startCoda(true, black, open - black, seats));
+  });
+  const hotFor = (playerId: string) => {
+    const aim = lesson?.aim ?? "";
+    const prefix = `tile-${playerId}-`;
+    return aim.startsWith(prefix) ? Number(aim.slice(prefix.length)) : null;
+  };
 
   function dispatch(action: CodaAction) {
     if (codaRoom) {
@@ -1020,6 +1047,7 @@ export function DaVinciPage() {
               selectedIndex={state.selected?.playerId === seated.partner.id ? state.selected.index : undefined}
               guesses={guessesOnRow(state, seated.partner.id, seated.partner.tiles)}
               onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: seated.partner!.id, index: i })}
+              hotTile={hotFor(seated.partner.id)}
             />
           ) : null}
           {seated.rival ? (
@@ -1035,6 +1063,7 @@ export function DaVinciPage() {
               selectedIndex={aimedRival}
               guesses={guessesOnRow(state, seated.rival.id, rivalRow)}
               onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: seated.rival!.id, index: i })}
+              hotTile={hotFor(seated.rival.id)}
             />
           ) : null}
           {seated.left ? (
@@ -1050,6 +1079,7 @@ export function DaVinciPage() {
               selectedIndex={state.selected?.playerId === seated.left.id ? state.selected.index : undefined}
               guesses={guessesOnRow(state, seated.left.id, seated.left.tiles)}
               onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: seated.left!.id, index: i })}
+              hotTile={hotFor(seated.left.id)}
             />
           ) : null}
 
@@ -1084,7 +1114,7 @@ export function DaVinciPage() {
                       return (
                         <button
                           key={color}
-                          className={`btn draw-color-btn ${color}`}
+                          className={mark(teaching, lesson?.aim, `draw-${color}`, `btn draw-color-btn ${color}`)}
                           type="button"
                           disabled={!canDraw}
                           onClick={() => dispatch({ type: "draw", color })}
@@ -1123,6 +1153,7 @@ export function DaVinciPage() {
               selectedIndex={state.selected?.playerId === seated.right.id ? state.selected.index : undefined}
               guesses={guessesOnRow(state, seated.right.id, seated.right.tiles)}
               onTile={(i) => myTurn && state.phase === "guess" && dispatch({ type: "select", playerId: seated.right!.id, index: i })}
+              hotTile={hotFor(seated.right.id)}
             />
           ) : null}
 
@@ -1145,6 +1176,8 @@ export function DaVinciPage() {
                 reserveSlot
                 fresh={state.fresh}
                 gaps={arrangeGaps}
+                hotGap={lesson?.aim?.startsWith("gap-") ? Number(lesson.aim.slice(4)) : null}
+                hotTile={lesson?.aim?.startsWith("penalty-") ? Number(lesson.aim.slice(8)) : null}
                 ghostAt={myInsert ? autoSlot : null}
                 lockSize={Boolean(seated.left)}
                 markHidden={Boolean(myTurn && state.phase === "penalty")}
@@ -1202,7 +1235,7 @@ export function DaVinciPage() {
                 {RPS_CHOICES.map((c) => (
                   <button
                     key={c.id}
-                    className={`rps-pick${myRpsThrow === c.id ? " on" : ""}`}
+                    className={mark(teaching, lesson?.aim, `rps-${c.id}`, `rps-pick${myRpsThrow === c.id ? " on" : ""}`)}
                     type="button"
                     disabled={rpsLocked}
                     onClick={() => dispatch({ type: "rps", throw: c.id })}
@@ -1262,7 +1295,7 @@ export function DaVinciPage() {
                       <button
                         key={n}
                         type="button"
-                        className={used ? "tried" : ""}
+                        className={mark(teaching, lesson?.aim, `guess-${n}`, used ? "tried" : "")}
                         disabled={!canGuess}
                         onClick={() => dispatch({ type: "guess", value: n })}
                       >
@@ -1272,7 +1305,7 @@ export function DaVinciPage() {
                   })}
                   <button
                     type="button"
-                    className={selectedTried.has("joker") ? "tried" : ""}
+                    className={mark(teaching, lesson?.aim, "guess-joker", selectedTried.has("joker") ? "tried" : "")}
                     disabled={!(state.phase === "guess" && myTurn && state.selected) || selectedTried.has("joker")}
                     onClick={() => dispatch({ type: "guess", value: "joker" })}
                   >
@@ -1282,7 +1315,7 @@ export function DaVinciPage() {
               </div>
               <div className="row-actions coda-continue">
                 <button
-                  className="btn btn-go"
+                  className={mark(teaching, lesson?.aim, "continue", "btn btn-go")}
                   type="button"
                   disabled={!(state.phase === "continue" && myTurn)}
                   onClick={() => dispatch({ type: "continue" })}
@@ -1290,7 +1323,7 @@ export function DaVinciPage() {
                   HIT AGAIN
                 </button>
                 <button
-                  className="btn btn-gold"
+                  className={mark(teaching, lesson?.aim, "stay", "btn btn-gold")}
                   type="button"
                   disabled={!(state.phase === "continue" && myTurn)}
                   onClick={() => dispatch({ type: "stay" })}
