@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { CodaGuide } from "./CodaGuide";
 import { createPortal } from "react-dom";
 import { MahjongTile } from "./MahjongTile";
 import { FlipFace, PokerFace, UnoFace } from "./PlayingCard";
@@ -455,6 +456,8 @@ export function GameRules({ game }: { game: string }) {
   if (game === "holdem") return <HoldemRules />;
   if (game === "coda") {
     return (
+      <>
+      <CodaGuide />
       <RuleSheet
         lead="2–4 players. Pick a black and white opening mix, then the tiles go down in order. Guess a hidden tile."
         rows={[
@@ -497,6 +500,7 @@ export function GameRules({ game }: { game: string }) {
           "When the deck is empty, skip the draw and keep guessing.",
         ]}
       />
+      </>
     );
   }
   if (game === "flip7") {

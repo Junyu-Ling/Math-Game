@@ -372,6 +372,136 @@ button:disabled {
   margin-top: 12px;
 }
 
+.coda-guide {
+  display: grid;
+  grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+  margin: 0 0 36px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.coda-guide-copy h3 {
+  margin: 6px 0 8px;
+  font-size: 1.55rem;
+}
+
+.coda-guide-copy p {
+  margin: 0;
+}
+
+.coda-guide-note {
+  margin-top: 10px !important;
+  color: #9a3412;
+}
+
+.coda-guide-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.coda-guide-table {
+  background: #f6f3ee;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px 16px 16px;
+}
+
+.coda-guide-seat {
+  margin-bottom: 14px;
+}
+
+.coda-guide-seat > span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.coda-guide-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  min-height: 84px;
+  padding-top: 28px;
+}
+
+.coda-guide-actions,
+.coda-guide-pad {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding-top: 28px;
+}
+
+.coda-guide-pad button {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  min-width: 36px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.guide-slot {
+  width: 28px;
+  height: 60px;
+  margin: 12px 12px 8px 0;
+  border: 2px dashed #111;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.coda-guide-pad button.is-hot,
+.coda-guide-actions .is-hot,
+.guide-slot {
+  box-shadow: 0 0 0 2px #111;
+}
+
+.guide-aim {
+  position: relative;
+  display: inline-flex;
+}
+
+.guide-arrow {
+  position: absolute;
+  left: 50%;
+  top: -22px;
+  width: 0;
+  height: 0;
+  margin-left: -8px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 12px solid #111;
+  animation: guide-bob 0.9s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes guide-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(5px);
+  }
+}
+
+@media (max-width: 800px) {
+  .coda-guide {
+    grid-template-columns: 1fr;
+  }
+}
+
 .rules-panel h3 {
   margin: 0 0 8px;
 }
