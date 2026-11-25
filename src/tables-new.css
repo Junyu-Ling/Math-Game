@@ -713,3 +713,47 @@
   min-height: 0;
   height: 100%;
 }
+
+/* The live table is measured against the visible window, then scaled so the hand is not clipped. */
+.stage-frame {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+}
+
+.stage-frame.is-fit {
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+}
+
+.stage-sizer {
+  width: 100%;
+  min-width: 0;
+}
+
+.stage-frame.is-fit .stage-sizer {
+  flex: none;
+  overflow: hidden;
+}
+
+.stage-scale {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-scale.is-measuring,
+.stage-scale.is-measuring .page-wide,
+.stage-scale.is-measuring .page-wide .game-layout,
+.stage-scale.is-measuring .page-wide .table {
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+  flex: none !important;
+}

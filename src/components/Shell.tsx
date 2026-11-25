@@ -8,6 +8,7 @@ import { Avatar } from "./Avatar";
 import { InvitePanel } from "./InvitePanel";
 import { InviteToasts } from "./InviteToasts";
 import { RotateGate } from "./RotateGate";
+import { StageWatch } from "./StageWatch";
 import { GameRules } from "./GameRules";
 import { RuleDock } from "./RuleSession";
 
@@ -179,7 +180,9 @@ export function Shell({ children }: { children: ReactNode }) {
       </header>
       <InviteToasts />
       <RotateGate />
-      <main>{children}</main>
+      <main>
+        <StageWatch>{children}</StageWatch>
+      </main>
       <RuleDock notes={(game) => <GameRules game={game} />} />
     </div>
   );
