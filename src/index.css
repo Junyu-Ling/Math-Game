@@ -2046,6 +2046,85 @@ h1 {
 .modal h2 { margin: 0 0 8px; font-size: 22px; font-weight: 600; }
 .modal p { color: var(--muted); line-height: 1.6; }
 
+.account-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 20px 0 18px;
+}
+
+.account-tabs button {
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: transparent;
+}
+
+.account-tabs button.is-on {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+.profile-form,
+.profile-records {
+  max-width: 560px;
+}
+
+.profile-photo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.profile-photo .btn {
+  position: relative;
+}
+
+.profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.profile-field span,
+.profile-gender legend {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.profile-field input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+  font-size: 16px;
+}
+
+.profile-gender {
+  border: 0;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-gender legend {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.record-row .record-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  flex: none;
+  align-items: center;
+}
+
 .account-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

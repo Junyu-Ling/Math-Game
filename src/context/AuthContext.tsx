@@ -14,6 +14,7 @@ type AuthState = {
   logout: () => void;
   acceptToken: (token: string) => Promise<void>;
   setChips: (chips: number) => Promise<void>;
+  updateProfile: (patch: { name?: string; avatar?: string; gender?: User["gender"] }) => Promise<void>;
   githubStartUrl: string;
   googleStartUrl: string;
 };
@@ -98,6 +99,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       githubStartUrl: authApi.githubStartUrl(),
       googleStartUrl: authApi.googleStartUrl(),
+      async updateProfile(patch) {
+        if (!token) throw new Error("Sign in first");
+        const next = await authApi.updateProfile(token, patch);
+        const nextToken = next.token || token;
+        setUser(next.user);
+        setToken(nextToken);
+        authApi.persist({ token: nextToken, user: next.user });
+      },
       async setChips(chips) {
         if (!token) return;
         const next = await authApi.updateChips(token, chips);

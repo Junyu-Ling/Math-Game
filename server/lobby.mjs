@@ -592,6 +592,39 @@ export async function findAccountById(id) {
   return readJson(`axiom:acct:${String(id)}`);
 }
 
+const PROFILE_GENDERS = new Set(["male", "female", "private"]);
+
+export async function updateAccountProfile(user, patch) {
+  const id = String(user?.id || "");
+  if (!id) throw new Error("Not signed in");
+  const current = (await findAccountById(id)) || { ...user, id };
+  const next = { ...current, id };
+  const body = patch || {};
+  if (body.name != null) {
+    const name = String(body.name).replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim();
+    if (name.length < 1 || name.length > 24) throw new Error("Name must be 1 to 24 characters");
+    next.name = name;
+  }
+  if (body.gender != null) {
+    const gender = String(body.gender);
+    if (!PROFILE_GENDERS.has(gender)) throw new Error("Pick male, female, or private");
+    next.gender = gender;
+  }
+  if (body.avatar != null) {
+    const avatar = String(body.avatar).trim();
+    if (avatar.length > 80000) throw new Error("Photo is too large");
+    const ok =
+      !avatar ||
+      /^https:\/\/\S+$/.test(avatar) ||
+      /^data:image\/(?:jpeg|jpg|png|webp);base64,[a-z0-9+/=]+$/i.test(avatar);
+    if (!ok) throw new Error("Use a photo");
+    next.avatar = avatar;
+  }
+  if (body.name == null && body.gender == null && body.avatar == null) throw new Error("Nothing to save");
+  await saveAccount(next);
+  return next;
+}
+
 export async function findAccountByEmail(email) {
   const id = await kvGet(`axiom:acctemail:${String(email).toLowerCase()}`);
   if (!id) return null;

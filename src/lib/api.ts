@@ -11,6 +11,7 @@ export type User = {
   login?: string;
   name?: string;
   avatar?: string;
+  gender?: "" | "male" | "female" | "private";
   githubId?: string;
   googleId?: string;
 };
@@ -127,6 +128,7 @@ function userFromJwt(token: string): User | null {
     login: payload.login,
     name: payload.name,
     avatar: payload.avatar,
+    gender: payload.gender === "male" || payload.gender === "female" || payload.gender === "private" ? payload.gender : "",
     githubId: payload.githubId,
     googleId: payload.googleId,
   };
@@ -303,6 +305,37 @@ export const authApi = {
     const { password: _pw, ...user } = found;
     void _pw;
     return user;
+  },
+
+  async updateProfile(
+    token: string,
+    patch: { name?: string; avatar?: string; gender?: User["gender"] },
+  ): Promise<AuthPayload> {
+    if (liveApi) {
+      return request("/api/me/profile", {
+        method: "PATCH",
+        headers: headers(token),
+        body: JSON.stringify(patch),
+      });
+    }
+    const stored = this.getStored();
+    if (!stored || stored.token !== token) throw new Error("Not signed in");
+    const users = readMockUsers();
+    const idx = users.findIndex((u) => u.email === stored.user.email);
+    if (idx < 0) throw new Error("User not found");
+    const current = users[idx];
+    if (!current) throw new Error("User not found");
+    if (patch.name != null) {
+      const name = patch.name.replace(/\s+/g, " ").trim();
+      if (name.length < 1 || name.length > 24) throw new Error("Name must be 1 to 24 characters");
+      current.name = name;
+    }
+    if (patch.gender != null) current.gender = patch.gender;
+    if (patch.avatar != null) current.avatar = patch.avatar;
+    writeMockUsers(users);
+    const { password: _pw, ...user } = current;
+    void _pw;
+    return { token, user };
   },
 
   async updateChips(token: string, chips: number): Promise<User> {

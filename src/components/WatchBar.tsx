@@ -1,4 +1,5 @@
 import { useLobby } from "../context/LobbyContext";
+import { downloadRecording } from "../lib/recording";
 
 export function WatchBar() {
   const { room, playback, watchLive, watchStart, watchScrub, leave } = useLobby();
@@ -28,6 +29,13 @@ export function WatchBar() {
       <span className="watch-count">
         {Math.min(playback.index, last) + 1}/{playback.total}
       </span>
+      <button
+        className="btn btn-ghost"
+        type="button"
+        onClick={() => downloadRecording(room.game, room.id, room.tape || [])}
+      >
+        Save
+      </button>
       <button className="btn" type="button" onClick={() => void leave()}>
         Exit
       </button>

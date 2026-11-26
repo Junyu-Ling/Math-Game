@@ -167,7 +167,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <span className="chip-pill">{user.chips}</span>
               <NavLink to="/account" title={user.email} className="nav-user">
                 <Avatar src={user.avatar} name={user.login || user.name || user.email} size={22} />
-                {user.login || user.name || user.email.split("@")[0]}
+                {user.name || user.login || user.email.split("@")[0]}
               </NavLink>
               <button className="linkish" type="button" onClick={logout}>
                 Log out

@@ -1,14 +1,35 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 
-/** Card rows can hang out of a clipped box without growing scrollHeight. Measure the painted edges. */
+/**
+ * A reel, log, or board window clips its children on purpose.
+ * Counting those children makes the page scale, which changes their size, which scales the page again.
+ */
 function neededSize(stage: HTMLElement) {
   const origin = stage.getBoundingClientRect();
   let right = stage.scrollWidth;
   let bottom = stage.scrollHeight;
+  const clipOf = new Map<HTMLElement, HTMLElement | null>();
   const nodes = stage.querySelectorAll<HTMLElement>("*");
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
-    if (!node || node.closest(".rule-dock, .net-modal, .invite-toasts")) continue;
+    if (!node || node.closest(".rule-dock, .net-modal, .invite-toasts, .watch-bar")) continue;
+    const parent = node.parentElement;
+    const parentClip = parent && clipOf.has(parent) ? clipOf.get(parent) || null : null;
+    let selfClip = parentClip;
+    if (!selfClip) {
+      const style = getComputedStyle(node);
+      const box = `${style.overflowX} ${style.overflowY}`;
+      const clips = /hidden|clip|auto|scroll/.test(box);
+      const structural =
+        node.classList.contains("page-wide") ||
+        node.classList.contains("game-layout") ||
+        node.classList.contains("table") ||
+        node.classList.contains("stage-scale");
+      if (clips && !structural) selfClip = node;
+    }
+    clipOf.set(node, selfClip);
+    if (parentClip) continue;
     const box = node.getBoundingClientRect();
     if (box.width < 2 || box.height < 2) continue;
     right = Math.max(right, box.right - origin.left);
@@ -30,10 +51,11 @@ function visibleSize() {
 }
 
 /**
- * Watches the real window and shrinks a live table until every seat and card row
- * sits inside it. A size that is too big is what used to clip the hand.
+ * Fits a live table to the window once per size. It does not watch the table itself:
+ * spins, deals, and timers used to change a child box and make the whole page jump.
  */
 export function StageWatch({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
   const frameRef = useRef<HTMLDivElement>(null);
   const sizerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -44,14 +66,7 @@ export function StageWatch({ children }: { children: ReactNode }) {
     const stage = stageRef.current;
     if (!frame || !sizer || !stage) return;
     let pending = 0;
-    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(schedule) : null;
-    const topbar = document.querySelector<HTMLElement>(".topbar");
-
-    const watch = () => {
-      ro?.observe(frame);
-      ro?.observe(stage);
-      if (topbar) ro?.observe(topbar);
-    };
+    let lastSig = "";
 
     const clearFit = () => {
       frame.classList.remove("is-fit");
@@ -64,16 +79,20 @@ export function StageWatch({ children }: { children: ReactNode }) {
     };
 
     const apply = () => {
-      ro?.disconnect();
       const { w, h } = visibleSize();
       const root = document.documentElement;
-      root.style.setProperty("--app-w", `${w}px`);
-      root.style.setProperty("--app-h", `${h}px`);
+      const nextW = `${w}px`;
+      const nextH = `${h}px`;
+      if (root.style.getPropertyValue("--app-w") !== nextW) root.style.setProperty("--app-w", nextW);
+      if (root.style.getPropertyValue("--app-h") !== nextH) root.style.setProperty("--app-h", nextH);
 
       const page = stage.querySelector<HTMLElement>(".page-wide");
+      const sig = `${w}x${h}|${page ? "game" : "home"}|${pathname}`;
+      if (sig === lastSig) return;
+      lastSig = sig;
+
       if (!page) {
         clearFit();
-        watch();
         return;
       }
 
@@ -84,19 +103,18 @@ export function StageWatch({ children }: { children: ReactNode }) {
       stage.style.height = "auto";
       sizer.style.width = "100%";
       sizer.style.height = "auto";
+      const measured = neededSize(stage);
+      stage.classList.remove("is-measuring");
       const availW = Math.max(1, frame.clientWidth);
       const availH = Math.max(1, frame.clientHeight);
-      const measured = neededSize(stage);
       const needW = Math.max(measured.needW, 1);
       const needH = Math.max(measured.needH, 1);
-      stage.classList.remove("is-measuring");
-      if (needW <= availW + 1 && needH <= availH + 1) {
+      if (needW <= availW + 12 && needH <= availH + 12) {
         sizer.style.width = "100%";
         sizer.style.height = "100%";
         stage.style.width = "100%";
         stage.style.height = "100%";
         stage.style.transform = "";
-        watch();
         return;
       }
       const next = Math.max(0.3, Math.min(1, availW / needW, availH / needH));
@@ -108,7 +126,6 @@ export function StageWatch({ children }: { children: ReactNode }) {
       stage.style.height = `${Math.ceil(needH)}px`;
       stage.style.transformOrigin = "top left";
       stage.style.transform = next < 0.992 ? `scale(${next.toFixed(4)})` : "";
-      watch();
     };
 
     function schedule() {
@@ -116,25 +133,23 @@ export function StageWatch({ children }: { children: ReactNode }) {
       pending = window.setTimeout(() => {
         pending = 0;
         apply();
-      }, 30);
+      }, 60);
     }
 
     apply();
     window.addEventListener("resize", schedule);
     window.visualViewport?.addEventListener("resize", schedule);
-    window.visualViewport?.addEventListener("scroll", schedule);
-    const late = window.setTimeout(schedule, 250);
-    const pulse = ro ? 0 : window.setInterval(schedule, 600);
+    const late = window.setTimeout(() => {
+      lastSig = "";
+      apply();
+    }, 400);
     return () => {
       if (pending) window.clearTimeout(pending);
       window.clearTimeout(late);
-      if (pulse) window.clearInterval(pulse);
-      ro?.disconnect();
       window.removeEventListener("resize", schedule);
       window.visualViewport?.removeEventListener("resize", schedule);
-      window.visualViewport?.removeEventListener("scroll", schedule);
     };
-  }, []);
+  }, [pathname]);
 
   return (
     <div className="stage-frame" ref={frameRef}>

@@ -28,6 +28,7 @@ import {
   loadHistoryTape,
   lobbyStoreKind,
   rememberPlayer,
+  updateAccountProfile,
   respondInvite,
   saveAccount,
   stashVerify,
@@ -53,6 +54,7 @@ function publicUser(u) {
     login: u.login || "",
     name: u.name || "",
     avatar: u.avatar || "",
+    gender: u.gender === "male" || u.gender === "female" || u.gender === "private" ? u.gender : "",
     githubId: u.githubId || "",
     googleId: u.googleId || "",
   };
@@ -546,6 +548,21 @@ export async function handle(req, res, path) {
     const exp = Number(payload.exp || 0) * 1000;
     const refresh = !exp || exp - Date.now() < 14 * 24 * 3600 * 1000;
     send(res, 200, refresh ? { user, token: signUser(user) } : { user });
+    return;
+  }
+
+  if (path === "me/profile") {
+    try {
+      const actor = authUser(req);
+      const body = await readBody(req);
+      const saved = await updateAccountProfile(actor, body);
+      users.set(String(saved.id), saved);
+      const user = publicUser(saved);
+      send(res, 200, { user, token: signUser(user) });
+    } catch (err) {
+      const status = err?.name === "JsonWebTokenError" || err?.name === "TokenExpiredError" ? 401 : 400;
+      send(res, status, { error: String(err.message || "Could not save") });
+    }
     return;
   }
 

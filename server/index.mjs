@@ -39,6 +39,7 @@ import {
   rememberPlayer,
   respondInvite,
   saveAccount,
+  updateAccountProfile,
   snapshot,
   watchLobby,
   purgeRetiredAccounts,
@@ -171,6 +172,7 @@ function publicUser(u) {
     login: u.login || "",
     name: u.name || "",
     avatar: u.avatar || "",
+    gender: u.gender === "male" || u.gender === "female" || u.gender === "private" ? u.gender : "",
     githubId: u.githubId || "",
     googleId: u.googleId || "",
   };
@@ -593,6 +595,25 @@ async function leaveCodaQueue(userId) {
     redisReady = false;
   }
 }
+
+app.patch("/api/me/profile", auth, async (req, res) => {
+  try {
+    const saved = await updateAccountProfile(req.user, req.body || {});
+    const users = readUsers();
+    const idx = users.findIndex((u) => String(u.id) === String(saved.id));
+    if (idx >= 0) {
+      const prev = users[idx];
+      users[idx] = { ...prev, ...saved, passwordHash: saved.passwordHash || prev.passwordHash };
+    } else {
+      users.push(saved);
+    }
+    writeUsers(users);
+    const user = publicUser(users[idx >= 0 ? idx : users.length - 1]);
+    res.json({ user, token: signUser(user) });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Could not save" });
+  }
+});
 
 app.patch("/api/me/chips", auth, (req, res) => {
   const chips = Number(req.body?.chips);
