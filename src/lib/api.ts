@@ -312,7 +312,7 @@ export const authApi = {
     patch: { name?: string; avatar?: string; gender?: User["gender"] },
   ): Promise<AuthPayload> {
     if (liveApi) {
-      return request("/api/profile", {
+      return request("/api/me", {
         method: "PATCH",
         headers: headers(token),
         body: JSON.stringify(patch),
