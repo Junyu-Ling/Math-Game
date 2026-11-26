@@ -1,6 +1,7 @@
 import { toCanvas } from "html-to-image";
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 import type { TapeFrame } from "./lobby";
+import { indexAtTime, tapePoints } from "./tape-clock";
 
 const WIDTH = 1280;
 const HEIGHT = 720;
@@ -31,33 +32,6 @@ function delay(ms: number) {
 
 function paint() {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve(undefined)));
-}
-
-/** Every stored moment, in order, spaced like the match. Nothing is skipped. */
-function playbackTimeline(count: number, times: number[]) {
-  const gaps: number[] = [];
-  for (let i = 1; i < count; i++) {
-    const prev = times[i - 1] ?? 0;
-    const next = times[i] ?? prev;
-    const raw = next - prev;
-    gaps.push(raw > 40 ? Math.min(800, Math.max(240, raw)) : 240);
-  }
-  let body = gaps.reduce((sum, gap) => sum + gap, 0);
-  const cap = 60_000;
-  if (body > cap) {
-    const scale = cap / body;
-    for (let i = 0; i < gaps.length; i++) gaps[i] = Math.max(90, Math.round((gaps[i] ?? 0) * scale));
-    body = gaps.reduce((sum, gap) => sum + gap, 0);
-  }
-  const points = [0];
-  for (const gap of gaps) points.push((points[points.length - 1] ?? 0) + gap);
-  return { points, total: (points[points.length - 1] ?? 0) + 700 };
-}
-
-function indexAt(points: number[], ms: number) {
-  let index = 0;
-  while (index + 1 < points.length && (points[index + 1] ?? 0) <= ms) index += 1;
-  return index;
 }
 
 function fileName(game: string, matchId: string) {
@@ -175,7 +149,8 @@ export async function recordVisibleMatch(opts: {
     const node = await gameNode();
     const count = Math.max(1, opts.total);
     const times = opts.times && opts.times.length >= count ? opts.times.slice(0, count) : Array.from({ length: count }, (_, i) => i * 400);
-    const { points, total } = playbackTimeline(count, times);
+    const points = tapePoints(times);
+    const total = (points[points.length - 1] ?? 0) + 700;
     const step = 1000 / FPS;
     const expected = Math.max(1, Math.round(total / step));
     const canvas = document.createElement("canvas");
@@ -266,7 +241,7 @@ export async function recordVisibleMatch(opts: {
     let captured = 0;
     let cursor = -1;
     for (let n = 0; n < expected; n++) {
-      const index = indexAt(points, Math.min(total, n * step));
+      const index = indexAtTime(points, Math.min(total, n * step));
       if (index !== cursor) {
         opts.seek(index);
         cursor = index;

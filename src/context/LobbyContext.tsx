@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AuthInvalid, authApi, pingServer } from "../lib/api";
 import { useAuth } from "./AuthContext";
 import { GAME_LABEL, GAME_PATH, lobbyApi, type Invite, type LobbySnap, type OnlinePlayer, type QueueSnap, type RoomSnap, type Settlement } from "../lib/lobby";
+import { indexAtTime, tapePoints } from "../lib/tape-clock";
 
 type LobbyCtx = {
   online: OnlinePlayer[];
@@ -35,10 +36,11 @@ type LobbyCtx = {
   declineReturn: () => void;
   askReconnect: () => void;
   /** Scrub a live watch or a saved recording. */
-  playback: { live: boolean; index: number; total: number; angle: string };
+  playback: { live: boolean; index: number; total: number; angle: string; playing: boolean };
   watchLive: () => void;
   watchStart: () => void;
   watchScrub: (index: number) => void;
+  watchPlay: (playing: boolean) => void;
   watchAngle: (angle: string) => void;
   spectate: (targetId: string) => Promise<void>;
   openReplay: (matchId: string) => Promise<void>;
@@ -99,7 +101,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   const nav = useNavigate();
   const loc = useLocation();
   const [snap, setSnap] = useState<LobbySnap>({ online: [], invites: [], room: null, store: "memory", queue: null });
-  const [play, setPlay] = useState({ live: true, index: 0, angle: "watch" });
+  const [play, setPlay] = useState({ live: true, index: 0, angle: "watch", playing: false, gen: 0 });
   const [settlement, setSettlement] = useState<Settlement | null>(null);
   const [error, setError] = useState("");
   const [net, setNet] = useState<NetLink>({
@@ -116,6 +118,8 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   const roomSeq = useRef(0);
   const snapRef = useRef(snap);
   snapRef.current = snap;
+  const playRef = useRef(play);
+  playRef.current = play;
   const leavingRef = useRef(false);
   /** Room id we already auto-left, so a repeated over payload does not leave twice. */
   const settledRoom = useRef<string | null>(null);
@@ -156,6 +160,39 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     expectRoomId.current = room.id;
     settledRoom.current = null;
   }
+
+  useEffect(() => {
+    const room = snap.room;
+    if (!room?.spectate || !play.playing || play.live || !room.tape || room.tape.length < 2) return;
+    const points = tapePoints(room.tape.map((frame) => frame.t));
+    const started = performance.now();
+    const startAt = points[Math.max(0, Math.min(play.index, points.length - 1))] ?? 0;
+    let raf = 0;
+    const tick = () => {
+      const current = snapRef.current.room;
+      const frames = current?.tape;
+      if (!frames || frames.length < 2 || !playRef.current.playing || playRef.current.live) return;
+      const marks = tapePoints(frames.map((frame) => frame.t));
+      const at = startAt + (performance.now() - started);
+      const index = indexAtTime(marks, at);
+      const end = marks[marks.length - 1] ?? 0;
+      const replay = Boolean(current?.id?.startsWith("replay:"));
+      if (index >= frames.length - 1 && at >= end + (replay ? 700 : 0)) {
+        setPlay((prev) =>
+          replay
+            ? { ...prev, playing: false, index: frames.length - 1 }
+            : { ...prev, live: true, playing: false, index: frames.length - 1 },
+        );
+        return;
+      }
+      if (index !== playRef.current.index) {
+        setPlay((prev) => (prev.playing && !prev.live ? { ...prev, index } : prev));
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [play.playing, play.live, play.gen, snap.room?.id]);
 
   useEffect(() => {
     const active = Object.values(inviteUntilByTo).some((t) => t > Date.now());
@@ -461,7 +498,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       } finally {
         leavingRef.current = false;
       }
-      setPlay({ live: true, index: 0, angle: "watch" });
+      setPlay({ live: true, index: 0, angle: "watch", playing: false, gen: 0 });
       setSnap((prev) => ({ ...prev, room: null }));
       return "left";
     }
@@ -518,6 +555,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         index: Math.max(0, Math.min(play.index, Math.max(0, (snap.room?.tape?.length || 1) - 1))),
         total: snap.room?.tape?.length || 0,
         angle: play.angle || "watch",
+        playing: Boolean(play.playing) && !play.live,
       },
       queue: snap.queue ?? null,
       settlement,
@@ -656,13 +694,16 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       },
       watchLive() {
         const total = snapRef.current.room?.tape?.length || 1;
-        setPlay((prev) => ({ ...prev, live: true, index: total - 1 }));
+        setPlay((prev) => ({ ...prev, live: true, playing: false, index: total - 1 }));
       },
       watchStart() {
-        setPlay((prev) => ({ ...prev, live: false, index: 0 }));
+        setPlay((prev) => ({ ...prev, live: false, playing: true, index: 0, gen: prev.gen + 1 }));
       },
       watchScrub(index: number) {
-        setPlay((prev) => ({ ...prev, live: false, index }));
+        setPlay((prev) => ({ ...prev, live: false, index, gen: prev.gen + 1 }));
+      },
+      watchPlay(playing: boolean) {
+        setPlay((prev) => ({ ...prev, live: false, playing, gen: prev.gen + 1 }));
       },
       watchAngle(angle: string) {
         setPlay((prev) => ({ ...prev, angle: angle || "watch" }));
@@ -671,7 +712,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         if (!token) throw new Error("Sign in first");
         const next = await lobbyApi.spectate(token, targetId);
         if (!next.room) throw new Error("They are not in a game");
-        setPlay({ live: true, index: Math.max(0, (next.room.tape?.length || 1) - 1), angle: "watch" });
+        setPlay({ live: true, index: Math.max(0, (next.room.tape?.length || 1) - 1), angle: "watch", playing: false, gen: 0 });
         acceptRoom(next.room);
         setSnap((prev) => ({
           ...next,
@@ -687,7 +728,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         const loaded = await lobbyApi.tape(token, matchId);
         const room = loaded.room as RoomSnap | undefined;
         if (!room?.game) throw new Error("Recording not found");
-        setPlay({ live: false, index: 0, angle: "watch" });
+        setPlay({ live: false, index: 0, angle: "watch", playing: true, gen: 0 });
         dismissedRoomId.current = null;
         settledRoom.current = null;
         setSettlement(null);

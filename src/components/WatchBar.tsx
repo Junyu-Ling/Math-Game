@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLobby } from "../context/LobbyContext";
 import type { RoomSnap } from "../lib/lobby";
 import { consumeQueuedRecording, recordVisibleMatch } from "../lib/recording";
@@ -15,17 +15,20 @@ function seatName(room: RoomSnap, id: string) {
 }
 
 export function WatchBar() {
-  const { room, playback, watchLive, watchStart, watchScrub, watchAngle, leave } = useLobby();
+  const { room, playback, watchLive, watchStart, watchScrub, watchPlay, watchAngle, leave } = useLobby();
   const [saving, setSaving] = useState("");
   const [saveErr, setSaveErr] = useState("");
+  const resumePlay = useRef(false);
   const watching = Boolean(room?.spectate && playback.total >= 1);
 
   async function saveVideo() {
     if (!room?.spectate || playback.total < 1 || saving) return;
     const wasLive = playback.live;
     const wasIndex = playback.index;
+    const wasPlaying = playback.playing;
     setSaveErr("");
     setSaving("Saving MP4…");
+    watchPlay(false);
     try {
       await recordVisibleMatch({
         game: room.game,
@@ -37,7 +40,10 @@ export function WatchBar() {
       });
       setSaving("");
       if (wasLive) watchLive();
-      else watchScrub(wasIndex);
+      else {
+        watchScrub(wasIndex);
+        if (wasPlaying) watchPlay(true);
+      }
     } catch (err) {
       setSaving("");
       setSaveErr(err instanceof Error ? err.message : "Could not save the video");
@@ -70,6 +76,19 @@ export function WatchBar() {
       </div>
       <div className="watch-controls">
       <strong>{saved ? "Recording" : "Watching"}</strong>
+      {playback.live ? null : (
+        <button
+          className="btn"
+          type="button"
+          disabled={Boolean(saving)}
+          onClick={() => {
+            if (!playback.playing && playback.index >= last) watchStart();
+            else watchPlay(!playback.playing);
+          }}
+        >
+          {playback.playing ? "Pause" : "Play"}
+        </button>
+      )}
       <button className="btn btn-ghost" type="button" onClick={watchStart} disabled={Boolean(saving)}>
         From start
       </button>
@@ -86,6 +105,15 @@ export function WatchBar() {
         value={Math.min(playback.index, last)}
         aria-label="Match timeline"
         disabled={Boolean(saving)}
+        onPointerDown={() => {
+          resumePlay.current = playback.playing;
+          if (playback.playing) watchPlay(false);
+        }}
+        onPointerUp={() => {
+          if (!resumePlay.current) return;
+          resumePlay.current = false;
+          watchPlay(true);
+        }}
         onChange={(event) => watchScrub(Number(event.target.value))}
       />
       <span className="watch-count">
