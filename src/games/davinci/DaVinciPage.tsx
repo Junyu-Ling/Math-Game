@@ -624,6 +624,7 @@ export function DaVinciPage() {
   };
 
   function dispatch(action: CodaAction) {
+    if (codaRoom?.spectate) return;
     if (codaRoom) {
       // Show the player's own choice at once; the server stays the source of truth and
       // overlayOptimistic() keeps it from flickering back when an older snapshot lands.
@@ -702,7 +703,7 @@ export function DaVinciPage() {
   }, [state?.rpsReveal, online]);
 
   useEffect(() => {
-    if (!arranging) return;
+    if (!arranging || codaRoom?.spectate) return;
     const roomEnds = online ? codaRoom?.endsAt ?? endsAtRef.current : null;
     // Never start a fresh 5s if the server deadline is missing or already past.
     const deadline = online ? (roomEnds ?? Date.now()) : Date.now() + ARRANGE_MS;
@@ -731,7 +732,7 @@ export function DaVinciPage() {
     tick();
     id = window.setInterval(tick, 50);
     return () => window.clearInterval(id);
-  }, [state?.arrangeId, arranging, online, codaRoom?.endsAt]);
+  }, [state?.arrangeId, arranging, online, codaRoom?.endsAt, codaRoom?.spectate]);
 
   useEffect(() => {
     if (!flash) return;
@@ -741,13 +742,13 @@ export function DaVinciPage() {
   }, [flash]);
 
   useEffect(() => {
-    if (!state || state.phase !== "over" || !state.winnerId || !you) return;
+    if (!state || state.phase !== "over" || !state.winnerId || !you || codaRoom?.spectate) return;
     // Let the table flip every code before the win/lose banner.
     const t = window.setTimeout(() => {
       setFlash({ kind: state.winnerId === you.id ? "win" : "lose" });
     }, 2200);
     return () => window.clearTimeout(t);
-  }, [state?.phase, state?.winnerId, you?.id]);
+  }, [state?.phase, state?.winnerId, you?.id, codaRoom?.spectate]);
 
   useEffect(() => {
     if (!state || online || heldCoda) return;
@@ -866,6 +867,14 @@ export function DaVinciPage() {
     if (!codaRoom) return;
     const view = codaRoom.view as CodaState;
     setYouId(user?.id != null ? String(user.id) : null);
+    if (codaRoom.spectate) {
+      optimisticRef.current = [];
+      prevLog.current = view.log.length;
+      setFlash(null);
+      setState(view);
+      endsAtRef.current = codaRoom.endsAt;
+      return;
+    }
     if (typeof codaRoom.serverNow === "number") {
       // Latency only ever makes (serverNow - local) too small, so the largest recent sample is the truest.
       const samples = clockSamplesRef.current;

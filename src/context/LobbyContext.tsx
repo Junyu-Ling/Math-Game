@@ -178,16 +178,18 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
     let timer = 0;
     let abort: AbortController | null = null;
     const applySnap = (next: LobbySnap) => {
-      if (next.settlement?.game && next.settlement.view) setSettlement(next.settlement);
+      const watchingTape = Boolean(snapRef.current.room?.spectate || snapRef.current.room?.id?.startsWith("replay:"));
+      if (next.settlement?.game && next.settlement.view && !watchingTape) setSettlement(next.settlement);
       setSnap((prev) => {
         const light = Boolean(next.light);
         let room: RoomSnap | null;
-        if (next.room) {
+        // A saved recording is not a seat. A later poll must not swap it for the live table.
+        if (prev.room?.id?.startsWith("replay:")) {
+          room = prev.room;
+        } else if (next.room) {
           room = takeRoom(next.room, prev.room);
           nullHoldUntil.current = 0;
           if (expectRoomId.current && next.room.id === expectRoomId.current) expectRoomId.current = null;
-        } else if (prev.room?.id?.startsWith("replay:")) {
-          room = prev.room;
         } else if (expectRoomId.current && prev.room?.id === expectRoomId.current) {
           // Stale watch/sync with room:null racing a just-finished join — keep the seat.
           room = prev.room;
@@ -305,7 +307,8 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   // Match already decided: show that result, drop the seat immediately. No extra wait.
   useEffect(() => {
     const room = snap.room;
-    if (!token || !room || !isGameOver(room) || leavingRef.current) return;
+    // A recording's last frame is "over", but that is the end of the tape, not a seat to settle and leave.
+    if (!token || !room || room.spectate || room.id.startsWith("replay:") || !isGameOver(room) || leavingRef.current) return;
     if (settledRoom.current === room.id) return;
     settledRoom.current = room.id;
     leavingRef.current = true;
@@ -686,6 +689,8 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         if (!room?.game) throw new Error("Recording not found");
         setPlay({ live: false, index: 0, angle: "watch" });
         dismissedRoomId.current = null;
+        settledRoom.current = null;
+        setSettlement(null);
         setSnap((prev) => ({ ...prev, room }));
         const path = GAME_PATH[room.game];
         if (path) nav(path);

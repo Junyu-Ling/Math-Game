@@ -482,7 +482,8 @@ export function SnakePage() {
   const [stickKnob, setStickKnob] = useState({ x: 0, y: 0 });
   const [stickLive, setStickLive] = useState(false);
 
-  const world = Boolean(room && (room.id === SNAKE_WORLD_ID || (room.view as SnakeState | undefined)?.mode === "world"));
+  const watching = Boolean(room?.spectate);
+  const world = Boolean(!watching && room && (room.id === SNAKE_WORLD_ID || (room.view as SnakeState | undefined)?.mode === "world"));
   const practice = Boolean(local && !room);
   const serverView = room?.view as SnakeState | undefined;
   const youId = practice ? "you" : user?.id != null ? String(user.id) : undefined;
@@ -542,6 +543,7 @@ export function SnakePage() {
   }
 
   function applyLocal(action: SnakeAction) {
+    if (room?.spectate) return;
     const cur = liveRef.current;
     if (!cur || !youId) return;
     liveRef.current = applySnakeAction(cur, youId, action);
@@ -568,12 +570,18 @@ export function SnakePage() {
 
   useEffect(() => {
     if (!serverView || practice) return;
+    if (room?.spectate) {
+      lastServerTickRef.current = serverView.tick;
+      liveRef.current = serverView;
+      pushHud(serverView, true);
+      return;
+    }
     // Same tick / duplicate watch payloads must not re-merge — that flickers foods & peers.
     if (serverView.tick <= lastServerTickRef.current && liveRef.current) return;
     lastServerTickRef.current = serverView.tick;
     liveRef.current = reconcileSnake(serverView, liveRef.current, youId, memoRef.current);
     pushHud(liveRef.current, true);
-  }, [serverView, practice, youId, serverView?.tick]);
+  }, [serverView, practice, youId, serverView?.tick, room?.spectate]);
 
   // Practice: full local sim. Online: predict only yourself; peers/food come from server.
   useEffect(() => {

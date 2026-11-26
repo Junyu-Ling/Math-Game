@@ -33,7 +33,7 @@ function paint() {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve(undefined)));
 }
 
-function pickIndexes(total: number, max = 90) {
+function pickIndexes(total: number, max = 100) {
   if (total <= 1) return [0];
   if (total <= max) return Array.from({ length: total }, (_, i) => i);
   const seen = new Set<number>();
@@ -240,11 +240,13 @@ export async function recordVisibleMatch(opts: {
       framerate: FPS,
     });
     let written = 0;
+    let captured = 0;
     for (let n = 0; n < indexes.length; n++) {
       opts.seek(indexes[n] ?? 0);
+      await delay(60);
       await paint();
+      await delay(40);
       await paint();
-      await delay(30);
       let shot: HTMLCanvasElement | null = null;
       try {
         shot = await toCanvas(node, {
@@ -257,7 +259,9 @@ export async function recordVisibleMatch(opts: {
       } catch {
         shot = null;
       }
-      if (shot) fitFrame(ctx, shot);
+      if (!shot) continue;
+      captured += 1;
+      fitFrame(ctx, shot);
       for (let copy = 0; copy < repeats; copy++) {
         const timestamp = Math.round((written * 1_000_000) / FPS);
         const bitmap = await createImageBitmap(canvas);
@@ -279,7 +283,7 @@ export async function recordVisibleMatch(opts: {
     }
     if (!configured) throw new Error("Could not prepare the video");
     muxer.finalize();
-    if (!written) throw new Error("Nothing to save");
+    if (!captured || !written) throw new Error("Could not capture the table");
     downloadBlob(new Blob([target.buffer], { type: "video/mp4" }), fileName(opts.game, opts.matchId));
   } finally {
     try {
