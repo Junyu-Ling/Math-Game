@@ -1,14 +1,16 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { AuthFrame, CodeBoxes } from "../components/AuthFrame";
 import { GithubButton } from "../components/GithubButton";
-import { IconMail } from "../components/Icons";
+import { GoogleButton } from "../components/GoogleButton";
+import { useAuth } from "../context/AuthContext";
 
 export function Register() {
-  const { register, verify, live } = useAuth();
+  const { register, verify } = useAuth();
   const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState("");
   const [needCode, setNeedCode] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -24,23 +26,23 @@ export function Register() {
     return () => window.clearInterval(id);
   }, [cooldownUntil]);
 
-  async function onRegister(e: FormEvent) {
-    e.preventDefault();
+  async function onRegister(event: { preventDefault(): void }) {
+    event.preventDefault();
     if (busy || cooldownSec > 0) return;
     setErr(false);
     setBusy(true);
     try {
-      const res = await register(email.trim().toLowerCase(), password);
+      await register(email.trim().toLowerCase(), password);
       setNeedCode(true);
-      setCooldownUntil(Date.now() + (res.cooldownSec ?? 60) * 1000);
+      setCooldownUntil(Date.now() + 60 * 1000);
       setNow(Date.now());
-      setMsg(res.hint || "A code was sent to your email.");
+      setMsg("Code sent. It expires in 10 minutes.");
     } catch (ex) {
       setErr(true);
-      const text = ex instanceof Error ? ex.message : "Registration failed";
+      const text = ex instanceof Error ? ex.message : "Could not create the account";
       setMsg(text);
       const wait = text.match(/Wait (\d+)s/i);
-      if (wait) {
+      if (wait?.[1]) {
         setCooldownUntil(Date.now() + Number(wait[1]) * 1000);
         setNow(Date.now());
       }
@@ -49,8 +51,8 @@ export function Register() {
     }
   }
 
-  async function onVerify(e: FormEvent) {
-    e.preventDefault();
+  async function onVerify(event: FormEvent) {
+    event.preventDefault();
     setErr(false);
     setBusy(true);
     try {
@@ -58,69 +60,75 @@ export function Register() {
       nav("/account");
     } catch (ex) {
       setErr(true);
-      setMsg(ex instanceof Error ? ex.message : "Verification failed");
+      setMsg(ex instanceof Error ? ex.message : "That code did not work");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="auth-wrap">
-      <p className="kicker">{live ? "Live API" : "Local mock"}</p>
-      <h1>Register</h1>
-      <p className="lede">Or continue with GitHub to create an account in one step.</p>
+    <AuthFrame
+      title="Create your account"
+      lede="One account for every table, your name and photo, and the games you want to watch again."
+      foot={
+        <>
+          Already playing? <Link to="/login">Sign in</Link>
+        </>
+      }
+    >
       <div className="auth-method">
+        <GoogleButton />
         <GithubButton />
       </div>
-      <p className="auth-or">or email</p>
+      <div className="auth-divider">
+        <span>or with email</span>
+      </div>
       {!needCode ? (
         <form onSubmit={onRegister}>
           <div className="field">
-            <label>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <label htmlFor="reg-email">Email</label>
+            <input id="reg-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
           </div>
           <div className="field">
-            <label>Password</label>
-            <input
-              type="password"
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <label htmlFor="reg-password">Password</label>
+            <div className="field-secret">
+              <input
+                id="reg-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                minLength={6}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+              <button type="button" className="field-reveal" onClick={() => setShowPassword((value) => !value)}>
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
+            <em>At least 6 characters.</em>
           </div>
-          <div className="row-actions">
-            <button className="btn btn-icon" type="submit" disabled={busy || cooldownSec > 0}>
-              <IconMail />
-              {cooldownSec > 0 ? `Send code (${cooldownSec}s)` : "Send code"}
-            </button>
-            <Link to="/login" className="btn btn-ghost">
-              Log in
-            </Link>
-          </div>
+          <button className="btn auth-submit" type="submit" disabled={busy || cooldownSec > 0 || password.length < 6}>
+            {cooldownSec > 0 ? `Send code in ${cooldownSec}s` : busy ? "Sending…" : "Create account"}
+          </button>
         </form>
       ) : (
         <form onSubmit={onVerify}>
+          <p className="auth-sent">
+            Enter the 6-digit code sent to <strong>{email}</strong>
+          </p>
           <div className="field">
             <label>Code</label>
-            <input value={code} onChange={(e) => setCode(e.target.value)} maxLength={6} required />
+            <CodeBoxes value={code} onChange={setCode} />
           </div>
-          <div className="row-actions">
-            <button className="btn" type="submit" disabled={busy}>
-              Verify
-            </button>
-            <button
-              className="btn btn-ghost"
-              type="button"
-              disabled={busy || cooldownSec > 0}
-              onClick={() => void onRegister({ preventDefault() {} } as FormEvent)}
-            >
-              {cooldownSec > 0 ? `Resend (${cooldownSec}s)` : "Resend"}
-            </button>
-          </div>
+          <button className="btn auth-submit" type="submit" disabled={busy || code.length < 6}>
+            {busy ? "Checking…" : "Verify and continue"}
+          </button>
+          <button className="auth-text" type="button" disabled={busy || cooldownSec > 0} onClick={onRegister}>
+            {cooldownSec > 0 ? `Resend in ${cooldownSec}s` : "Resend code"}
+          </button>
         </form>
       )}
-      <p className={`msg ${err ? "err" : "ok"}`}>{msg}</p>
-    </div>
+      {msg ? <p className={`auth-note${err ? " is-err" : ""}`}>{msg}</p> : null}
+    </AuthFrame>
   );
 }

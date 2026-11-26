@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AuthFrame } from "../components/AuthFrame";
 import { useAuth } from "../context/AuthContext";
 
 export function AuthCallback() {
@@ -26,10 +27,8 @@ export function AuthCallback() {
   }, [acceptToken, nav]);
 
   return (
-    <div className="auth-wrap">
-      <p className="kicker">Account</p>
-      <h1>Signing in</h1>
-      <p className="lede">{msg}</p>
-    </div>
+    <AuthFrame title="Signing you in" lede={msg}>
+      <div className="auth-wait" aria-hidden />
+    </AuthFrame>
   );
 }

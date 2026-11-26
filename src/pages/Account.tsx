@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLobby } from "../context/LobbyContext";
 import type { User } from "../lib/api";
-import { GAME_LABEL, lobbyApi, type HistoryRow, type TapeFrame } from "../lib/lobby";
-import { downloadRecording } from "../lib/recording";
+import { GAME_LABEL, lobbyApi, type HistoryRow } from "../lib/lobby";
+import { cancelQueuedRecording, queueRecording } from "../lib/recording";
 import { Avatar } from "../components/Avatar";
 
 type Tab = "profile" | "records";
@@ -120,14 +120,12 @@ export function Account() {
   }
 
   async function saveFile(row: HistoryRow) {
-    if (!token) return;
     setHistErr("");
+    queueRecording(row.id);
     try {
-      const loaded = (await lobbyApi.tape(token, row.id)) as { game?: string; tape?: TapeFrame[] };
-      const tape = Array.isArray(loaded.tape) ? loaded.tape : [];
-      if (!tape.length) throw new Error("Recording not found");
-      downloadRecording(loaded.game || row.game, row.id, tape);
+      await openReplay(row.id);
     } catch (err) {
+      cancelQueuedRecording();
       setHistErr(err instanceof Error ? err.message : "Could not save");
     }
   }
@@ -210,7 +208,7 @@ export function Account() {
         </form>
       ) : (
         <div className="profile-records">
-          <p className="lede">The last 100 games. Watch one here, or save the recording to this computer.</p>
+          <p className="lede">The last 100 games. Watch one here, or save it to this computer as an MP4.</p>
           {histErr ? <p className="msg err">{histErr}</p> : null}
           {history.length === 0 ? <p>No saved games yet.</p> : null}
           <div className="record-list">
@@ -232,7 +230,7 @@ export function Account() {
                       Watch
                     </button>
                     <button className="btn btn-ghost" type="button" onClick={() => void saveFile(row)}>
-                      Save
+                      Save MP4
                     </button>
                   </div>
                 </div>
