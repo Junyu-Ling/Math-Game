@@ -766,15 +766,41 @@
   transform: translateX(-50%);
   z-index: 90;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
-  width: min(720px, calc(100vw - 24px));
+  width: min(760px, calc(100vw - 24px));
   padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   background: #ffffff;
   box-shadow: 0 8px 28px rgba(17, 17, 17, 0.08);
   pointer-events: auto;
+}
+
+.watch-angles,
+.watch-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.watch-angles {
+  flex-wrap: wrap;
+}
+
+.watch-angles button {
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: var(--bg-2);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.watch-angles button.is-on {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
 }
 
 .watch-bar strong {
@@ -823,6 +849,22 @@
   color: var(--muted);
   font-style: normal;
   font-size: 13px;
+}
+
+.record-result {
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--bg-2);
+}
+
+.record-result.is-win {
+  color: #1d6b3a;
+  background: #e7f6ec;
+}
+
+.record-result.is-loss {
+  color: #8a3030;
+  background: #fdecec;
 }
 
 .stage-scale.is-measuring,

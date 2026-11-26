@@ -33,6 +33,8 @@ export type TapeFrame = {
   seq: number;
   phase: string;
   view: unknown;
+  /** One rendered table per seat, plus `watch` for the neutral table. */
+  views?: Record<string, unknown>;
 };
 
 export type HistoryRow = {

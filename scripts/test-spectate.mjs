@@ -28,6 +28,8 @@ const watching = await L.spectateUser(fan, host.id);
 assert.equal(watching.room?.spectate, true);
 assert.ok((watching.room.tape?.length || 0) >= 1, "watch has a timeline");
 assert.equal(watching.room.view.phase, "play");
+assert.ok(watching.room.tape[0].views?.watch, "the table view is on every frame");
+assert.ok(watching.room.tape[0].views[host.id], "a seat view is on every frame");
 
 const hostStill = await L.snapshot(host.id);
 assert.equal(hostStill.room?.id, added.room.id, "watching does not take the seat");

@@ -2339,15 +2339,30 @@ function publicRoom(room, viewerId) {
   };
 }
 
+function viewsForState(room, state) {
+  const base = { ...room, state };
+  const views = { watch: publicRoom(base, "watch")?.view ?? state };
+  for (const seat of room.seats || []) {
+    const id = String(seat || "");
+    if (!id || views[id]) continue;
+    views[id] = publicRoom(base, id)?.view ?? views.watch;
+  }
+  return views;
+}
+
 function spectateRoom(room) {
   const pub = publicRoom(room, "watch");
   if (!pub) return null;
-  const tape = (Array.isArray(room.tape) ? room.tape : []).map((frame) => ({
-    t: frame.t,
-    seq: frame.seq,
-    phase: frame.phase,
-    view: publicRoom({ ...room, state: frame.state }, "watch")?.view ?? frame.state,
-  }));
+  const tape = (Array.isArray(room.tape) ? room.tape : []).map((frame) => {
+    const views = viewsForState(room, frame.state);
+    return {
+      t: frame.t,
+      seq: frame.seq,
+      phase: frame.phase,
+      view: views.watch,
+      views,
+    };
+  });
   return { ...pub, spectate: true, tape };
 }
 

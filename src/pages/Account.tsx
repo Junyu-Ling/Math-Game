@@ -130,115 +130,127 @@ export function Account() {
     }
   }
 
-  return (
-    <div className="page account-page">
-      <p className="kicker">Account</p>
-      <h1>{name || user.email}</h1>
-      <div className="account-tabs" role="tablist" aria-label="Account">
-        <button className={tab === "profile" ? "is-on" : ""} type="button" role="tab" aria-selected={tab === "profile"} onClick={() => setTab("profile")}>
-          Profile
-        </button>
-        <button className={tab === "records" ? "is-on" : ""} type="button" role="tab" aria-selected={tab === "records"} onClick={() => setTab("records")}>
-          Records
-        </button>
-      </div>
+  const joined = user.createdAt
+    ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "";
+  const signedWith = user.googleId ? "Google" : user.githubId || user.provider === "github" ? "GitHub" : "Email";
 
-      {tab === "profile" ? (
-        <form
-          className="profile-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void saveProfile();
-          }}
-        >
-          <div className="profile-photo">
-            <Avatar src={avatar} name={name || user.email} size={72} />
-            <label className="btn btn-ghost">
-              Change photo
-              <input
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = "";
-                  if (!file) return;
-                  void readPhoto(file)
-                    .then(setAvatar)
-                    .catch((err: Error) => setNotice(err.message));
-                }}
-              />
-            </label>
-            {avatar ? (
-              <button className="btn btn-ghost" type="button" onClick={() => setAvatar("")}>
-                Remove
-              </button>
-            ) : null}
-          </div>
-          <label className="profile-field">
-            <span>Username</span>
-            <input value={name} maxLength={24} onChange={(event) => setName(event.target.value)} />
+  return (
+    <div className="account-screen">
+      <section className="account-card">
+        <header className="account-id">
+          <label className="account-avatar">
+            <Avatar src={avatar} name={name || user.email} size={84} />
+            <span>Photo</span>
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                void readPhoto(file)
+                  .then(setAvatar)
+                  .catch((err: Error) => setNotice(err.message));
+              }}
+            />
           </label>
-          <fieldset className="profile-gender">
-            <legend>Gender</legend>
-            {(
-              [
-                ["male", "Male"],
-                ["female", "Female"],
-                ["private", "Private"],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                className={`btn${gender === value ? "" : " btn-ghost"}`}
-                type="button"
-                aria-pressed={gender === value}
-                onClick={() => setGender(value)}
-              >
-                {label}
-              </button>
-            ))}
-          </fieldset>
-          <div className="row-actions">
-            <button className="btn" type="submit" disabled={saving || !name.trim()}>
-              {saving ? "Saving…" : "Save"}
-            </button>
+          <div>
+            <p className="kicker">Account</p>
+            <h1>{name || user.email}</h1>
+            <p className="account-mail">{user.email}</p>
+            <p className="account-meta">
+              <span>{signedWith}</span>
+              {joined ? <span>Joined {joined}</span> : null}
+            </p>
           </div>
-          {notice ? <p className={notice === "Saved" ? "msg" : "msg err"}>{notice}</p> : null}
-        </form>
-      ) : (
-        <div className="profile-records">
-          <p className="lede">The last 100 games. Watch one here, or save it to this computer as an MP4.</p>
-          {histErr ? <p className="msg err">{histErr}</p> : null}
-          {history.length === 0 ? <p>No saved games yet.</p> : null}
-          <div className="record-list">
-            {history.map((row) => {
-              const won = row.winnerId && row.winnerId === row.you;
-              const draw = !row.winnerId;
-              const result = draw ? "Draw" : won ? "Win" : "Loss";
-              const when = new Date(row.at).toLocaleString();
-              return (
-                <div key={row.id} className="record-row">
-                  <div>
-                    <strong>{GAME_LABEL[row.game] || row.game}</strong>
-                    <span>{result}</span>
-                    <em>{when}</em>
-                    {row.names?.length ? <em>{row.names.join(" · ")}</em> : null}
-                  </div>
-                  <div className="record-actions">
-                    <button className="btn" type="button" onClick={() => void openReplay(row.id).catch((err: Error) => setHistErr(err.message))}>
-                      Watch
-                    </button>
-                    <button className="btn btn-ghost" type="button" onClick={() => void saveFile(row)}>
-                      Save MP4
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        </header>
+
+        <div className="account-tabs" role="tablist" aria-label="Account">
+          <button className={tab === "profile" ? "is-on" : ""} type="button" role="tab" aria-selected={tab === "profile"} onClick={() => setTab("profile")}>
+            Profile
+          </button>
+          <button className={tab === "records" ? "is-on" : ""} type="button" role="tab" aria-selected={tab === "records"} onClick={() => setTab("records")}>
+            Records{history.length ? ` · ${history.length}` : ""}
+          </button>
         </div>
-      )}
+
+        {tab === "profile" ? (
+          <form
+            className="profile-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveProfile();
+            }}
+          >
+            <label className="profile-field">
+              <span>Username</span>
+              <input value={name} maxLength={24} autoComplete="nickname" onChange={(event) => setName(event.target.value)} />
+            </label>
+            <fieldset className="profile-gender">
+              <legend>Gender</legend>
+              <div className="profile-seg">
+                {(
+                  [
+                    ["male", "Male"],
+                    ["female", "Female"],
+                    ["private", "Private"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button key={value} type="button" className={gender === value ? "is-on" : ""} aria-pressed={gender === value} onClick={() => setGender(value)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <div className="profile-save">
+              {avatar ? (
+                <button className="btn btn-ghost" type="button" onClick={() => setAvatar("")}>
+                  Remove photo
+                </button>
+              ) : (
+                <span />
+              )}
+              <button className="btn" type="submit" disabled={saving || !name.trim()}>
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+            {notice ? <p className={notice === "Saved" ? "msg" : "msg err"}>{notice}</p> : null}
+          </form>
+        ) : (
+          <div className="profile-records">
+            <p className="account-note">The last 100 games. Watch one here, or save it as an MP4.</p>
+            {histErr ? <p className="msg err">{histErr}</p> : history.length === 0 ? <p className="account-empty">No saved games yet.</p> : null}
+            <div className="record-list">
+              {history.map((row) => {
+                const won = row.winnerId && row.winnerId === row.you;
+                const draw = !row.winnerId;
+                const result = draw ? "Draw" : won ? "Win" : "Loss";
+                const when = new Date(row.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+                return (
+                  <article key={row.id} className="record-row">
+                    <div>
+                      <strong>{GAME_LABEL[row.game] || row.game}</strong>
+                      <span className={`record-result is-${result.toLowerCase()}`}>{result}</span>
+                      <em>{when}</em>
+                      {row.names?.length ? <em>{row.names.join(" · ")}</em> : null}
+                    </div>
+                    <div className="record-actions">
+                      <button className="btn" type="button" onClick={() => void openReplay(row.id).catch((err: Error) => setHistErr(err.message))}>
+                        Watch
+                      </button>
+                      <button className="btn btn-ghost" type="button" onClick={() => void saveFile(row)}>
+                        Save MP4
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

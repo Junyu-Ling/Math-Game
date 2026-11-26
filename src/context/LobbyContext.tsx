@@ -35,10 +35,11 @@ type LobbyCtx = {
   declineReturn: () => void;
   askReconnect: () => void;
   /** Scrub a live watch or a saved recording. */
-  playback: { live: boolean; index: number; total: number };
+  playback: { live: boolean; index: number; total: number; angle: string };
   watchLive: () => void;
   watchStart: () => void;
   watchScrub: (index: number) => void;
+  watchAngle: (angle: string) => void;
   spectate: (targetId: string) => Promise<void>;
   openReplay: (matchId: string) => Promise<void>;
 };
@@ -52,11 +53,12 @@ export type NetLink = {
   tableLabel: string | null;
 };
 
-function shownRoom(room: RoomSnap | null, play: { live: boolean; index: number }): RoomSnap | null {
+function shownRoom(room: RoomSnap | null, play: { live: boolean; index: number; angle?: string }): RoomSnap | null {
   if (!room?.spectate || !room.tape?.length) return room;
   const index = Math.max(0, Math.min(play.index, room.tape.length - 1));
   const frame = room.tape[index];
-  return { ...room, view: frame?.view ?? room.view, endsAt: play.live ? room.endsAt : null };
+  const angled = play.angle && play.angle !== "watch" ? frame?.views?.[play.angle] : frame?.views?.watch;
+  return { ...room, view: angled ?? frame?.view ?? room.view, endsAt: play.live ? room.endsAt : null };
 }
 
 const Ctx = createContext<LobbyCtx | null>(null);
@@ -97,7 +99,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
   const nav = useNavigate();
   const loc = useLocation();
   const [snap, setSnap] = useState<LobbySnap>({ online: [], invites: [], room: null, store: "memory", queue: null });
-  const [play, setPlay] = useState({ live: true, index: 0 });
+  const [play, setPlay] = useState({ live: true, index: 0, angle: "watch" });
   const [settlement, setSettlement] = useState<Settlement | null>(null);
   const [error, setError] = useState("");
   const [net, setNet] = useState<NetLink>({
@@ -216,7 +218,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       });
       setError("");
       if (next.room?.spectate && next.room.tape?.length) {
-        setPlay((prev) => (prev.live ? { live: true, index: next.room!.tape!.length - 1 } : prev));
+        setPlay((prev) => (prev.live ? { ...prev, index: next.room!.tape!.length - 1 } : prev));
       }
       const incoming = next.room && !(dismissedRoomId.current && next.room.id === dismissedRoomId.current) ? next.room : null;
       // The shared snake world is entered only by opening /play/snake. A leftover seat there must
@@ -456,7 +458,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       } finally {
         leavingRef.current = false;
       }
-      setPlay({ live: true, index: 0 });
+      setPlay({ live: true, index: 0, angle: "watch" });
       setSnap((prev) => ({ ...prev, room: null }));
       return "left";
     }
@@ -512,6 +514,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         live: play.live,
         index: Math.max(0, Math.min(play.index, Math.max(0, (snap.room?.tape?.length || 1) - 1))),
         total: snap.room?.tape?.length || 0,
+        angle: play.angle || "watch",
       },
       queue: snap.queue ?? null,
       settlement,
@@ -650,19 +653,22 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
       },
       watchLive() {
         const total = snapRef.current.room?.tape?.length || 1;
-        setPlay({ live: true, index: total - 1 });
+        setPlay((prev) => ({ ...prev, live: true, index: total - 1 }));
       },
       watchStart() {
-        setPlay({ live: false, index: 0 });
+        setPlay((prev) => ({ ...prev, live: false, index: 0 }));
       },
       watchScrub(index: number) {
-        setPlay({ live: false, index });
+        setPlay((prev) => ({ ...prev, live: false, index }));
+      },
+      watchAngle(angle: string) {
+        setPlay((prev) => ({ ...prev, angle: angle || "watch" }));
       },
       async spectate(targetId: string) {
         if (!token) throw new Error("Sign in first");
         const next = await lobbyApi.spectate(token, targetId);
         if (!next.room) throw new Error("They are not in a game");
-        setPlay({ live: true, index: Math.max(0, (next.room.tape?.length || 1) - 1) });
+        setPlay({ live: true, index: Math.max(0, (next.room.tape?.length || 1) - 1), angle: "watch" });
         acceptRoom(next.room);
         setSnap((prev) => ({
           ...next,
@@ -678,7 +684,7 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         const loaded = await lobbyApi.tape(token, matchId);
         const room = loaded.room as RoomSnap | undefined;
         if (!room?.game) throw new Error("Recording not found");
-        setPlay({ live: false, index: 0 });
+        setPlay({ live: false, index: 0, angle: "watch" });
         dismissedRoomId.current = null;
         setSnap((prev) => ({ ...prev, room }));
         const path = GAME_PATH[room.game];

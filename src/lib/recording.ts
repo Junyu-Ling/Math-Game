@@ -67,6 +67,68 @@ async function gameNode() {
   throw new Error("Open the match before saving a video");
 }
 
+function splitNals(bytes: Uint8Array) {
+  const nals: Uint8Array[] = [];
+  const leadAt = (pos: number) => {
+    if (pos + 3 < bytes.length && bytes[pos] === 0 && bytes[pos + 1] === 0 && bytes[pos + 2] === 1) return 3;
+    if (pos + 4 < bytes.length && bytes[pos] === 0 && bytes[pos + 1] === 0 && bytes[pos + 2] === 0 && bytes[pos + 3] === 1) return 4;
+    return 0;
+  };
+  let i = 0;
+  while (i < bytes.length && !leadAt(i)) i += 1;
+  while (i < bytes.length) {
+    const lead = leadAt(i);
+    if (!lead) break;
+    const start = i + lead;
+    let end = start;
+    while (end < bytes.length && !leadAt(end)) end += 1;
+    if (end > start) nals.push(bytes.subarray(start, end));
+    i = end;
+  }
+  return nals;
+}
+
+function isAnnexB(bytes: Uint8Array) {
+  return bytes.length > 4 && bytes[0] === 0 && bytes[1] === 0 && (bytes[2] === 1 || (bytes[2] === 0 && bytes[3] === 1));
+}
+
+function nalsToAvcc(nals: Uint8Array[]) {
+  let size = 0;
+  for (const nal of nals) size += 4 + nal.length;
+  const out = new Uint8Array(size);
+  let offset = 0;
+  for (const nal of nals) {
+    out[offset] = (nal.length >>> 24) & 255;
+    out[offset + 1] = (nal.length >>> 16) & 255;
+    out[offset + 2] = (nal.length >>> 8) & 255;
+    out[offset + 3] = nal.length & 255;
+    out.set(nal, offset + 4);
+    offset += 4 + nal.length;
+  }
+  return out;
+}
+
+function avcDecoderConfig(sps: Uint8Array, pps: Uint8Array) {
+  const desc = new Uint8Array(11 + sps.length + pps.length);
+  desc[0] = 1;
+  desc[1] = sps[1] || 0x42;
+  desc[2] = sps[2] || 0;
+  desc[3] = sps[3] || 0x1f;
+  desc[4] = 0xff;
+  desc[5] = 0xe1;
+  desc[6] = (sps.length >> 8) & 255;
+  desc[7] = sps.length & 255;
+  desc.set(sps, 8);
+  let offset = 8 + sps.length;
+  desc[offset] = 1;
+  desc[offset + 1] = (pps.length >> 8) & 255;
+  desc[offset + 2] = pps.length & 255;
+  desc.set(pps, offset + 3);
+  return desc;
+}
+
+const VIDEO_COLOR = { primaries: "bt709", transfer: "bt709", matrix: "bt709", fullRange: false } as const;
+
 function fitFrame(ctx: CanvasRenderingContext2D, shot: HTMLCanvasElement) {
   ctx.fillStyle = "#f4f2ee";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -96,7 +158,7 @@ export async function recordVisibleMatch(opts: {
     const canvas = document.createElement("canvas");
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: false, colorSpace: "srgb" });
     if (!ctx) throw new Error("Could not prepare the video");
 
     const target = new ArrayBufferTarget();
@@ -107,8 +169,57 @@ export async function recordVisibleMatch(opts: {
       firstTimestampBehavior: "offset",
     });
     let failed: Error | null = null;
+    let sps: Uint8Array | null = null;
+    let pps: Uint8Array | null = null;
+    let configured = false;
+    const waiting: { data: Uint8Array; type: "key" | "delta"; timestamp: number; duration: number }[] = [];
+    const duration = Math.round(1_000_000 / FPS);
+    const writeSample = (sample: { data: Uint8Array; type: "key" | "delta"; timestamp: number; duration: number }, withConfig: boolean) => {
+      muxer.addVideoChunkRaw(
+        sample.data,
+        sample.type,
+        sample.timestamp,
+        sample.duration,
+        withConfig && sps && pps
+          ? { decoderConfig: { codec: "avc1.42001f", description: avcDecoderConfig(sps, pps), colorSpace: VIDEO_COLOR } }
+          : undefined,
+      );
+    };
     encoder = new VideoEncoder({
-      output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+      output: (chunk, meta) => {
+        const raw = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(raw);
+        const sampleDuration = chunk.duration && chunk.duration > 0 ? chunk.duration : duration;
+        if (isAnnexB(raw)) {
+          const nals = splitNals(raw);
+          for (const nal of nals) {
+            const kind = (nal[0] ?? 0) & 31;
+            if (kind === 7) sps = nal;
+            if (kind === 8) pps = nal;
+          }
+          const data = nalsToAvcc(nals.filter((nal) => ((nal[0] ?? 0) & 31) !== 9));
+          waiting.push({ data, type: chunk.type, timestamp: chunk.timestamp, duration: sampleDuration });
+          if (sps && pps) {
+            for (const sample of waiting) writeSample(sample, !configured && sample === waiting[0]);
+            configured = true;
+            waiting.length = 0;
+          }
+          return;
+        }
+        const browser = meta?.decoderConfig;
+        if (browser?.description) {
+          muxer.addVideoChunk(chunk, {
+            decoderConfig: {
+              codec: browser.codec || "avc1.42001f",
+              description: browser.description,
+              colorSpace: browser.colorSpace ?? VIDEO_COLOR,
+            },
+          });
+          configured = true;
+          return;
+        }
+        waiting.push({ data: raw, type: chunk.type, timestamp: chunk.timestamp, duration: sampleDuration });
+      },
       error: (err) => {
         failed = err instanceof Error ? err : new Error("Could not encode the video");
       },
@@ -127,9 +238,7 @@ export async function recordVisibleMatch(opts: {
       height: HEIGHT,
       bitrate: 1_800_000,
       framerate: FPS,
-      latencyMode: "quality",
-      avc: { format: "avc" },
-    } as VideoEncoderConfig);
+    });
     let written = 0;
     for (let n = 0; n < indexes.length; n++) {
       opts.seek(indexes[n] ?? 0);
@@ -150,7 +259,10 @@ export async function recordVisibleMatch(opts: {
       }
       if (shot) fitFrame(ctx, shot);
       for (let copy = 0; copy < repeats; copy++) {
-        const frame = new VideoFrame(canvas, { timestamp: Math.round((written * 1_000_000) / FPS) });
+        const timestamp = Math.round((written * 1_000_000) / FPS);
+        const bitmap = await createImageBitmap(canvas);
+        const frame = new VideoFrame(bitmap, { timestamp, duration, alpha: "discard" });
+        bitmap.close();
         encoder.encode(frame, { keyFrame: written % 24 === 0 });
         frame.close();
         written += 1;
@@ -160,6 +272,12 @@ export async function recordVisibleMatch(opts: {
     }
     await encoder.flush();
     if (failed) throw failed;
+    if (waiting.length && sps && pps) {
+      for (const sample of waiting) writeSample(sample, !configured && sample === waiting[0]);
+      configured = true;
+      waiting.length = 0;
+    }
+    if (!configured) throw new Error("Could not prepare the video");
     muxer.finalize();
     if (!written) throw new Error("Nothing to save");
     downloadBlob(new Blob([target.buffer], { type: "video/mp4" }), fileName(opts.game, opts.matchId));
