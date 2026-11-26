@@ -596,7 +596,7 @@ async function leaveCodaQueue(userId) {
   }
 }
 
-app.patch("/api/me/profile", auth, async (req, res) => {
+app.patch("/api/profile", auth, async (req, res) => {
   try {
     const saved = await updateAccountProfile(req.user, req.body || {});
     const users = readUsers();

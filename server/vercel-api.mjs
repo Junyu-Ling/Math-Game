@@ -551,7 +551,7 @@ export async function handle(req, res, path) {
     return;
   }
 
-  if (path === "me/profile") {
+  if (path === "profile") {
     try {
       const actor = authUser(req);
       const body = await readBody(req);
