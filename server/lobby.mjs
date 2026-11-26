@@ -453,6 +453,24 @@ async function lrangeAll(key) {
   return memList(key);
 }
 
+async function lpushTrim(key, value, max, ttlSec) {
+  const raw = JSON.stringify(value);
+  const r = client();
+  if (r) {
+    try {
+      await r.lpush(key, raw);
+      await r.ltrim(key, 0, Math.max(0, max - 1));
+      if (ttlSec) await r.expire(key, ttlSec);
+      return;
+    } catch {
+      /* memory */
+    }
+  }
+  const rows = memList(key);
+  rows.unshift(raw);
+  memListSave(key, rows.slice(0, max), ttlSec);
+}
+
 async function lremValue(key, value) {
   if (value == null || value === "") return;
   const r = client();
@@ -809,7 +827,81 @@ export async function peekRoomRecord(roomId) {
   return getRoomRecord(roomId);
 }
 
+function tapePhase(state) {
+  return String(state?.phase || state?.street || "");
+}
+
+function thinTape(tape, max) {
+  if (tape.length <= max) return tape;
+  const first = tape[0];
+  const last = tape[tape.length - 1];
+  const mid = tape.slice(1, -1);
+  const keep = Math.max(0, max - 2);
+  const out = [first];
+  const step = mid.length / Math.max(1, keep);
+  for (let i = 0; i < keep; i++) out.push(mid[Math.min(mid.length - 1, Math.floor(i * step))]);
+  out.push(last);
+  return out;
+}
+
+/** One frame per change, capped, so a spectator can scrub without storing every snake tick. */
+function noteTape(room) {
+  if (!room?.state) return;
+  const phase = tapePhase(room.state);
+  const now = Date.now();
+  const tape = Array.isArray(room.tape) ? room.tape : [];
+  const last = tape[tape.length - 1];
+  const gap = room.game === "snake" ? 500 : 0;
+  if (last && last.phase === phase && phase !== "over" && now - last.t < gap && last.seq === (room.seq || 0)) return;
+  if (last && last.phase === phase && phase !== "over" && gap === 0 && last.seq === (room.seq || 0)) return;
+  let state;
+  try {
+    state = JSON.parse(JSON.stringify(room.state));
+  } catch {
+    return;
+  }
+  if (!room.tapeId) room.tapeId = `${room.id}:${now}`;
+  tape.push({ t: now, seq: room.seq || 0, phase, state });
+  room.tape = thinTape(tape, 100);
+}
+
+const HIST_MAX = 100;
+const HIST_TTL = 60 * 60 * 24 * 45;
+
+async function archiveIfOver(room) {
+  if (!room?.id || room.archived) return;
+  if (tapePhase(room.state) !== "over") return;
+  room.archived = true;
+  const frames = Array.isArray(room.tape) ? room.tape : [];
+  if (!frames.length) return;
+  const matchId = String(room.tapeId || room.id);
+  const names = (room.faces || []).map((f) => f?.name).filter(Boolean);
+  const winnerId = room.state?.winnerId || room.state?.winner || null;
+  for (const id of humanSeatIds(room.seats)) {
+    const entry = {
+      id: matchId,
+      game: room.game,
+      at: Date.now(),
+      names,
+      winnerId: winnerId ? String(winnerId) : null,
+      you: id,
+    };
+    try {
+      await kvSet(
+        `axiom:tape:${id}:${matchId}`,
+        { game: room.game, seats: room.seats, faces: room.faces || [], frames },
+        HIST_TTL,
+      );
+      await lpushTrim(`axiom:hist:${id}`, entry, HIST_MAX, HIST_TTL);
+    } catch {
+      /* a missed recording must not stop the table */
+    }
+  }
+}
+
 async function saveRoom(room, opts = {}) {
+  noteTape(room);
+  await archiveIfOver(room);
   const humans = humanSeatIds(room.seats);
   let faces = Array.isArray(room.faces)
     ? room.faces.filter((f) => f && humans.includes(String(f.id)))
@@ -828,6 +920,10 @@ async function saveRoom(room, opts = {}) {
     readyIds: Array.isArray(room.readyIds) ? room.readyIds.map(String) : [],
     matched: Boolean(room.matched),
     seekingMatch: Boolean(room.seekingMatch),
+    tape: Array.isArray(room.tape) ? room.tape : [],
+    tapeId: room.tapeId || "",
+    watchers: Array.isArray(room.watchers) ? room.watchers.map(String) : [],
+    archived: Boolean(room.archived),
   };
   const r = client();
   if (r) {
@@ -845,7 +941,8 @@ async function saveRoom(room, opts = {}) {
     for (const id of humanSeatIds(room.seats)) await kvSet(`axiom:seat:${id}`, room.id, ROOM_SEC);
   }
   if (!opts.skipRemember) await rememberSeats(room);
-  await wakeUsers(humanSeatIds(room.seats));
+  const wake = [...new Set([...humanSeatIds(room.seats), ...(room.watchers || []).map(String)])];
+  await wakeUsers(wake);
 }
 
 async function rememberSeats(room) {
@@ -965,6 +1062,7 @@ export async function snapshot(userId, light = false) {
     if (inv) invites.push(inv);
   }
   const rid = await getSeat(userId);
+  const watchId = rid ? "" : String((await kvGet(`axiom:watch:${userId}`)) || "");
   let room = null;
   if (rid) {
     let rec = await attachMods(await getRoomRecord(rid));
@@ -979,6 +1077,11 @@ export async function snapshot(userId, light = false) {
         room = publicRoom(rec, userId);
       }
     }
+  } else if (watchId) {
+    let rec = await attachMods(await getRoomRecord(watchId));
+    const watching = (rec?.watchers || []).map(String).includes(String(userId));
+    if (rec && watching) room = spectateRoom(rec);
+    else await kvDel(`axiom:watch:${userId}`);
   }
   const pending = await readJson(`axiom:result:${userId}`);
   if (pending?.game) await kvDel(`axiom:result:${userId}`);
@@ -2060,6 +2163,12 @@ export async function joinSnakeWorld(user, hue) {
 export async function leaveRoom(userId, expectedRoomId = null) {
   const id = String(userId || "");
   const expected = expectedRoomId ? String(expectedRoomId) : null;
+  const watchId = String((await kvGet(`axiom:watch:${id}`)) || "");
+  if (watchId && (!expected || expected === watchId || expected.startsWith("replay:"))) {
+    await dropWatcher(id, watchId);
+    const seated = await getSeat(id);
+    if (!seated) return snapshot(id);
+  }
   const rid = await getSeat(id);
   // Client leave-on-navigate can race a just-finished match/invite seat claim. If the seat already
   // moved (or the expected room is already gone and we are only queued), do not cancel the queue
@@ -2195,6 +2304,84 @@ function publicRoom(room, viewerId) {
     seekingMatch: Boolean(room.seekingMatch),
     view,
   };
+}
+
+function spectateRoom(room) {
+  const pub = publicRoom(room, "watch");
+  if (!pub) return null;
+  const tape = (Array.isArray(room.tape) ? room.tape : []).map((frame) => ({
+    t: frame.t,
+    seq: frame.seq,
+    phase: frame.phase,
+    view: publicRoom({ ...room, state: frame.state }, "watch")?.view ?? frame.state,
+  }));
+  return { ...pub, spectate: true, tape };
+}
+
+async function dropWatcher(userId, roomId) {
+  const id = String(userId);
+  await kvDel(`axiom:watch:${id}`);
+  if (!roomId) return;
+  const rec = await getRoomRecord(roomId);
+  if (!rec) return;
+  rec.watchers = (rec.watchers || []).map(String).filter((w) => w !== id);
+  await saveRoom(rec, { skipRemember: true });
+}
+
+export async function spectateUser(user, targetId) {
+  const id = String(user.id);
+  const target = String(targetId || "");
+  if (!target || target === id) throw new Error("Pick someone who is in a game");
+  if (await getSeat(id)) throw new Error("Leave your table before watching");
+  const rid = await getSeat(target);
+  if (!rid) throw new Error("They are not in a game");
+  const rec = await attachMods(await getRoomRecord(rid));
+  if (!rec) throw new Error("That table has ended");
+  rec.watchers = [...new Set([...(rec.watchers || []).map(String), id])];
+  await kvSet(`axiom:watch:${id}`, rec.id, ROOM_SEC);
+  await saveRoom(rec, { skipRemember: true });
+  return snapshot(id);
+}
+
+export async function leaveWatch(userId) {
+  const id = String(userId || "");
+  const rid = String((await kvGet(`axiom:watch:${id}`)) || "");
+  if (rid) await dropWatcher(id, rid);
+  return snapshot(id);
+}
+
+export async function listHistory(userId) {
+  const rows = await lrangeAll(`axiom:hist:${String(userId)}`);
+  const out = [];
+  for (const raw of rows) {
+    try {
+      const row = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (row?.id && row?.game) out.push(row);
+    } catch {
+      /* skip */
+    }
+    if (out.length >= HIST_MAX) break;
+  }
+  return out;
+}
+
+export async function loadHistoryTape(user, matchId) {
+  const id = String(user.id);
+  const key = `axiom:tape:${id}:${String(matchId || "")}`;
+  const saved = await readJson(key);
+  if (!saved?.frames?.length) throw new Error("Recording not found");
+  const mods = await getMods();
+  const room = {
+    id: String(matchId),
+    game: saved.game,
+    seats: saved.seats || [],
+    faces: saved.faces || [],
+    state: saved.frames[saved.frames.length - 1].state,
+    mods,
+    tape: saved.frames,
+  };
+  const pub = spectateRoom(room);
+  return { game: saved.game, tape: pub?.tape || [], room: { ...pub, id: `replay:${matchId}` } };
 }
 
 async function seatFaces(seats) {

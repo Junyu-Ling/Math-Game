@@ -6,7 +6,7 @@ import { Avatar } from "./Avatar";
 
 export function InviteList({ game, meta }: { game: string; meta?: Record<string, unknown> }) {
   const { user } = useAuth();
-  const { online, error, invite, room, store, inviteCooldownMs } = useLobby();
+  const { online, error, invite, room, store, inviteCooldownMs, spectate } = useLobby();
   const view = room?.view as { phase?: string; street?: string } | undefined;
   const tableWait = Boolean(
     room &&
@@ -87,14 +87,24 @@ export function InviteList({ game, meta }: { game: string; meta?: Record<string,
               {p.name}
               <em className={`presence ${statusClass}`}>{status}</em>
             </span>
-            <button
-              className="btn"
-              type="button"
-              disabled={!canInviteMore || cooling || !live || inGame || matching || seated.has(p.id)}
-              onClick={() => void invite(p.id, game, meta).catch((ex) => alert(ex.message))}
-            >
-              {!live ? "Offline" : inGame ? "In game" : matching ? "Matching" : cooling ? `Invite (${waitSec})` : "Invite"}
-            </button>
+            {inGame ? (
+              <button
+                className="btn"
+                type="button"
+                onClick={() => void spectate(p.id).catch((ex: Error) => alert(ex.message))}
+              >
+                Watch
+              </button>
+            ) : (
+              <button
+                className="btn"
+                type="button"
+                disabled={!canInviteMore || cooling || !live || matching || seated.has(p.id)}
+                onClick={() => void invite(p.id, game, meta).catch((ex) => alert(ex.message))}
+              >
+                {!live ? "Offline" : matching ? "Matching" : cooling ? `Invite (${waitSec})` : "Invite"}
+              </button>
+            )}
           </div>
           );
         })

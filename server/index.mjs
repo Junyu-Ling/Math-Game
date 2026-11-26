@@ -30,6 +30,9 @@ import {
   joinSnakeWorld,
   leaveQueue,
   leaveRoom,
+  spectateUser,
+  listHistory,
+  loadHistoryTape,
   lobbyStoreKind,
   findAccountByEmail,
   findAccountById,
@@ -651,6 +654,15 @@ app.post("/api/lobby", auth, async (req, res) => {
     }
     if (op === "leave") {
       return res.json(await leaveRoom(req.user.id, req.body?.roomId || null));
+    }
+    if (op === "spectate") {
+      return res.json(await spectateUser(req.user, String(req.body.targetId || "")));
+    }
+    if (op === "history") {
+      return res.json({ history: await listHistory(req.user.id) });
+    }
+    if (op === "tape") {
+      return res.json(await loadHistoryTape(req.user, String(req.body.matchId || "")));
     }
     if (op === "queue") {
       return res.json(await enqueueMatch(req.user, String(req.body.game || ""), req.body.meta || {}));

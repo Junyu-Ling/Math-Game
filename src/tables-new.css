@@ -748,6 +748,76 @@
   flex-direction: column;
 }
 
+.shell.is-watching .stage-scale {
+  pointer-events: none;
+}
+
+.watch-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(720px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 8px 28px rgba(17, 17, 17, 0.08);
+  pointer-events: auto;
+}
+
+.watch-bar strong {
+  font-size: 13px;
+}
+
+.watch-range {
+  flex: 1 1 auto;
+  min-width: 80px;
+}
+
+.watch-count {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.record-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.record-row div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.record-row span,
+.record-row em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 13px;
+}
+
 .stage-scale.is-measuring,
 .stage-scale.is-measuring .page-wide,
 .stage-scale.is-measuring .page-wide .game-layout,

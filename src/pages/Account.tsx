@@ -1,8 +1,31 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useLobby } from "../context/LobbyContext";
+import { GAME_LABEL, lobbyApi, type HistoryRow } from "../lib/lobby";
 
 export function Account() {
-  const { user, live, loading } = useAuth();
+  const { user, live, loading, token } = useAuth();
+  const { openReplay } = useLobby();
+  const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [histErr, setHistErr] = useState("");
+  useEffect(() => {
+    if (!token) return;
+    let stop = false;
+    lobbyApi
+      .history(token)
+      .then((res) => {
+        if (stop) return;
+        const rows = (res as { history?: HistoryRow[] }).history;
+        setHistory(Array.isArray(rows) ? rows.slice(0, 100) : []);
+      })
+      .catch((err: Error) => {
+        if (!stop) setHistErr(err.message);
+      });
+    return () => {
+      stop = true;
+    };
+  }, [token]);
   if (loading && !user) {
     return (
       <div className="page">
@@ -51,6 +74,31 @@ export function Account() {
           <span>Next</span>
           <b style={{ fontSize: 16 }}>Invite</b>
         </div>
+      </div>
+      <h2>Records</h2>
+      <p className="lede">The last 100 games. Open a recording to watch from the start, or drag the timeline.</p>
+      {histErr ? <p className="msg err">{histErr}</p> : null}
+      {history.length === 0 ? <p>No saved games yet.</p> : null}
+      <div className="record-list">
+        {history.map((row) => {
+          const won = row.winnerId && row.winnerId === row.you;
+          const draw = !row.winnerId;
+          const result = draw ? "Draw" : won ? "Win" : "Loss";
+          const when = new Date(row.at).toLocaleString();
+          return (
+            <div key={row.id} className="record-row">
+              <div>
+                <strong>{GAME_LABEL[row.game] || row.game}</strong>
+                <span>{result}</span>
+                <em>{when}</em>
+                {row.names?.length ? <em>{row.names.join(" · ")}</em> : null}
+              </div>
+              <button className="btn" type="button" onClick={() => void openReplay(row.id).catch((err: Error) => setHistErr(err.message))}>
+                Watch
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

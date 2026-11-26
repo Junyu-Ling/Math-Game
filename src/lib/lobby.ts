@@ -28,6 +28,22 @@ export type Invite = {
   meta?: Record<string, unknown>;
 };
 
+export type TapeFrame = {
+  t: number;
+  seq: number;
+  phase: string;
+  view: unknown;
+};
+
+export type HistoryRow = {
+  id: string;
+  game: string;
+  at: number;
+  names: string[];
+  winnerId: string | null;
+  you: string;
+};
+
 export type RoomSnap = {
   id: string;
   game: string;
@@ -37,6 +53,8 @@ export type RoomSnap = {
   serverNow?: number;
   seq?: number;
   seekingMatch?: boolean;
+  spectate?: boolean;
+  tape?: TapeFrame[];
   view: unknown;
 };
 
@@ -157,6 +175,15 @@ export const lobbyApi = {
   },
   unqueue(token: string) {
     return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "unqueue" }) });
+  },
+  spectate(token: string, targetId: string) {
+    return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "spectate", targetId }) });
+  },
+  history(token: string) {
+    return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "history" }) });
+  },
+  tape(token: string, matchId: string) {
+    return call(token, "/api/lobby", { method: "POST", body: JSON.stringify({ op: "tape", matchId }) });
   },
   leave(token: string, roomId?: string | null) {
     return call(token, "/api/lobby", {

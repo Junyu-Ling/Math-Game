@@ -23,6 +23,9 @@ import {
   joinSnakeWorld,
   leaveQueue,
   leaveRoom,
+  spectateUser,
+  listHistory,
+  loadHistoryTape,
   lobbyStoreKind,
   rememberPlayer,
   respondInvite,
@@ -339,6 +342,18 @@ export async function handle(req, res, path) {
       }
       if (op === "leave") {
         send(res, 200, await leaveRoom(user.id, body?.roomId || null));
+        return;
+      }
+      if (op === "spectate") {
+        send(res, 200, await spectateUser(user, String(body.targetId || "")));
+        return;
+      }
+      if (op === "history") {
+        send(res, 200, { history: await listHistory(user.id) });
+        return;
+      }
+      if (op === "tape") {
+        send(res, 200, await loadHistoryTape(user, String(body.matchId || "")));
         return;
       }
       if (op === "queue") {

@@ -9,6 +9,7 @@ import { InvitePanel } from "./InvitePanel";
 import { InviteToasts } from "./InviteToasts";
 import { RotateGate } from "./RotateGate";
 import { StageWatch } from "./StageWatch";
+import { WatchBar } from "./WatchBar";
 import { GameRules } from "./GameRules";
 import { RuleDock } from "./RuleSession";
 
@@ -149,8 +150,10 @@ function NavMatch() {
 
 export function Shell({ children }: { children: ReactNode }) {
   const { user, logout, loading } = useAuth();
+  const { room } = useLobby();
+  const watching = Boolean(room?.spectate);
   return (
-    <div className="shell">
+    <div className={`shell${watching ? " is-watching" : ""}`}>
       <header className="topbar">
         <NavLink to="/" className="brand">
           <strong>ByteGame</strong>
@@ -184,6 +187,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <StageWatch>{children}</StageWatch>
       </main>
       <RuleDock notes={(game) => <GameRules game={game} />} />
+      <WatchBar />
     </div>
   );
 }
