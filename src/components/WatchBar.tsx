@@ -31,6 +31,7 @@ export function WatchBar() {
         game: room.game,
         matchId: room.id,
         total: playback.total,
+        times: (room.tape ?? []).map((frame) => frame.t),
         seek: watchScrub,
         onProgress: (done, total) => setSaving(`Saving MP4 ${done}/${total}`),
       });

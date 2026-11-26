@@ -4,7 +4,7 @@ import type { TapeFrame } from "./lobby";
 
 const WIDTH = 1280;
 const HEIGHT = 720;
-const FPS = 8;
+const FPS = 12;
 
 let queuedId = "";
 let running = false;
@@ -33,12 +33,31 @@ function paint() {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve(undefined)));
 }
 
-function pickIndexes(total: number, max = 100) {
-  if (total <= 1) return [0];
-  if (total <= max) return Array.from({ length: total }, (_, i) => i);
-  const seen = new Set<number>();
-  for (let i = 0; i < max; i++) seen.add(Math.round((i * (total - 1)) / (max - 1)));
-  return [...seen];
+/** Every stored moment, in order, spaced like the match. Nothing is skipped. */
+function playbackTimeline(count: number, times: number[]) {
+  const gaps: number[] = [];
+  for (let i = 1; i < count; i++) {
+    const prev = times[i - 1] ?? 0;
+    const next = times[i] ?? prev;
+    const raw = next - prev;
+    gaps.push(raw > 40 ? Math.min(800, Math.max(240, raw)) : 240);
+  }
+  let body = gaps.reduce((sum, gap) => sum + gap, 0);
+  const cap = 60_000;
+  if (body > cap) {
+    const scale = cap / body;
+    for (let i = 0; i < gaps.length; i++) gaps[i] = Math.max(90, Math.round((gaps[i] ?? 0) * scale));
+    body = gaps.reduce((sum, gap) => sum + gap, 0);
+  }
+  const points = [0];
+  for (const gap of gaps) points.push((points[points.length - 1] ?? 0) + gap);
+  return { points, total: (points[points.length - 1] ?? 0) + 700 };
+}
+
+function indexAt(points: number[], ms: number) {
+  let index = 0;
+  while (index + 1 < points.length && (points[index + 1] ?? 0) <= ms) index += 1;
+  return index;
 }
 
 function fileName(game: string, matchId: string) {
@@ -139,11 +158,12 @@ function fitFrame(ctx: CanvasRenderingContext2D, shot: HTMLCanvasElement) {
   ctx.drawImage(shot, Math.round((WIDTH - dw) / 2), Math.round((HEIGHT - dh) / 2), dw, dh);
 }
 
-/** Play the open table from the tape and save an MP4 of what is on screen. */
+/** Play the whole tape in order and record the moving table, not one still per change. */
 export async function recordVisibleMatch(opts: {
   game: string;
   matchId: string;
   total: number;
+  times?: number[];
   seek: (index: number) => void;
   onProgress?: (done: number, total: number) => void;
 }) {
@@ -153,8 +173,11 @@ export async function recordVisibleMatch(opts: {
   let encoder: VideoEncoder | null = null;
   try {
     const node = await gameNode();
-    const indexes = pickIndexes(Math.max(1, opts.total));
-    const repeats = 2;
+    const count = Math.max(1, opts.total);
+    const times = opts.times && opts.times.length >= count ? opts.times.slice(0, count) : Array.from({ length: count }, (_, i) => i * 400);
+    const { points, total } = playbackTimeline(count, times);
+    const step = 1000 / FPS;
+    const expected = Math.max(1, Math.round(total / step));
     const canvas = document.createElement("canvas");
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
@@ -241,38 +264,50 @@ export async function recordVisibleMatch(opts: {
     });
     let written = 0;
     let captured = 0;
-    for (let n = 0; n < indexes.length; n++) {
-      opts.seek(indexes[n] ?? 0);
-      await delay(60);
-      await paint();
-      await delay(40);
-      await paint();
+    let cursor = -1;
+    for (let n = 0; n < expected; n++) {
+      const index = indexAt(points, Math.min(total, n * step));
+      if (index !== cursor) {
+        opts.seek(index);
+        cursor = index;
+        await paint();
+        await paint();
+        await delay(90);
+      } else {
+        await paint();
+      }
+      const shotStarted = performance.now();
       let shot: HTMLCanvasElement | null = null;
       try {
         shot = await toCanvas(node, {
           pixelRatio: 1,
           backgroundColor: "#f4f2ee",
           skipFonts: true,
-          cacheBust: true,
+          cacheBust: false,
           filter: (dom) => !(dom instanceof HTMLElement && (dom.classList.contains("watch-bar") || dom.classList.contains("rule-dock"))),
         });
       } catch {
         shot = null;
       }
-      if (!shot) continue;
-      captured += 1;
-      fitFrame(ctx, shot);
-      for (let copy = 0; copy < repeats; copy++) {
-        const timestamp = Math.round((written * 1_000_000) / FPS);
-        const bitmap = await createImageBitmap(canvas);
-        const frame = new VideoFrame(bitmap, { timestamp, duration, alpha: "discard" });
-        bitmap.close();
-        encoder.encode(frame, { keyFrame: written % 24 === 0 });
-        frame.close();
-        written += 1;
-        if (failed) throw failed;
+      if (shot) {
+        captured += 1;
+        fitFrame(ctx, shot);
+      } else if (!captured) {
+        opts.onProgress?.(n + 1, expected);
+        continue;
       }
-      opts.onProgress?.(n + 1, indexes.length);
+      while (encoder.encodeQueueSize > 10) await delay(20);
+      const timestamp = Math.round((written * 1_000_000) / FPS);
+      const bitmap = await createImageBitmap(canvas);
+      const frame = new VideoFrame(bitmap, { timestamp, duration, alpha: "discard" });
+      bitmap.close();
+      encoder.encode(frame, { keyFrame: written % (FPS * 2) === 0 });
+      frame.close();
+      written += 1;
+      if (failed) throw failed;
+      opts.onProgress?.(n + 1, expected);
+      const spent = performance.now() - shotStarted;
+      if (spent < step) await delay(step - spent);
     }
     await encoder.flush();
     if (failed) throw failed;
