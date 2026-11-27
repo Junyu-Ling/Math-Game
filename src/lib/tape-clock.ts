@@ -3,7 +3,7 @@ export function tapePoints(times: number[]) {
   const points = [0];
   for (let i = 1; i < times.length; i++) {
     const raw = (times[i] ?? 0) - (times[i - 1] ?? 0);
-    const gap = raw > 40 ? Math.min(800, Math.max(240, raw)) : 240;
+    const gap = raw > 40 ? Math.min(1400, Math.max(720, raw)) : 720;
     points.push((points[points.length - 1] ?? 0) + gap);
   }
   return points;

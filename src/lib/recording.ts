@@ -5,7 +5,8 @@ import { indexAtTime, tapePoints } from "./tape-clock";
 
 const WIDTH = 1280;
 const HEIGHT = 720;
-const FPS = 12;
+const FPS = 30;
+const BLEND_MS = 320;
 
 let queuedId = "";
 let running = false;
@@ -122,14 +123,28 @@ function avcDecoderConfig(sps: Uint8Array, pps: Uint8Array) {
 
 const VIDEO_COLOR = { primaries: "bt709", transfer: "bt709", matrix: "bt709", fullRange: false } as const;
 
-function fitFrame(ctx: CanvasRenderingContext2D, shot: HTMLCanvasElement) {
-  ctx.fillStyle = "#f4f2ee";
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+function drawFit(ctx: CanvasRenderingContext2D, shot: HTMLCanvasElement) {
   if (!shot.width || !shot.height) return;
   const scale = Math.min(WIDTH / shot.width, HEIGHT / shot.height);
   const dw = Math.round(shot.width * scale);
   const dh = Math.round(shot.height * scale);
   ctx.drawImage(shot, Math.round((WIDTH - dw) / 2), Math.round((HEIGHT - dh) / 2), dw, dh);
+}
+
+function paintMix(ctx: CanvasRenderingContext2D, from: HTMLCanvasElement | null, to: HTMLCanvasElement | null, t: number) {
+  const eased = t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#f4f2ee";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  if (from && eased < 1) {
+    ctx.globalAlpha = 1 - eased;
+    drawFit(ctx, from);
+  }
+  if (to) {
+    ctx.globalAlpha = eased <= 0 && from ? 0 : eased;
+    if (ctx.globalAlpha > 0) drawFit(ctx, to);
+  }
+  ctx.globalAlpha = 1;
 }
 
 /** Play the whole tape in order and record the moving table, not one still per change. */
@@ -226,7 +241,7 @@ export async function recordVisibleMatch(opts: {
       codec: "avc1.42001f",
       width: WIDTH,
       height: HEIGHT,
-      bitrate: 1_800_000,
+      bitrate: 2_800_000,
       framerate: FPS,
     });
     if (!support.supported) throw new Error("This browser cannot save MP4");
@@ -234,24 +249,18 @@ export async function recordVisibleMatch(opts: {
       codec: "avc1.42001f",
       width: WIDTH,
       height: HEIGHT,
-      bitrate: 1_800_000,
+      bitrate: 2_800_000,
       framerate: FPS,
+      latencyMode: "realtime",
     });
-    let written = 0;
-    let captured = 0;
-    let cursor = -1;
-    for (let n = 0; n < expected; n++) {
-      const index = indexAtTime(points, Math.min(total, n * step));
-      if (index !== cursor) {
-        opts.seek(index);
-        cursor = index;
-        await paint();
-        await paint();
-        await delay(90);
-      } else {
-        await paint();
-      }
-      const shotStarted = performance.now();
+    const shots: (HTMLCanvasElement | null)[] = [];
+    let lastShot: HTMLCanvasElement | null = null;
+    const job = count + expected;
+    for (let i = 0; i < count; i++) {
+      opts.seek(i);
+      await paint();
+      await paint();
+      await delay(40);
       let shot: HTMLCanvasElement | null = null;
       try {
         shot = await toCanvas(node, {
@@ -264,25 +273,30 @@ export async function recordVisibleMatch(opts: {
       } catch {
         shot = null;
       }
-      if (shot) {
-        captured += 1;
-        fitFrame(ctx, shot);
-      } else if (!captured) {
-        opts.onProgress?.(n + 1, expected);
-        continue;
-      }
-      while (encoder.encodeQueueSize > 10) await delay(20);
+      if (shot) lastShot = shot;
+      shots.push(lastShot);
+      opts.onProgress?.(i + 1, job);
+    }
+    if (!lastShot) throw new Error("Could not capture the table");
+    let written = 0;
+    for (let n = 0; n < expected; n++) {
+      const ms = Math.min(total, n * step);
+      const index = indexAtTime(points, ms);
+      const to = shots[index] ?? lastShot;
+      const from = index > 0 ? shots[index - 1] ?? to : null;
+      const started = points[index] ?? 0;
+      const mix = index === 0 ? 1 : Math.min(1, Math.max(0, (ms - started) / BLEND_MS));
+      paintMix(ctx, from, to, mix);
+      while (encoder.encodeQueueSize > 8) await delay(12);
       const timestamp = Math.round((written * 1_000_000) / FPS);
       const bitmap = await createImageBitmap(canvas);
       const frame = new VideoFrame(bitmap, { timestamp, duration, alpha: "discard" });
       bitmap.close();
-      encoder.encode(frame, { keyFrame: written % (FPS * 2) === 0 });
+      encoder.encode(frame, { keyFrame: written % 15 === 0 });
       frame.close();
       written += 1;
       if (failed) throw failed;
-      opts.onProgress?.(n + 1, expected);
-      const spent = performance.now() - shotStarted;
-      if (spent < step) await delay(step - spent);
+      opts.onProgress?.(count + n + 1, job);
     }
     await encoder.flush();
     if (failed) throw failed;
@@ -293,7 +307,7 @@ export async function recordVisibleMatch(opts: {
     }
     if (!configured) throw new Error("Could not prepare the video");
     muxer.finalize();
-    if (!captured || !written) throw new Error("Could not capture the table");
+    if (!written) throw new Error("Could not capture the table");
     downloadBlob(new Blob([target.buffer], { type: "video/mp4" }), fileName(opts.game, opts.matchId));
   } finally {
     try {

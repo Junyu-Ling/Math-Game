@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AuthInvalid, authApi, pingServer } from "../lib/api";
 import { useAuth } from "./AuthContext";
@@ -186,7 +187,19 @@ export function LobbyProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (index !== playRef.current.index) {
-        setPlay((prev) => (prev.playing && !prev.live ? { ...prev, index } : prev));
+        const apply = () => {
+          setPlay((prev) => (prev.playing && !prev.live ? { ...prev, index } : prev));
+        };
+        const start = (document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } }).startViewTransition;
+        if (start && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          try {
+            start(() => flushSync(apply));
+          } catch {
+            apply();
+          }
+        } else {
+          apply();
+        }
       }
       raf = requestAnimationFrame(tick);
     };

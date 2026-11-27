@@ -757,6 +757,13 @@
 
 .shell.is-watching .stage-scale {
   pointer-events: none;
+  view-transition-name: watch-table;
+}
+
+::view-transition-old(watch-table),
+::view-transition-new(watch-table) {
+  animation-duration: 0.32s;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .watch-bar {
