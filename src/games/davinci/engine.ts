@@ -68,6 +68,8 @@ export type CodaState = {
   tried: Record<string, CodaValue[]>;
   fresh: Record<string, string>;
   leftByColor?: { black: number; white: number };
+  /** This guess was chosen with Hit again, so it can still be cancelled. */
+  again?: boolean;
 };
 
 /** Official deck: black 0–11, white 0–11, and one dash of each color. The dash is not optional. */
@@ -575,7 +577,7 @@ export function aiDrawColor(state: CodaState): Color {
 export function drawCard(state: CodaState, color?: Color): CodaState {
   if (state.phase !== "draw") return state;
   if (state.deck.length === 0) {
-    return { ...state, phase: "guess", drawn: null, selected: null };
+    return { ...state, phase: "guess", drawn: null, selected: null, again: false };
   }
   const want = color ?? aiDrawColor(state);
   const idx = state.deck.findIndex((t) => t.color === want);
@@ -590,6 +592,7 @@ export function drawCard(state: CodaState, color?: Color): CodaState {
     deck: rest,
     drawn: { ...card, revealed: false },
     phase: "guess",
+    again: false,
     log: [...state.log, { id: uid("l"), text: `${who} draws a ${colorName} tile.`, tone: currentPlayer(state).human ? "you" : "ai" }],
   };
 }
@@ -653,6 +656,7 @@ export function guessTile(state: CodaState, guess: CodaValue): CodaState {
       tried,
       players,
       selected: null,
+      again: false,
       phase: "continue",
       log: [
         ...state.log,
@@ -755,7 +759,12 @@ export function aiPenaltyIndex(state: CodaState): number {
 
 export function continueGuess(state: CodaState): CodaState {
   if (state.phase !== "continue") return state;
-  return { ...state, phase: "guess", selected: null };
+  return { ...state, phase: "guess", selected: null, again: true };
+}
+
+export function cancelGuess(state: CodaState): CodaState {
+  if (state.phase !== "guess" || !state.again) return state;
+  return { ...state, phase: "continue", selected: null, again: false };
 }
 
 export function stay(state: CodaState): CodaState {
@@ -1157,6 +1166,7 @@ export type CodaAction =
   | { type: "select"; playerId: string; index: number }
   | { type: "guess"; value: CodaValue }
   | { type: "continue" }
+  | { type: "cancel" }
   | { type: "stay" }
   | { type: "penalty"; index: number }
   | { type: "slot"; index: number; tileId?: string; leftId?: string | null; rightId?: string | null }
@@ -1183,6 +1193,8 @@ export function applyAction(state: CodaState, actorId: string, action: CodaActio
       return isActorTurn(state, actorId) ? guessTile(state, action.value) : state;
     case "continue":
       return isActorTurn(state, actorId) ? continueGuess(state) : state;
+    case "cancel":
+      return isActorTurn(state, actorId) ? cancelGuess(state) : state;
     case "stay":
       return isActorTurn(state, actorId) ? stay(state) : state;
     case "penalty":

@@ -475,7 +475,7 @@ function aiDrawColor(state) {
 function drawCard(state, color) {
   if (state.phase !== "draw") return state;
   if (state.deck.length === 0) {
-    return { ...state, phase: "guess", drawn: null, selected: null };
+    return { ...state, phase: "guess", drawn: null, selected: null, again: false };
   }
   const want = color ?? aiDrawColor(state);
   const idx = state.deck.findIndex((t) => t.color === want);
@@ -490,6 +490,7 @@ function drawCard(state, color) {
     deck: rest,
     drawn: { ...card, revealed: false },
     phase: "guess",
+    again: false,
     log: [...state.log, { id: uid("l"), text: `${who} draws a ${colorName} tile.`, tone: currentPlayer(state).human ? "you" : "ai" }]
   };
 }
@@ -544,6 +545,7 @@ function guessTile(state, guess) {
       tried,
       players,
       selected: null,
+      again: false,
       phase: "continue",
       log: [
         ...state.log,
@@ -638,7 +640,11 @@ function aiPenaltyIndex(state) {
 }
 function continueGuess(state) {
   if (state.phase !== "continue") return state;
-  return { ...state, phase: "guess", selected: null };
+  return { ...state, phase: "guess", selected: null, again: true };
+}
+function cancelGuess(state) {
+  if (state.phase !== "guess" || !state.again) return state;
+  return { ...state, phase: "continue", selected: null, again: false };
 }
 function stay(state) {
   if (state.phase !== "continue") return state;
@@ -986,6 +992,8 @@ function applyAction(state, actorId, action) {
       return isActorTurn(state, actorId) ? guessTile(state, action.value) : state;
     case "continue":
       return isActorTurn(state, actorId) ? continueGuess(state) : state;
+    case "cancel":
+      return isActorTurn(state, actorId) ? cancelGuess(state) : state;
     case "stay":
       return isActorTurn(state, actorId) ? stay(state) : state;
     case "penalty":
@@ -1062,6 +1070,7 @@ export {
   aiPenaltyIndex,
   aiShouldContinue,
   applyAction,
+  cancelGuess,
   continueGuess,
   currentPlayer,
   dealCodaTable,

@@ -5,6 +5,7 @@ import {
   aiPenaltyIndex,
   aiShouldContinue,
   ARRANGE_MS,
+  cancelGuess,
   continueGuess,
   currentPlayer,
   deckCounts,
@@ -87,6 +88,9 @@ function statusText(
     return myTurn
       ? "Wrong guess. Tap one of your own hidden tiles to knock it face-up. You drew nothing this miss."
       : `${currentPlayer(state).name} missed — they must knock down one of their hidden tiles.`;
+  }
+  if (state.phase === "guess" && state.again) {
+    return "Guess another hidden tile, or cancel if you would rather stop.";
   }
   if (state.phase === "guess" && state.selected) {
     return myTurn
@@ -320,7 +324,7 @@ function OppSeat({
         ) : null}
         <Row
           tiles={tiles}
-          hide
+          hide={!tiles.some((tile) => !tile.revealed && !tile.masked)}
           downRevealed
           playerId={player.id}
           selectedIndex={selectedIndex}
@@ -644,6 +648,8 @@ export function DaVinciPage() {
           });
           setState((s) => (s ? setPendingSlot(s, action.index, you.id, action.tileId, action.leftId, action.rightId) : s));
         }
+      } else if (action.type === "cancel" && state && myTurn) {
+        setState((s) => (s ? cancelGuess(s) : s));
       } else if (action.type === "select" && state && myTurn && state.phase === "guess") {
         optimisticRef.current.push({
           kind: "select",
@@ -665,6 +671,7 @@ export function DaVinciPage() {
       setState(next);
       if (fx) setFlash(fx);
     } else if (action.type === "continue") setState((s) => (s ? continueGuess(s) : s));
+    else if (action.type === "cancel") setState((s) => (s ? cancelGuess(s) : s));
     else if (action.type === "stay") setState((s) => (s ? stay(s) : s));
     else if (action.type === "penalty") {
       if (!you) return;
@@ -866,7 +873,9 @@ export function DaVinciPage() {
   useEffect(() => {
     if (!codaRoom) return;
     const view = codaRoom.view as CodaState;
-    setYouId(user?.id != null ? String(user.id) : null);
+    const angle = codaRoom.spectate ? lobby.playback.angle : "";
+    const watched = angle && angle !== "watch" && view.players.some((p) => String(p.id) === String(angle));
+    setYouId(watched ? String(angle) : user?.id != null ? String(user.id) : null);
     if (codaRoom.spectate) {
       optimisticRef.current = [];
       prevLog.current = view.log.length;
@@ -909,7 +918,7 @@ export function DaVinciPage() {
       return overlayOptimistic(held, youKey, optimisticRef.current);
     });
     endsAtRef.current = codaRoom.endsAt;
-  }, [codaRoom, user?.id]);
+  }, [codaRoom, user?.id, lobby.playback.angle]);
 
   return (
     <div className="page-wide coda-page">
@@ -1331,6 +1340,11 @@ export function DaVinciPage() {
                 >
                   HIT AGAIN
                 </button>
+                {state.phase === "guess" && state.again && myTurn ? (
+                  <button className="btn btn-ghost" type="button" onClick={() => dispatch({ type: "cancel" })}>
+                    Cancel
+                  </button>
+                ) : null}
                 <button
                   className={mark(teaching, lesson?.aim, "stay", "btn btn-gold")}
                   type="button"
